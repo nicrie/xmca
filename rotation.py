@@ -45,7 +45,7 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
 
     # normalize the matrix
     # using sqrt of the sum of squares (Kaiser)
-	h = np.sqrt(np.sum(A**2,axis=1))
+	h = np.sqrt(np.sum(A * A.conjugate(),axis=1))
 	A = np.diag(1./h) @ A
 
     # seek for rotation matrix based on varimax criteria
@@ -54,8 +54,8 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
 		d_old = d
 		basis = A @ R
 
-		transformed = A.conjugate().T @ (basis**3 - (gamma/n) *
-                             (basis @ np.diag(np.sum(basis**2,axis=0))))
+		transformed = A.conjugate().T @ (basis**2 * basis.conjugate() - (gamma/n) *
+                             (basis @ np.diag(np.sum(basis*basis.conjugate(),axis=0))))
 
 		u,s,vh = np.linalg.svd(transformed)
 		R = u @ vh

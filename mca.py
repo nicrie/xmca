@@ -682,7 +682,7 @@ class xMCA(MCA):
 
 
 	def __normalizeTo1(self, data):
-		return data / abs(data).max()
+		return data / abs(data).max(['lon','lat'])
 
 	def createFigure(self, n=3, grandCols=1):
 		rows, cols = [n, 2 * grandCols]
@@ -886,7 +886,7 @@ class xMCA(MCA):
 		var, varErr = self.explainedVariance(n)
 		var, varErr = [var.values, varErr.values]
 		
-		amplitude = eofs * eofs.conjugate()
+		amplitude = np.sqrt(eofs * eofs.conjugate())
 		phase = np.arctan2(eofs.imag,eofs.real)
 		
 		# normalize all EOFs such that they range from -1...+1
