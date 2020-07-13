@@ -20,6 +20,7 @@ from matplotlib.gridspec import GridSpec
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+
 from rotation import promax
 
 
@@ -581,7 +582,7 @@ class xMCA(MCA):
 					coords 	= {'mode' : modes},
 					name 	= 'uncertainty of described variance')
 
-		return desVar, desVarErr
+		return values, error
 
 	
 	def pcs(self, n=None):
@@ -681,26 +682,45 @@ class xMCA(MCA):
 		return boundaries 
 
 
-	def __normalizeTo1(self, data):
+	def __normalizeEOFto1(self, data):
 		return data / abs(data).max(['lon','lat'])
 
-	def createFigure(self, n=3, grandCols=1):
-		rows, cols = [n, 2 * grandCols]
+
+	def __normalizePCto1(self, data):
+		return data / abs(data).max(['time'])
+
+
+	def __createFigure(self, nrows=3, coltypes=['t','s']):
+		nRows, nCols = [nrows, len(coltypes)]
+				
+		# positions of temporal plots
+		isTemporalCol 	= [True if i=='t' else False for i in coltypes]
 		
-		fig 	= plt.figure(figsize = (14 * grandCols, 5 * n))
-		gs 		= GridSpec(rows, cols, width_ratios=[1, 1]*grandCols) 
+		# set projections associated with temporal/spatial plots
+		projTemporalPlot 	= None
+		projSpatialPlot 	= ccrs.PlateCarree()
+		projections = [projTemporalPlot if i=='t' else projSpatialPlot for i in coltypes]
 		
+		# set relative width of temporal/spatial plots
+		widthTemporalPlot 	= 4
+		widthSpatialPlot 	= 5
+		widths = [widthTemporalPlot if i=='t' else widthSpatialPlot for i in coltypes]
 		
-		axesPC = np.empty((n,grandCols), dtype=mplt.axes.SubplotBase)
-		axesEOF = np.empty((n, grandCols), dtype=mplt.axes.SubplotBase)
+		# create figure environment
+		fig 	= plt.figure(figsize = (7 * nCols, 5 * nRows))
+		gs 		= GridSpec(nRows, nCols, width_ratios=widths) 
+		axes 	= np.empty((nRows, nCols), dtype=mplt.axes.SubplotBase)
 		
-		for i in range(rows):
-			for j in range(grandCols):
-				axesPC[i,j] = plt.subplot(gs[i,2*j])
-				axesEOF[i,j] = plt.subplot(gs[i,2*j+1], projection = ccrs.PlateCarree())
+		for i in range(nRows):
+			for j,proj in enumerate(projections):
+				axes[i,j] = plt.subplot(gs[i,j], projection=proj)
+		
+		axesPC = axes[:,isTemporalCol]
+		axesEOF = axes[:,np.logical_not(isTemporalCol)]
 		
 		return fig, axesPC, axesEOF
 	
+
 
 	def __validateSigns(self, signs, n):
 		"""Check if list of signs match the length n.
@@ -742,14 +762,16 @@ class xMCA(MCA):
 		return signs * data
 
 
-	def plotMode(self, n=1, signs=None, title='', cmap='RdGy_r'):
+	def plotMode(self, n=1, right=False, signs=None, title='', cmap='RdGy_r'):
 		"""
-		Plot PC and EOF of left data field for mode `n`.
+		Plot mode`n` PC and EOF of left (and right) data field.
 
 		Parameters
 		----------
 		n : int, optional
 			Mode of PC and EOF to plot. The default is 1.
+		right : boolean
+			Plot PC and EOF of right field. The default is False.
 		signs : list of int, optional
 			Either +1 or -1 in order to flip the sign of shown PCs/EOFs. 
 			The default is None.
@@ -761,52 +783,190 @@ class xMCA(MCA):
 		None.
 
 		"""
-		pcs 		= self.pcs(n)[0].sel(mode=n).real
-		eofs 		= self.eofs(n)[0].sel(mode=n).real
-		var, varErr = self.explainedVariance(n)
-		var, varErr = [var.sel(mode=n).values, varErr.sel(mode=n).values]
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.sel(mode=n).real, pcsRight.sel(mode=n).real]
 		
-		# normalize all EOFs such that they range from -1...+1
-		eofs 		= self.__normalizeTo1(eofs)
+		eofsLeft, eofsRight 	= self.eofs(n)
+		eofsLeft, eofsRight 	= [eofsLeft.sel(mode=n).real, eofsRight.sel(mode=n).real]
 
+		var, varErr 			= self.explainedVariance(n)
+		var, varErr 			= [var.sel(mode=n).values, varErr.sel(mode=n).values]
+				
+				
+		# normalize all EOFs/PCs such that they range from -1...+1
+		eofsLeft 		= self.__normalizeEOFto1(eofsLeft)
+		eofsRight 		= self.__normalizeEOFto1(eofsRight)
+		pcsLeft 		= self.__normalizePCto1(pcsLeft)
+		pcsRight 		= self.__normalizePCto1(pcsRight)
+		
 		# flip signs of PCs and EOFs, if needed
-		eofs 	= self.__flipSigns(eofs, signs)
-		pcs 	= self.__flipSigns(pcs, signs)
+		eofsLeft 	= self.__flipSigns(eofsLeft, signs)
+		eofsRight 	= self.__flipSigns(eofsRight, signs)
+		pcsLeft 	= self.__flipSigns(pcsLeft, signs)
+		pcsRight 	= self.__flipSigns(pcsRight, signs)
 
 		# map boundaries as [east, west, south, north]
-		mapBoundaries = self.__getMapBoundaries(eofs)
+		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
+		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
-		fig, axesPC, axesEOF = self.createFigure(1,1)
-		axPC = axesPC[0,0]
-		axEOF = axesEOF[0,0]
-		# plot PCs
-		pcs.plot(ax=axPC)
-		axPC.set_ylim(-0.06,0.06)
-		axPC.set_xlabel('')
-		axPC.set_ylabel('PC ' + str(n))
-		axPC.set_title('')
-		#axPC.text(0.15,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var,varErr)
-		#	,transform=axPC.transAxes,horizontalalignment='center')
-			
-		# plot EOFs
-		eofs.plot(ax=axEOF,cmap=cmap,extend='both',
-							  add_colorbar=True,vmin=-.8,vmax=.8)
-		axEOF.set_extent(mapBoundaries,crs=ccrs.PlateCarree())
-		axEOF.coastlines(resolution='50m', lw=0.5)
-		axEOF.add_feature(cfeature.LAND.with_scale('50m'))
+		if right:
+			fig, axesPC, axesEOF = self.__createFigure(2,['t','s'])
+		else:
+			fig, axesPC, axesEOF = self.__createFigure(1,['t','s'])
+
 		
-		axEOF.set_title('')
-		axEOF.set_aspect('auto')
+
+		# plot PCs/EOFs
+		pcsLeft.plot(ax=axesPC[0,0])
+		eofsLeft.plot(
+			ax=axesEOF[0,0],cmap=cmap,extend='neither',add_colorbar=True, 
+			vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
+		axesEOF[0,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+		
+		if right:
+			pcsRight.plot(ax=axesPC[1,0])
+			eofsRight.plot(
+				ax=axesEOF[1,0],cmap=cmap,extend='neither',add_colorbar=True, 
+				vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
+			axesEOF[1,0].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+	
 			
-		fig.subplots_adjust(wspace=0.1,hspace=0,left=0.05)
+		for i,a in enumerate(axesPC[:,0]):
+			a.set_ylim(-1,1)
+			a.set_xlabel('')
+			a.set_ylabel('PC (normalized)')
+			a.set_title('')
+
+			
+		for i,a in enumerate(axesEOF[:,0]):
+			
+			a.coastlines(resolution='50m', lw=0.5)
+			a.add_feature(cfeature.LAND.with_scale('50m'))
+			a.set_title('')
+			a.set_aspect('auto')
+		
+
+		fig.subplots_adjust(wspace=0.1,hspace=0.2,left=0.05)
 		if title == '':
 			title = "PC {} ({:.1f} $\pm$ {:.1f} \%)".format(n, var,varErr)
-		fig.suptitle(title, y=1.0)
 		
-	
-	def plotOverview(self, n=3, signs=None, title=''):
+		if right:
+			yOffset = 0.95
+		else:
+			yOffset = 1.00
+		fig.suptitle(title, y=yOffset)
+
+
+	def cplotMode(self, n=1, right=False, signs=None, title='', cmap='pink_r'):
 		"""
-		Plot first `n` PCs of left data field alongside their corresponding EOFs.
+		Plot mode`n` PC and EOF of left (and right) data field.
+
+		Parameters
+		----------
+		n : int, optional
+			Mode of PC and EOF to plot. The default is 1.
+		right : boolean
+			Plot PC and EOF of right field. The default is False.
+		signs : list of int, optional
+			Either +1 or -1 in order to flip the sign of shown PCs/EOFs. 
+			The default is None.
+		title : str, optional
+			Title of figure. The default is ''.
+
+		Returns
+		-------
+		None.
+
+		"""
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.sel(mode=n).real, pcsRight.sel(mode=n).real]
+		
+		eofsLeft, eofsRight 	= self.eofs(n)		
+		
+		amplitudeLeft = (eofsLeft * eofsLeft.conjugate()).sel(mode=n)
+		amplitudeRight = (eofsRight * eofsRight.conjugate()).sel(mode=n)
+		
+		phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real).sel(mode=n)
+		phaseRight = np.arctan2(eofsRight.imag,eofsRight.real).sel(mode=n)
+
+		var, varErr 			= self.explainedVariance(n)
+		var, varErr 			= [var.sel(mode=n).values, varErr.sel(mode=n).values]
+				
+				
+		# normalize all EOFs/PCs such that they range from -1...+1
+		amplitudeLeft 		= self.__normalizeEOFto1(amplitudeLeft)
+		amplitudeRight 		= self.__normalizeEOFto1(amplitudeRight)
+		pcsLeft 		= self.__normalizePCto1(pcsLeft)
+		pcsRight 		= self.__normalizePCto1(pcsRight)
+		
+		# flip signs of PCs and EOFs, if needed
+		amplitudeLeft 	= self.__flipSigns(amplitudeLeft, signs)
+		amplitudeRight 	= self.__flipSigns(amplitudeRight, signs)
+		pcsLeft 	= self.__flipSigns(pcsLeft, signs)
+		pcsRight 	= self.__flipSigns(pcsRight, signs)
+
+		# map boundaries as [east, west, south, north]
+		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
+		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
+
+		# create figure environment
+		if right:
+			fig, axesPC, axesEOF = self.__createFigure(2,['t','s','s'])
+		else:
+			fig, axesPC, axesEOF = self.__createFigure(1,['t','s','s'])
+
+
+			
+		# plot PCs/Amplitude/Phase
+		pcsLeft.real.plot(ax=axesPC[0,0])
+		amplitudeLeft.real.plot(ax=axesEOF[0,0],cmap=cmap,extend='neither',add_colorbar=True, 
+			vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
+		phaseLeft.plot(ax=axesEOF[0,1],cmap='twilight_shifted', 
+							  cbar_kwargs={'label': 'Phase (rad)'},
+							  add_colorbar=True,vmin=-np.pi,vmax=np.pi)			
+		
+		
+		axesEOF[0,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+		axesEOF[0,1].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+		
+		axesEOF[0,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+		axesEOF[0,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+		
+		
+		if right:
+			pcsRight.real.plot(ax=axesPC[1,0])
+			amplitudeRight.real.plot(ax=axesEOF[1,0],cmap=cmap,extend='neither',add_colorbar=True, 
+				vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
+			phaseRight.plot(ax=axesEOF[1,1],cmap='twilight_shifted', 
+								  cbar_kwargs={'label': 'Phase (rad)'},
+								  add_colorbar=True,vmin=-np.pi,vmax=np.pi)			
+			
+			axesEOF[1,0].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+			axesEOF[1,1].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+			
+			axesEOF[1,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+			axesEOF[1,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+
+		for a in axesPC.flatten():
+			a.set_ylabel('Real PC (normalized)')
+			a.set_xlabel('')
+			a.set_title('')
+			
+
+		for a in axesEOF.flatten():
+			a.coastlines(lw=0.5, resolution='50m')
+			a.set_aspect('auto')		 
+
+		
+		fig.subplots_adjust(wspace=0.1,hspace=0.17,left=0.05)
+		fig.suptitle(title)
+
+
+
+	
+	def plotOverview(self, n=3, right=False, signs=None, title='', cmap='RdGy_r'):
+		"""
+		Plot first `n` PCs and EOFs of left data field.
 
 		Parameters
 		----------
@@ -823,46 +983,77 @@ class xMCA(MCA):
 		None.
 
 		"""
-		pcs 		= self.pcs(n)[0].real
-		eofs 		= self.eofs(n)[0].real
-		var, varErr = self.explainedVariance(n)
-		var, varErr = [var.values, varErr.values]
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
 		
-		# normalize all EOFs such that they range from -1...+1
-		eofs 		= self.__normalizeTo1(eofs)
+		eofsLeft, eofsRight 	= self.eofs(n)
+		eofsLeft, eofsRight 	= [eofsLeft.real, eofsRight.real]
 
+		var, varErr 			= self.explainedVariance(n)
+		var, varErr 			= [var.values, varErr.values]
+				
+				
+		# normalize all EOFs/PCs such that they range from -1...+1
+		eofsLeft 		= self.__normalizeEOFto1(eofsLeft)
+		eofsRight 		= self.__normalizeEOFto1(eofsRight)
+		pcsLeft 		= self.__normalizePCto1(pcsLeft)
+		pcsRight 		= self.__normalizePCto1(pcsRight)
+		
 		# flip signs of PCs and EOFs, if needed
-		eofs 	= self.__flipSigns(eofs, signs)
-		pcs 	= self.__flipSigns(pcs, signs)
+		eofsLeft 	= self.__flipSigns(eofsLeft, signs)
+		eofsRight 	= self.__flipSigns(eofsRight, signs)
+		pcsLeft 	= self.__flipSigns(pcsLeft, signs)
+		pcsRight 	= self.__flipSigns(pcsRight, signs)
 
 		# map boundaries as [east, west, south, north]
-		mapBoundaries = self.__getMapBoundaries(eofs)
+		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
+		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
-		fig, axesPC, axesEOF = self.createFigure(n,1)
+		if right:
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','t'])
+		else:
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s'])
+
 		
-		# plot PCs 
-		for i,a in enumerate(axesPC.flatten()):
-			pcs.sel(mode=(i+1)).plot(ax=a)
+		# plot PCs/EOFs
+		for i in range(n):
+			pcsLeft.sel(mode=(i+1)).plot(ax=axesPC[i,0])
+			eofsLeft.sel(mode=(i+1)).plot(ax=axesEOF[i,0],cmap=cmap,extend='neither',add_colorbar=True, 
+				vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
+			axesEOF[i,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			axesEOF[i,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
+		
+		if right:
+			for i in range(n):
+				pcsRight.sel(mode=(i+1)).plot(ax=axesPC[i,1])
+				eofsRight.sel(mode=(i+1)).plot(ax=axesEOF[i,1],cmap=cmap,extend='neither',add_colorbar=True, 
+					vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
+				axesEOF[i,1].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+				axesEOF[i,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
+							
+			
+		for a in axesPC.flatten():
+			a.set_ylim(-1,1)
 			a.set_xlabel('')
-			a.set_ylabel('PC ' + str(i+1))
+			a.set_ylabel('PC (normalized)')
 			a.set_title('')
-			a.text(0.1,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var[i],varErr[i])
-				,transform=a.transAxes,horizontalalignment='center')
+		
+		if right:
+			for a in axesPC[:,1]:
+				a.yaxis.tick_right()
+				a.yaxis.set_label_position("right")
 			
 		# plot EOFs
-		for i,a in enumerate(axesEOF.flatten()):
-			eofs.sel(mode=(i+1)).plot(ax=a,cmap='RdGy_r',
-								  add_colorbar=False,vmin=-.9,vmax=.9)
+		for a in axesEOF.flatten():
 			a.coastlines(lw=0.5)
-			a.set_extent(mapBoundaries,crs=ccrs.PlateCarree())
-			a.set_title('')
 			a.set_aspect('auto')
 			
-		fig.subplots_adjust(wspace=0.1,hspace=0,left=0.05)
+	
+		fig.subplots_adjust(wspace=.1,hspace=0.2,left=0.05)
 		fig.suptitle(title)
 
 
-	def cplotOverview(self, n=3, signs=None, title=''):
+	def cplotOverview(self, n=3, right=False, signs=None, title='', cmap='pink_r'):
 		"""
 		Plot first `n` complex PCs of left data field alongside their corresponding EOFs.
 
@@ -881,94 +1072,30 @@ class xMCA(MCA):
 		None.
 
 		"""		
-		pcs 		= self.pcs(n)[0]
-		eofs 		= self.eofs(n)[0]
-		var, varErr = self.explainedVariance(n)
-		var, varErr = [var.values, varErr.values]
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
 		
-		amplitude = np.sqrt(eofs * eofs.conjugate())
-		phase = np.arctan2(eofs.imag,eofs.real)
+		eofsLeft, eofsRight 	= self.eofs(n)		
 		
-		# normalize all EOFs such that they range from -1...+1
-		amplitude 	= self.__normalizeTo1(amplitude)
-
-		# flip signs of PCs and EOFs, if needed
-		amplitude 	= self.__flipSigns(amplitude, signs)
-		pcs 		= self.__flipSigns(pcs, signs)
-
-		# map boundaries as [east, west, south, north]
-		mapBoundaries = self.__getMapBoundaries(eofs)
-
-		fig, axesPC, axesEOF = self.createFigure(n,2)
+		amplitudeLeft = (eofsLeft * eofsLeft.conjugate())
+		amplitudeRight = (eofsRight * eofsRight.conjugate())
 		
-		# plot PCs 
-		for i,[ar,ac] in enumerate(axesPC):
-			pcs.sel(mode=(i+1)).real.plot(ax=ar)
-			ar.set_xlabel('')
-			ar.set_ylabel('PC ' + str(i+1))
-			ar.set_title('')
-			ar.text(0.1,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var[i],varErr[i])
-				,transform=ar.transAxes,horizontalalignment='center')
+		phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
+		phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
-			pcs.sel(mode=(i+1)).imag.plot(ax=ac)
-			ac.set_xlabel('')
-			ac.set_ylabel('PC ' + str(i+1))
-			ac.set_title('')
-			ac.text(0.1,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var[i],varErr[i])
-				,transform=ar.transAxes,horizontalalignment='center')
+		var, varErr 			= self.explainedVariance(n)
+		var, varErr 			= [var.values, varErr.values]
 				
-		# plot EOFs
-		for i,[ar,ac] in enumerate(axesEOF):
-			amplitude.sel(mode=(i+1)).real.plot(ax=ar,cmap='RdGy_r',
-								  add_colorbar=False,vmin=-.9,vmax=.9)
-			ar.coastlines(lw=0.5)
-			ar.set_extent(mapBoundaries,crs=ccrs.PlateCarree())
-			ar.set_title('')
-			ar.set_aspect('auto')
-			
-			phase.sel(mode=(i+1)).plot(ax=ac,cmap='twilight',
-								  add_colorbar=False,vmin=-3,vmax=3)
-			ac.coastlines(lw=0.5)
-			ac.set_extent(mapBoundaries,crs=ccrs.PlateCarree())
-			ac.set_title('')
-			ac.set_aspect('auto')
+				
+		# normalize all EOFs/PCs such that they range from -1...+1
+		amplitudeLeft 		= self.__normalizeEOFto1(amplitudeLeft)
+		amplitudeRight 		= self.__normalizeEOFto1(amplitudeRight)
+		pcsLeft 		= self.__normalizePCto1(pcsLeft)
+		pcsRight 		= self.__normalizePCto1(pcsRight)
 		
-		fig.subplots_adjust(wspace=0.1,hspace=0,left=0.05)
-		fig.suptitle(title)
-
-
-
-	def plot2Overview(self, n=3, signs=None, title='',cmap='RdGy_r'):
-		"""
-		Plot first `n` PCs of left and right data field alongside their corresponding EOFs.
-
-		Parameters
-		----------
-		n : int, optional
-			Number of PCs and EOFs to plot. The default is 3.
-		signs : list of int, optional
-			List of +-1 in order to flip the sign of shown PCs/EOFs. 
-			Length of list has to match `n`. The default is None.
-		title : str, optional
-			Title of figure. The default is ''.
-
-		Returns
-		-------
-		None.
-
-		"""		
-		pcsLeft, pcsRight 	= self.pcs(n)
-		eofsLeft, eofsRight = self.eofs(n)
-		var, varErr = self.explainedVariance(n)
-		var, varErr = [var.values, varErr.values]
-		
-		# normalize all EOFs such that they range from -1...+1
-		eofsLeft 	= self.__normalizeTo1(eofsLeft)
-		eofsRight 	= self.__normalizeTo1(eofsRight)
-
 		# flip signs of PCs and EOFs, if needed
-		eofsLeft 	= self.__flipSigns(eofsLeft, signs)
-		eofsRight 	= self.__flipSigns(eofsRight, signs)
+		amplitudeLeft 	= self.__flipSigns(amplitudeLeft, signs)
+		amplitudeRight 	= self.__flipSigns(amplitudeRight, signs)
 		pcsLeft 	= self.__flipSigns(pcsLeft, signs)
 		pcsRight 	= self.__flipSigns(pcsRight, signs)
 
@@ -976,39 +1103,62 @@ class xMCA(MCA):
 		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
 		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
-		fig, axesPC, axesEOF = self.createFigure(n,2)
-		
-		# plot PCs 
-		for i,[ar,ac] in enumerate(axesPC):
-			pcsLeft.sel(mode=(i+1)).real.plot(ax=ar)
-			ar.set_xlabel('')
-			ar.set_ylabel('PC ' + str(i+1))
-			ar.set_title('')
-			ar.text(0.1,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var[i],varErr[i])
-				,transform=ar.transAxes,horizontalalignment='center')
+		# create figure environment
+		if right:
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','s','s','t'])
+		else:
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s'])
 
-			pcsRight.sel(mode=(i+1)).real.plot(ax=ac)
-			ac.set_xlabel('')
-			ac.set_ylabel('PC ' + str(i+1))
-			ac.set_title('')
-			ac.text(0.1,0.9,r'{:.1f} $\pm$ {:.1f} \%'.format(var[i],varErr[i])
-				,transform=ar.transAxes,horizontalalignment='center')
+
 			
-		# plot EOFs
-		for i,[ar,ac] in enumerate(axesEOF):
-			eofsLeft.sel(mode=(i+1)).real.plot(ax=ar,cmap=cmap,
-								  add_colorbar=False,vmin=-.9,vmax=.9)
-			ar.coastlines(lw=0.5)
-			ar.set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
-			ar.set_title('')
-			ar.set_aspect('auto')
+		# plot PCs/Amplitude/Phase
+		for i in range(n):
+			pcsLeft.sel(mode=(i+1)).real.plot(ax=axesPC[i,0])
+			amplitudeLeft.sel(mode=(i+1)).real.plot(ax=axesEOF[i,0],cmap=cmap,extend='neither',add_colorbar=True, 
+				vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
+			phaseLeft.sel(mode=(i+1)).plot(ax=axesEOF[i,1],cmap='twilight_shifted', 
+								  cbar_kwargs={'label': 'Phase (rad)'},
+								  add_colorbar=True,vmin=-np.pi,vmax=np.pi)			
 			
-			eofsRight.sel(mode=(i+1)).plot(ax=ac,cmap=cmap,
-								  add_colorbar=False,vmin=-.9,vmax=.9)
-			ac.coastlines(lw=0.5)
-			ac.set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
-			ac.set_title('')
-			ac.set_aspect('auto')
+			axesEOF[i,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			axesEOF[i,1].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			
+			axesEOF[i,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
+			axesEOF[i,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
 		
-		fig.subplots_adjust(wspace=0.1,hspace=0,left=0.05)
+		if right:
+			for i in range(n):
+				pcsRight.sel(mode=(i+1)).real.plot(ax=axesPC[i,1])
+				amplitudeRight.sel(mode=(i+1)).real.plot(ax=axesEOF[i,2],cmap=cmap,extend='neither',add_colorbar=True, 
+					vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
+				phaseRight.sel(mode=(i+1)).plot(ax=axesEOF[i,3],cmap='twilight_shifted', 
+									  cbar_kwargs={'label': 'Phase (rad)'},
+									  add_colorbar=True,vmin=-np.pi,vmax=np.pi)			
+				
+				axesEOF[i,2].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+				axesEOF[i,3].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+				
+				axesEOF[i,2].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
+				axesEOF[i,3].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
+
+		if right:
+			for a in axesPC[:,1]:
+				a.yaxis.tick_right()
+				a.yaxis.set_label_position("right")					
+			
+		for a in axesPC.flatten():
+			a.set_ylabel('Real PC (normalized)')
+			a.set_xlabel('')
+			a.set_title('')
+			
+
+		for a in axesEOF.flatten():
+			a.coastlines(lw=0.5, resolution='50m')
+			a.set_aspect('auto')		 
+
+		
+		fig.subplots_adjust(wspace=0.1,hspace=0.17,left=0.05)
 		fig.suptitle(title)
+
+
+
