@@ -199,12 +199,12 @@ class MCA(object):
 		self.__VRight 	= VRight
 		
 		# loadings // EOF fields
-		self.__LLeft 	= self.__VLeft @ S 
-		self.__LRight 	= self.__VRight @ S
+		self.__LLeft 	= VLeft @ S 
+		self.__LRight 	= VRight @ S
 		
 		# get PC scores by projecting data fields on loadings 
-		self.__ULeft 	= self.__noNanDataLeft @ self.__VLeft @ Si
-		self.__URight 	= self.__noNanDataRight @ self.__VRight @ Si
+		self.__ULeft 	= self.__noNanDataLeft @ VLeft @ Si
+		self.__URight 	= self.__noNanDataRight @ VRight @ Si
 				
 		print('Finished!', flush=True)
 
@@ -351,13 +351,16 @@ class MCA(object):
 		return desVar, desVarErr
 	
 	
-	def pcs(self, n=None):
+	def pcs(self, n=None, scaling=0):
 		"""Return the first `n` PCs.
 
 		Parameters
 		----------
 		n : int, optional
 			Number of PCs to be returned. The default is None.
+		scaling : [0,1], optional
+			If 1, scale PCs by square root of eigenvalues. If 0, return 
+			unscaled PCs. The default is 0.		
 
 		Returns
 		-------
@@ -369,16 +372,24 @@ class MCA(object):
 		"""
 		pcsLeft 	= self.__ULeft[:,:n]
 		pcsRight 	= self.__URight[:,:n]
+		
+		if (scaling==1):
+			pcsLeft 	= pcsLeft * np.sqrt(self.__eigenvalues[:n])
+			pcsRight 	= pcsRight * np.sqrt(self.__eigenvalues[:n])
+		
 		return pcsLeft, pcsRight
 	
 	
-	def eofs(self, n=None):
+	def eofs(self, n=None, scaling=0):
 		"""Return the first `n` EOFs.
 
 		Parameters
 		----------
 		n : int, optional
 			Number of EOFs to be returned. The default is None.
+		scaling : [0,1], optional
+			If 1, scale PCs by square root of eigenvalues. If 0, return 
+			unscaled PCs. The default is 0.		
 
 		Returns
 		-------
@@ -402,6 +413,11 @@ class MCA(object):
 		# reshape data fields to have original input shape
 		eofsLeft 	= eofsLeft.reshape(self.__originalShapeLeft + (n,))
 		eofsRight 	= eofsRight.reshape(self.__originalShapeRight + (n,))
+		
+		if (scaling==1):
+			eofsLeft 	= eofsLeft * np.sqrt(self.__eigenvalues[:n])
+			eofsRight 	= eofsRight * np.sqrt(self.__eigenvalues[:n])
+		
 		return eofsLeft, eofsRight
 
 
@@ -585,7 +601,7 @@ class xMCA(MCA):
 		return values, error
 
 	
-	def pcs(self, n=None):
+	def pcs(self, n=None, scaling=0):
 		"""Return first `n` PCs.
 
 		Parameters
@@ -602,7 +618,7 @@ class xMCA(MCA):
 			PCs of right input field.
 
 		"""
-		leftData, rightData = MCA.pcs(self, n)
+		leftData, rightData = MCA.pcs(self, n, scaling=scaling)
 
 		if n is None:
 			n = leftData.shape[1]
@@ -626,7 +642,7 @@ class xMCA(MCA):
 		return leftPcs, rightPcs
 
 	
-	def eofs(self, n=None):
+	def eofs(self, n=None, scaling=0):
 		"""Return the first `n` EOFs.
 
 		Parameters
@@ -643,7 +659,7 @@ class xMCA(MCA):
 			EOFs of right input field.
 
 		"""
-		leftData, rightData = MCA.eofs(self, n)
+		leftData, rightData = MCA.eofs(self, n, scaling=scaling)
 		
 		if n is None:
 			n = leftData.shape[-1]
