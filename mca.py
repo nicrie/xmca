@@ -762,6 +762,84 @@ class xMCA(MCA):
 		return signs * data
 
 
+	def __calculateCorrelation(self, x, y):
+		assert(self.__isXarray(x))
+		assert(self.__isXarray(y))
+		
+		x = x - x.mean('time')
+		y = y - y.mean('time')
+		
+		xy = (x*y).mean('time')
+		sigx = x.std('time')
+		sigy = y.std('time')
+		
+		return xy/sigx/sigy
+		
+
+
+	def homogeneousPatterns(self, n=None):
+		"""
+		Return left and right homogeneous correlation maps.
+
+		Parameters
+		----------
+		n : int, optional
+			Number of patterns (modes) to be returned. If None then all patterns 
+			are returned. The default is None.
+
+		Returns
+		-------
+		xr.DataArray
+			Left homogeneous correlation maps.
+		xr.DataArray
+			Right homogeneous correlation maps.
+
+		"""
+		
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
+	
+		fieldLeft  = self.__left 
+		fieldRight = self.__right
+		
+		homPatternsLeft 	= self.__calculateCorrelation(fieldLeft,pcsLeft)
+		homPatternsRight 	= self.__calculateCorrelation(fieldRight,pcsRight)
+
+		return homPatternsLeft, homPatternsRight
+
+
+	def heterogeneousPatterns(self, n=None):
+		"""
+		Return left and right heterogeneous correlation maps.
+
+		Parameters
+		----------
+		n : int, optional
+			Number of patterns (modes) to be returned. If None then all patterns 
+			are returned. The default is None.
+
+		Returns
+		-------
+		xr.DataArray
+			Left heterogeneous correlation maps.
+		xr.DataArray
+			Right heterogeneous correlation maps.
+
+		"""		
+		pcsLeft, pcsRight 		= self.pcs(n)
+		pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
+	
+		fieldLeft  = self.__left 
+		fieldRight = self.__right
+		
+		hetPatternsLeft 	= self.__calculateCorrelation(fieldLeft,pcsRight)
+		hetPatternsRight 	= self.__calculateCorrelation(fieldRight,pcsLeft)
+
+		return hetPatternsLeft, hetPatternsRight
+
+
+
+
 	def plotMode(self, n=1, right=False, signs=None, title='', cmap='RdGy_r'):
 		"""
 		Plot mode`n` PC and EOF of left (and right) data field.
@@ -855,6 +933,8 @@ class xMCA(MCA):
 		else:
 			yOffset = 1.00
 		fig.suptitle(title, y=yOffset)
+
+
 
 
 	def cplotMode(self, n=1, right=False, signs=None, title='', cmap='pink_r'):
