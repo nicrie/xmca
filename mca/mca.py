@@ -16,7 +16,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
 
-from rotation import promax
+from mca.rotation import promax
 
 
 # =============================================================================
