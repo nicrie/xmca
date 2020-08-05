@@ -700,7 +700,7 @@ class xMCA(MCA):
 		return data / abs(data).max(['time'])
 
 
-	def __createFigure(self, nrows=3, coltypes=['t','s']):
+	def __createFigure(self, nrows=3, coltypes=['t','s'], cenLon=0):
 		nRows, nCols = [nrows, len(coltypes)]
 
 		# positions of temporal plots
@@ -708,7 +708,7 @@ class xMCA(MCA):
 
 		# set projections associated with temporal/spatial plots
 		projTemporalPlot 	= None
-		projSpatialPlot 	= ccrs.PlateCarree()
+		projSpatialPlot 	= ccrs.PlateCarree(central_longitude=cenLon)
 		projections = [projTemporalPlot if i=='t' else projSpatialPlot for i in coltypes]
 
 		# set relative width of temporal/spatial plots
@@ -890,29 +890,38 @@ class xMCA(MCA):
 		pcsRight 	= self.__flipSigns(pcsRight, signs)
 
 		# map boundaries as [east, west, south, north]
-		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
+		mapBoundariesLeft  = self.__getMapBoundaries(eofsLeft)
 		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
+		# mapProjection and center longitude for
+		mapProjection = ccrs.PlateCarree()
+		cenLon  = int((mapBoundariesLeft[0] + mapBoundariesLeft[1]) / 2)
+		# take the center longitude of left field  for both, left and right
+		# field as simplification; I don't know a way of specifying
+		# multiple projections at the same time
+
 		if right:
-			fig, axesPC, axesEOF = self.__createFigure(2,['t','s'])
+			fig, axesPC, axesEOF = self.__createFigure(2,['t','s'],cenLon)
 		else:
-			fig, axesPC, axesEOF = self.__createFigure(1,['t','s'])
+			fig, axesPC, axesEOF = self.__createFigure(1,['t','s'],cenLon)
 
 
 
 		# plot PCs/EOFs
-		pcsLeft.plot(ax=axesPC[0,0])
+		pcsLeft.plot(ax = axesPC[0,0])
 		eofsLeft.plot(
-			ax=axesEOF[0,0],cmap=cmap,extend='neither',add_colorbar=True,
-			vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
-		axesEOF[0,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			ax = axesEOF[0,0], transform = mapProjection, cmap = cmap,
+			extend = 'neither',	add_colorbar = True, vmin = -1, vmax = 1,
+			cbar_kwargs = {'label': 'EOF (normalized)'})
+		axesEOF[0,0].set_extent(mapBoundariesLeft, crs = mapProjection)
 
 		if right:
-			pcsRight.plot(ax=axesPC[1,0])
+			pcsRight.plot(ax = axesPC[1,0])
 			eofsRight.plot(
-				ax=axesEOF[1,0],cmap=cmap,extend='neither',add_colorbar=True,
-				vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
-			axesEOF[1,0].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+				ax=axesEOF[1,0], transform = mapProjection, cmap = cmap,
+				extend = 'neither', add_colorbar = True, vmin = -1, vmax = 1,
+				cbar_kwargs = {'label': 'EOF (normalized)'})
+			axesEOF[1,0].set_extent(mapBoundariesRight, crs = mapProjection)
 
 
 		for i,a in enumerate(axesPC[:,0]):
@@ -967,8 +976,8 @@ class xMCA(MCA):
 
 		eofsLeft, eofsRight 	= self.eofs(n)
 
-		amplitudeLeft = (eofsLeft * eofsLeft.conjugate()).sel(mode=n)
-		amplitudeRight = (eofsRight * eofsRight.conjugate()).sel(mode=n)
+		amplitudeLeft = np.sqrt((eofsLeft * eofsLeft.conjugate()).sel(mode=n))
+		amplitudeRight = np.sqrt((eofsRight * eofsRight.conjugate()).sel(mode=n))
 
 		phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real).sel(mode=n)
 		phaseRight = np.arctan2(eofsRight.imag,eofsRight.real).sel(mode=n)
@@ -993,40 +1002,48 @@ class xMCA(MCA):
 		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
 		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
+		# mapProjection and center longitude for
+		mapProjection = ccrs.PlateCarree()
+		cenLon  = int((mapBoundariesLeft[0] + mapBoundariesLeft[1]) / 2)
+		# take the center longitude of left field  for both, left and right
+		# field as simplification; I don't know a way of specifying
+		# multiple projections at the same time
+
 		# create figure environment
 		if right:
-			fig, axesPC, axesEOF = self.__createFigure(2,['t','s','s'])
+			fig, axesPC, axesEOF = self.__createFigure(2,['t','s','s'], cenLon)
 		else:
-			fig, axesPC, axesEOF = self.__createFigure(1,['t','s','s'])
+			fig, axesPC, axesEOF = self.__createFigure(1,['t','s','s'], cenLon)
 
 
 
 		# plot PCs/Amplitude/Phase
-		pcsLeft.real.plot(ax=axesPC[0,0])
-		amplitudeLeft.real.plot(ax=axesEOF[0,0],cmap=cmap,extend='neither',add_colorbar=True,
-			vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
-		phaseLeft.plot(ax=axesEOF[0,1],cmap='twilight_shifted',
-							  cbar_kwargs={'label': 'Phase (rad)'},
-							  add_colorbar=True,vmin=-np.pi,vmax=np.pi)
+		pcsLeft.real.plot(ax = axesPC[0,0])
+		amplitudeLeft.real.plot(ax = axesEOF[0,0], transform = mapProjection,
+			cmap = cmap, extend = 'neither', add_colorbar = True,
+			vmin = 0, vmax = 1, cbar_kwargs = {'label' : 'Amplitude (normalized)'})
+		phaseLeft.plot(ax = axesEOF[0,1], transform = mapProjection,
+			cmap = 'twilight_shifted', cbar_kwargs = {'label' : 'Phase (rad)'},
+			add_colorbar = True, vmin = -np.pi, vmax = np.pi)
 
-
-		axesEOF[0,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
-		axesEOF[0,1].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+		axesEOF[0,0].set_extent(mapBoundariesLeft,crs = mapProjection)
+		axesEOF[0,1].set_extent(mapBoundariesLeft,crs = mapProjection)
 
 		axesEOF[0,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
 		axesEOF[0,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
 
 
 		if right:
-			pcsRight.real.plot(ax=axesPC[1,0])
-			amplitudeRight.real.plot(ax=axesEOF[1,0],cmap=cmap,extend='neither',add_colorbar=True,
-				vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
-			phaseRight.plot(ax=axesEOF[1,1],cmap='twilight_shifted',
-								  cbar_kwargs={'label': 'Phase (rad)'},
-								  add_colorbar=True,vmin=-np.pi,vmax=np.pi)
+			pcsRight.real.plot(ax = axesPC[1,0])
+			amplitudeRight.real.plot(ax = axesEOF[1,0], transform = mapProjection,
+			 cmap = cmap, extend = 'neither', add_colorbar = True, vmin = 0,
+			 vmax = 1, cbar_kwargs = {'label' : 'Amplitude (normalized)'})
+			phaseRight.plot(ax = axesEOF[1,1], transform = mapProjection,
+			cmap = 'twilight_shifted', cbar_kwargs = {'label' : 'Phase (rad)'},
+			add_colorbar = True, vmin = -np.pi, vmax = 	np.pi)
 
-			axesEOF[1,0].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
-			axesEOF[1,1].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+			axesEOF[1,0].set_extent(mapBoundariesRight,crs = mapProjection)
+			axesEOF[1,1].set_extent(mapBoundariesRight,crs = mapProjection)
 
 			axesEOF[1,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
 			axesEOF[1,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
@@ -1038,11 +1055,11 @@ class xMCA(MCA):
 
 
 		for a in axesEOF.flatten():
-			a.coastlines(lw=0.5, resolution='50m')
+			a.coastlines(lw = 0.5, resolution = '50m')
 			a.set_aspect('auto')
 
 
-		fig.subplots_adjust(wspace=0.1,hspace=0.17,left=0.05)
+		fig.subplots_adjust(wspace = 0.1, hspace = 0.17, left = 0.05)
 		fig.suptitle(title)
 
 
@@ -1091,26 +1108,37 @@ class xMCA(MCA):
 		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
 		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
+		# mapProjection and center longitude for
+		mapProjection = ccrs.PlateCarree()
+		cenLon  = int((mapBoundariesLeft[0] + mapBoundariesLeft[1]) / 2)
+		# take the center longitude of left field  for both, left and right
+		# field as simplification; I don't know a way of specifying
+		# multiple projections at the same time
+
 		if right:
-			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','t'])
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','t'], cenLon)
 		else:
-			fig, axesPC, axesEOF = self.__createFigure(n,['t','s'])
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s'], cenLon)
 
 
 		# plot PCs/EOFs
 		for i in range(n):
-			pcsLeft.sel(mode=(i+1)).plot(ax=axesPC[i,0])
-			eofsLeft.sel(mode=(i+1)).plot(ax=axesEOF[i,0],cmap=cmap,extend='neither',add_colorbar=True,
-				vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
-			axesEOF[i,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			pcsLeft.sel(mode = (i+1)).plot(ax = axesPC[i,0])
+			eofsLeft.sel(mode = (i+1)).plot(ax = axesEOF[i,0],
+			transform = mapProjection, cmap = cmap, extend = 'neither',
+			add_colorbar = True, vmin = -1,	vmax = 1,
+			cbar_kwargs = {'label' : 'EOF (normalized)'})
+			axesEOF[i,0].set_extent(mapBoundariesLeft,crs = mapProjection)
 			axesEOF[i,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
 
 		if right:
 			for i in range(n):
-				pcsRight.sel(mode=(i+1)).plot(ax=axesPC[i,1])
-				eofsRight.sel(mode=(i+1)).plot(ax=axesEOF[i,1],cmap=cmap,extend='neither',add_colorbar=True,
-					vmin=-1,vmax=1,cbar_kwargs={'label': 'EOF (normalized)'})
-				axesEOF[i,1].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
+				pcsRight.sel(mode = (i+1)).plot(ax = axesPC[i,1])
+				eofsRight.sel(mode = (i+1)).plot(ax = axesEOF[i,1],
+				transform = mapProjection, cmap = cmap, extend = 'neither',
+				add_colorbar = True, vmin = -1, vmax = 1,
+				cbar_kwargs = {'label': 'EOF (normalized)'})
+				axesEOF[i,1].set_extent(mapBoundariesRight,crs = mapProjection)
 				axesEOF[i,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
 
 
@@ -1127,11 +1155,11 @@ class xMCA(MCA):
 
 		# plot EOFs
 		for a in axesEOF.flatten():
-			a.coastlines(lw=0.5)
+			a.coastlines(lw = 0.5)
 			a.set_aspect('auto')
 
 
-		fig.subplots_adjust(wspace=.1,hspace=0.2,left=0.05)
+		fig.subplots_adjust(wspace = .1, hspace = 0.2, left = 0.05)
 		fig.suptitle(title)
 
 
@@ -1159,8 +1187,8 @@ class xMCA(MCA):
 
 		eofsLeft, eofsRight 	= self.eofs(n)
 
-		amplitudeLeft = (eofsLeft * eofsLeft.conjugate())
-		amplitudeRight = (eofsRight * eofsRight.conjugate())
+		amplitudeLeft = np.sqrt((eofsLeft * eofsLeft.conjugate()))
+		amplitudeRight = np.sqrt((eofsRight * eofsRight.conjugate()))
 
 		phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
 		phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
@@ -1185,37 +1213,54 @@ class xMCA(MCA):
 		mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
 		mapBoundariesRight = self.__getMapBoundaries(eofsRight)
 
+		# mapProjection and center longitude for
+		mapProjection = ccrs.PlateCarree()
+		cenLon  = int((mapBoundariesLeft[0] + mapBoundariesLeft[1]) / 2)
+		# take the center longitude of left field  for both, left and right
+		# field as simplification; I don't know a way of specifying
+		# multiple projections at the same time
+
 		# create figure environment
 		if right:
-			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','s','s','t'])
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','s','s','t'], cenLon)
 		else:
-			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s'])
+			fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s'], cenLon)
 
 
 
 		# plot PCs/Amplitude/Phase
 		for i in range(n):
-			pcsLeft.sel(mode=(i+1)).real.plot(ax=axesPC[i,0])
-			amplitudeLeft.sel(mode=(i+1)).real.plot(ax=axesEOF[i,0],cmap=cmap,extend='neither',add_colorbar=True,
-				vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
-			phaseLeft.sel(mode=(i+1)).plot(ax=axesEOF[i,1],cmap='twilight_shifted',
-								  cbar_kwargs={'label': 'Phase (rad)'},
-								  add_colorbar=True,vmin=-np.pi,vmax=np.pi)
+			pcsLeft.sel(mode=(i+1)).real.plot(ax = axesPC[i,0])
 
-			axesEOF[i,0].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
-			axesEOF[i,1].set_extent(mapBoundariesLeft,crs=ccrs.PlateCarree())
+			amplitudeLeft.sel(mode=(i+1)).real.plot(ax = axesEOF[i,0],
+			transform = mapProjection, cmap = cmap, extend = 'neither',
+			add_colorbar = True, vmin = 0, vmax = 1,
+			cbar_kwargs = {'label' : 'Amplitude (normalized)'})
+
+			phaseLeft.sel(mode=(i+1)).plot(ax = axesEOF[i,1],
+			transform = mapProjection, cmap = 'twilight_shifted',
+			cbar_kwargs = {'label' : 'Phase (rad)'}, add_colorbar = True,
+			vmin = -np.pi, vmax = np.pi)
+
+			axesEOF[i,0].set_extent(mapBoundariesLeft,crs=mapProjection)
+			axesEOF[i,1].set_extent(mapBoundariesLeft,crs=mapProjection)
 
 			axesEOF[i,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
 			axesEOF[i,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(i+1,var[i],varErr[i]))
 
 		if right:
 			for i in range(n):
-				pcsRight.sel(mode=(i+1)).real.plot(ax=axesPC[i,1])
-				amplitudeRight.sel(mode=(i+1)).real.plot(ax=axesEOF[i,2],cmap=cmap,extend='neither',add_colorbar=True,
-					vmin=0,vmax=1,cbar_kwargs={'label': 'Amplitude (normalized)'})
-				phaseRight.sel(mode=(i+1)).plot(ax=axesEOF[i,3],cmap='twilight_shifted',
-									  cbar_kwargs={'label': 'Phase (rad)'},
-									  add_colorbar=True,vmin=-np.pi,vmax=np.pi)
+				pcsRight.sel(mode=(i+1)).real.plot(ax = axesPC[i,1])
+
+				amplitudeRight.sel(mode=(i+1)).real.plot(ax = axesEOF[i,2],
+				transform = mapProjection, cmap = cmap, extend = 'neither',
+				add_colorbar = True, vmin = 0, vmax = 1,
+				cbar_kwargs = {'label' : 'Amplitude (normalized)'})
+
+				phaseRight.sel(mode=(i+1)).plot(ax = axesEOF[i,3],
+				transform = mapProjection, cmap = 'twilight_shifted',
+				cbar_kwargs = {'label': 'Phase (rad)'}, add_colorbar = True,
+				vmin = -np.pi, vmax = np.pi)
 
 				axesEOF[i,2].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
 				axesEOF[i,3].set_extent(mapBoundariesRight,crs=ccrs.PlateCarree())
@@ -1235,9 +1280,9 @@ class xMCA(MCA):
 
 
 		for a in axesEOF.flatten():
-			a.coastlines(lw=0.5, resolution='50m')
+			a.coastlines(lw = 0.5, resolution = '50m')
 			a.set_aspect('auto')
 
 
-		fig.subplots_adjust(wspace=0.1,hspace=0.17,left=0.05)
+		fig.subplots_adjust(wspace = 0.1, hspace = 0.17, left = 0.05)
 		fig.suptitle(title)
