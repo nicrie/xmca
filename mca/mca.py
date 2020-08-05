@@ -18,7 +18,6 @@ import cartopy.feature as cfeature
 
 from mca.rotation import promax
 
-
 # =============================================================================
 #%% MCA
 # =============================================================================
@@ -732,7 +731,6 @@ class xMCA(MCA):
 		return fig, axesPC, axesEOF
 
 
-
 	def __validateSigns(self, signs, n):
 		"""Check if list of signs match the length n.
 
@@ -785,7 +783,6 @@ class xMCA(MCA):
 		sigy = y.std('time')
 
 		return xy/sigx/sigy
-
 
 
 	def homogeneousPatterns(self, n=None):
@@ -847,8 +844,6 @@ class xMCA(MCA):
 		hetPatternsRight 	= self.__calculateCorrelation(fieldRight,pcsLeft)
 
 		return hetPatternsLeft, hetPatternsRight
-
-
 
 
 	def plotMode(self, n=1, right=False, signs=None, title='', cmap='RdGy_r'):
@@ -944,8 +939,6 @@ class xMCA(MCA):
 		else:
 			yOffset = 1.00
 		fig.suptitle(title, y=yOffset)
-
-
 
 
 	def cplotMode(self, n=1, right=False, signs=None, title='', cmap='pink_r'):
@@ -1051,8 +1044,6 @@ class xMCA(MCA):
 
 		fig.subplots_adjust(wspace=0.1,hspace=0.17,left=0.05)
 		fig.suptitle(title)
-
-
 
 
 	def plotOverview(self, n=3, right=False, signs=None, title='', cmap='RdGy_r'):
