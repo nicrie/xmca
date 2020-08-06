@@ -1,4 +1,3 @@
-from . import mca
+from mca.array import MCA
+from mca.xarray import xMCA
 
-# Define the objects imported by imports of the form: from mca import *
-__all__ = ['mca']
