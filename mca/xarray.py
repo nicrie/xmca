@@ -243,15 +243,15 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of EOFs to return If none, all EOFs are returned.
-        The default is None.
+            Number of EOFs to return If none, all EOFs are returned.
+            The default is None.
 
         Returns
         -------
         DataArray
-        EOFs of left input field.
+            EOFs of left input field.
         DataArray
-        EOFs of right input field.
+            EOFs of right input field.
 
         """
         leftData, rightData = MCA.eofs(self, n, scaling=scaling)
@@ -279,6 +279,60 @@ class xMCA(MCA):
           })
 
         return leftEofs, rightEofs
+
+
+    def spatialAmplitude(self, n=None):
+        """Return the spatial amplitude fields for the first `n` EOFs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of amplitude fields to return. If none, all fields are returned.
+            The default is None.
+
+        Returns
+        -------
+        DataArray
+            Fields of left input field.
+        DataArray
+            Fields of right input field.
+
+        """
+        eofsLeft, eofsRight = self.eofs(n)
+
+        amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
+        amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
+
+        return amplitudeLeft, amplitudeRight
+
+
+    def spatialPhase(self, n=None):
+        """Return the spatial phase fields for the first `n` EOFs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of phase fields to return. If none, all fields are returned.
+            The default is None.
+
+        Returns
+        -------
+        DataArray
+            Fields of left input field.
+        DataArray
+            Fields of right input field.
+
+        """
+        eofsLeft, eofsRight = self.eofs(n)
+
+        phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
+        phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
+
+        return phaseLeft, phaseRight
+
+
+
+
 
 
     def __getMapBoundaries(self, data):
@@ -551,57 +605,52 @@ class xMCA(MCA):
         fig.suptitle(title, y=yOffset)
 
 
-    def cplotMode(self, n=1, right=False, signs=None, title='', cmap='pink_r'):
+    def cplotMode(self, n=1, right=False, threshold=0, title='', cmap='pink_r'):
         """
         Plot mode`n` PC and EOF of left (and right) data field.
 
         Parameters
         ----------
         n : int, optional
-        Mode of PC and EOF to plot. The default is 1.
+            Mode of PC and EOF to plot. The default is 1.
         right : boolean
-        Plot PC and EOF of right field. The default is False.
-        signs : list of int, optional
-        Either +1 or -1 in order to flip the sign of shown PCs/EOFs.
-        The default is None.
+            Plot PC and EOF of right field. The default is False.
+        threshold : int, optional
+            Amplitude threshold below which the fields are masked out.
+            The default is 0.
         title : str, optional
-        Title of figure. The default is ''.
+            Title of figure. The default is ''.
 
         Returns
         -------
         None.
 
         """
-        pcsLeft, pcsRight 		= self.pcs(n)
-        pcsLeft, pcsRight 		= [pcsLeft.sel(mode=n).real, pcsRight.sel(mode=n).real]
+        pcsLeft, pcsRight 	= self.pcs(n)
+        pcsLeft, pcsRight 	= [pcsLeft.sel(mode=n).real, pcsRight.sel(mode=n).real]
 
-        eofsLeft, eofsRight 	= self.eofs(n)
+        amplitudeLeft, amplitudeRight   = self.spatialAmplitude(n)
+        phaseLeft, phaseRight           = self.spatialPhase(n)
 
-        amplitudeLeft = np.sqrt((eofsLeft * eofsLeft.conjugate()).sel(mode=n))
-        amplitudeRight = np.sqrt((eofsRight * eofsRight.conjugate()).sel(mode=n))
-
-        phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real).sel(mode=n)
-        phaseRight = np.arctan2(eofsRight.imag,eofsRight.real).sel(mode=n)
-
-        var, varErr 			= self.explainedVariance(n)
-        var, varErr 			= [var.sel(mode=n).values, varErr.sel(mode=n).values]
+        var, varErr 		= self.explainedVariance(n)
+        var, varErr 		= [var.sel(mode=n).values, varErr.sel(mode=n).values]
 
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        amplitudeLeft 		= self.__normalizeEOFto1(amplitudeLeft)
-        amplitudeRight 		= self.__normalizeEOFto1(amplitudeRight)
-        pcsLeft 		= self.__normalizePCto1(pcsLeft)
-        pcsRight 		= self.__normalizePCto1(pcsRight)
+        amplitudeLeft   = self.__normalizeEOFto1(amplitudeLeft)
+        amplitudeRight  = self.__normalizeEOFto1(amplitudeRight)
+        pcsLeft         = self.__normalizePCto1(pcsLeft)
+        pcsRight        = self.__normalizePCto1(pcsRight)
 
-        # flip signs of PCs and EOFs, if needed
-        amplitudeLeft 	= self.__flipSigns(amplitudeLeft, signs)
-        amplitudeRight 	= self.__flipSigns(amplitudeRight, signs)
-        pcsLeft 	= self.__flipSigns(pcsLeft, signs)
-        pcsRight 	= self.__flipSigns(pcsRight, signs)
+        # apply amplitude threshold
+        amplitudeLeft   = amplitudeLeft.where(amplitudeLeft > threshold)
+        amplitudeRight  = amplitudeRight.where(amplitudeRight > threshold)
+        phaseLeft       = phaseLeft.where(amplitudeLeft > threshold)
+        phaseRight      = phaseRight.where(amplitudeRight > threshold)
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
-        mapBoundariesRight = self.__getMapBoundaries(eofsRight)
+        mapBoundariesLeft  = self.__getMapBoundaries(amplitudeLeft)
+        mapBoundariesRight = self.__getMapBoundaries(amplitudeRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
@@ -768,19 +817,19 @@ class xMCA(MCA):
         fig.suptitle(title)
 
 
-    def cplotOverview(self, n=3, right=False, signs=None, title='', cmap='pink_r'):
+    def cplotOverview(self, n=3, right=False, threshold=0, title='', cmap='pink_r'):
         """
         Plot first `n` complex PCs of left data field alongside their corresponding EOFs.
 
         Parameters
         ----------
         n : int, optional
-        Number of PCs and EOFs to plot. The default is 3.
-        signs : list of int, optional
-        List of +-1 in order to flip the sign of shown PCs/EOFs.
-        Length of list has to match `n`. The default is None.
+            Number of PCs and EOFs to plot. The default is 3.
+        threshold : int, optional
+            Amplitude threshold below which the fields are masked out.
+            The default is 0.
         title : str, optional
-        Title of figure. The default is ''.
+            Title of figure. The default is ''.
 
         Returns
         -------
@@ -790,13 +839,8 @@ class xMCA(MCA):
         pcsLeft, pcsRight 		= self.pcs(n)
         pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
 
-        eofsLeft, eofsRight 	= self.eofs(n)
-
-        amplitudeLeft = np.sqrt((eofsLeft * eofsLeft.conjugate()))
-        amplitudeRight = np.sqrt((eofsRight * eofsRight.conjugate()))
-
-        phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
-        phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
+        amplitudeLeft, amplitudeRight   = self.spatialAmplitude(n)
+        phaseLeft, phaseRight           = self.spatialPhase(n)
 
         var, varErr 			= self.explainedVariance(n)
         var, varErr 			= [var.values, varErr.values]
@@ -808,15 +852,16 @@ class xMCA(MCA):
         pcsLeft 		= self.__normalizePCto1(pcsLeft)
         pcsRight 		= self.__normalizePCto1(pcsRight)
 
-        # flip signs of PCs and EOFs, if needed
-        amplitudeLeft 	= self.__flipSigns(amplitudeLeft, signs)
-        amplitudeRight 	= self.__flipSigns(amplitudeRight, signs)
-        pcsLeft 	= self.__flipSigns(pcsLeft, signs)
-        pcsRight 	= self.__flipSigns(pcsRight, signs)
+        # apply amplitude threshold
+        amplitudeLeft   = amplitudeLeft.where(amplitudeLeft > threshold)
+        amplitudeRight  = amplitudeRight.where(amplitudeRight > threshold)
+        phaseLeft       = phaseLeft.where(amplitudeLeft > threshold)
+        phaseRight      = phaseRight.where(amplitudeRight > threshold)
+
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
-        mapBoundariesRight = self.__getMapBoundaries(eofsRight)
+        mapBoundariesLeft = self.__getMapBoundaries(amplitudeLeft)
+        mapBoundariesRight = self.__getMapBoundaries(amplitudeRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
