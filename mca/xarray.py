@@ -630,7 +630,10 @@ class xMCA(MCA):
         pcsLeft, pcsRight 	= [pcsLeft.sel(mode=n).real, pcsRight.sel(mode=n).real]
 
         amplitudeLeft, amplitudeRight   = self.spatialAmplitude(n)
+        amplitudeLeft, amplitudeRight   = [amplitudeLeft.sel(mode=n), amplitudeRight.sel(mode=n)]
+
         phaseLeft, phaseRight           = self.spatialPhase(n)
+        phaseLeft, phaseRight           = [phaseLeft.sel(mode=n),phaseRight.sel(mode=n)]
 
         var, varErr 		= self.explainedVariance(n)
         var, varErr 		= [var.sel(mode=n).values, varErr.sel(mode=n).values]
@@ -696,11 +699,11 @@ class xMCA(MCA):
                 cmap = 'twilight_shifted', cbar_kwargs = {'label' : 'Phase (rad)'},
                 add_colorbar = True, vmin = -np.pi, vmax = 	np.pi)
 
-        axesEOF[1,0].set_extent(mapBoundariesRight,crs = mapProjection)
-        axesEOF[1,1].set_extent(mapBoundariesRight,crs = mapProjection)
+            axesEOF[1,0].set_extent(mapBoundariesRight,crs = mapProjection)
+            axesEOF[1,1].set_extent(mapBoundariesRight,crs = mapProjection)
 
-        axesEOF[1,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
-        axesEOF[1,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+            axesEOF[1,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
+            axesEOF[1,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,varErr))
 
         for a in axesPC.flatten():
             a.set_ylabel('Real PC (normalized)')
