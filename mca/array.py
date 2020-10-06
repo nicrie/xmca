@@ -450,7 +450,8 @@ class MCA(object):
         amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
         amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
 
-        return amplitudeLeft, amplitudeRight
+        # use the real part to force a real output
+        return amplitudeLeft.real, amplitudeRight.real
 
     def spatialPhase(self, n=None):
         """Return the spatial phase fields for the first `n` EOFs.
@@ -474,4 +475,5 @@ class MCA(object):
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
-        return phaseLeft, phaseRight
+        # use the real part to force a real output
+        return phaseLeft.real, phaseRight.real

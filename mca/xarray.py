@@ -303,7 +303,8 @@ class xMCA(MCA):
         amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
         amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
 
-        return amplitudeLeft, amplitudeRight
+        # use the real part to force a real output
+        return amplitudeLeft.real, amplitudeRight.real
 
 
     def spatialPhase(self, n=None):
@@ -328,7 +329,8 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
-        return phaseLeft, phaseRight
+        # use the real part to force a real output
+        return phaseLeft.real, phaseRight.real
 
 
 
