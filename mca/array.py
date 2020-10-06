@@ -428,3 +428,50 @@ class MCA(object):
             eofsRight 	= eofsRight * np.sqrt(self.__eigenvalues[:n])
 
         return eofsLeft, eofsRight
+
+    def spatialAmplitude(self, n=None):
+        """Return the spatial amplitude fields for the first `n` EOFs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of amplitude fields to be returned. If None, return all fields. The default is None.
+
+        Returns
+        -------
+        ndarray
+            Amplitude fields of left input field.
+        ndarray
+            Amplitude fields of right input field.
+
+        """
+        eofsLeft, eofsRight = self.eofs(n)
+
+        amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
+        amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
+
+        return amplitudeLeft, amplitudeRight
+
+    def spatialPhase(self, n=None):
+        """Return the spatial phase fields for the first `n` EOFs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of phase fields to return. If none, all fields are returned.
+            The default is None.
+
+        Returns
+        -------
+        ndarray
+            Fields of left input field.
+        ndarray
+            Fields of right input field.
+
+        """
+        eofsLeft, eofsRight = self.eofs(n)
+
+        phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
+        phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
+
+        return phaseLeft, phaseRight
