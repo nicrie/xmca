@@ -477,3 +477,53 @@ class MCA(object):
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
+
+    def temporalAmplitude(self, n=None):
+        """Return the temporal amplitude time series for the first `n` PCs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of amplitude series to be returned. If None, return all series.
+            The default is None.
+
+        Returns
+        -------
+        ndarray
+            Amplitude time series of left input field.
+        ndarray
+            Amplitude time series of right input field.
+
+        """
+        pcsLeft, pcsRight = self.pcs(n)
+
+        amplitudeLeft   = np.sqrt(pcsLeft * pcsLeft.conjugate())
+        amplitudeRight  = np.sqrt(pcsRight * pcsRight.conjugate())
+
+        # use the real part to force a real output
+        return amplitudeLeft.real, amplitudeRight.real
+
+    def temporalPhase(self, n=None):
+        """Return the temporal phase function for the first `n` PCs.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of phase functions to return. If none, return all series.
+            The default is None.
+
+        Returns
+        -------
+        ndarray
+            Phase function of left input field.
+        ndarray
+            Phase function of right input field.
+
+        """
+        pcsLeft, pcsRight = self.pcs(n)
+
+        phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
+        phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)
+
+        # use the real part to force a real output
+        return phaseLeft.real, phaseRight.real
