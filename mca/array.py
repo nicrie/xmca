@@ -181,19 +181,15 @@ class MCA(object):
             Use Hilbert transform to complexify the input data fields
             in order to perform complex PCA/MCA
         """
-        print('Start analysis...',flush=True)
 
         # complexify input data via Hilbert transfrom
         if (useHilbert):
-            print('Apply Hilbert transform...', flush=True)
             self.__noNanDataLeft 	= hilbert(self.__noNanDataLeft,axis=0)
             self.__noNanDataRight 	= hilbert(self.__noNanDataRight,axis=0)
 
-        print('Build Covariance matrix...',flush=True)
         kernel = self.__noNanDataLeft.conjugate().T @ self.__noNanDataRight / self.__observations
 
         # solve eigenvalue problem
-        print('Perform SVD...',flush=True)
         VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
         VRight = VTRight.conjugate().T
 
@@ -214,8 +210,6 @@ class MCA(object):
         # get PC scores by projecting data fields on loadings
         self.__ULeft 	= self.__noNanDataLeft @ VLeft @ Si
         self.__URight 	= self.__noNanDataRight @ VRight @ Si
-
-        print('Finished!', flush=True)
 
 
     def rotate(self, nRotations, power=1, tol=1e-5):
@@ -247,7 +241,6 @@ class MCA(object):
         None.
 
         """
-        print('Rotate EOFs...', flush=True)
         if(nRotations < 2):
             raise ValueError('nRotations must be >=2')
         if(power<1):

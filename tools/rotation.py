@@ -60,7 +60,6 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
 		d = np.sum(s)
 		if abs(d-d_old)/d < tol:
 			converged = True
-			print('SVD converged successfully!')
 			break
 
 	if(not converged):
@@ -111,9 +110,9 @@ def promax(A, power=1, maxIter=1000, tol=1e-8):
 
     # pre-normalization by communalities (sum of squared rows)
 	h = np.sqrt(np.sum(X**2,axis=1))
-	X = np.diag(1./h) @ X    
-    
-    # "Procustes" equation 
+	X = np.diag(1./h) @ X
+
+    # "Procustes" equation
 	P = X * np.abs(X)**(power - 1)
 
     # fit linear regression model of "Procrustes" equation
