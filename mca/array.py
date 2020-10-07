@@ -26,14 +26,14 @@ class MCA(object):
     Parameters
     ----------
     left : ndarray
-    Left input data. First dimension needs to be time.
+        Left input data. First dimension needs to be time.
     right : ndarray, optional
-    Right input data. First dimension needs to be time.
-    If none is provided, automatically, right field is assumed to be
-    the same as left field. In this case, MCA reducdes to normal PCA.
-    The default is None.
+        Right input data. First dimension needs to be time.
+        If none is provided, automatically, right field is assumed to be
+        the same as left field. In this case, MCA reducdes to normal PCA.
+        The default is None.
     normalize : boolean, optional
-    Input data is normalized to unit variance. The default is True.
+        Input data is normalized to unit variance. The default is True.
 
 
     Examples
@@ -58,14 +58,14 @@ class MCA(object):
         Parameters
         ----------
         left : ndarray
-        Left input data. First dimension needs to be time.
+            Left input data. First dimension needs to be time.
         right : ndarray, optional
-        Right input data. First dimension needs to be time.
-        If none is provided, automatically, right field is assumed to be
-        the same as left field. In this case, MCA reducdes to normal PCA.
-        The default is None.
+            Right input data. First dimension needs to be time.
+            If none is provided, automatically, right field is assumed to be
+            the same as left field. In this case, MCA reducdes to normal PCA.
+            The default is None.
         normalize : boolean, optional
-        Input data is normalized to unit variance. The default is True.
+            Input data is normalized to unit variance. The default is True.
 
 
         """
@@ -178,8 +178,8 @@ class MCA(object):
         Parameters
         ----------
         useHilbert : boolean, optional
-        Use Hilbert transform to complexify the input data fields
-        in order to perform complex PCA/MCA
+            Use Hilbert transform to complexify the input data fields
+            in order to perform complex PCA/MCA
         """
         print('Start analysis...',flush=True)
 
@@ -231,16 +231,16 @@ class MCA(object):
         Parameters
         ----------
         nRotations : int
-        Number of EOFs to rotate.
+            Number of EOFs to rotate.
         power : int, optional
-        Power of Promax rotation. The default is 1.
+            Power of Promax rotation. The default is 1.
         tol : float, optional
-        Tolerance of rotation process. The default is 1e-5.
+            Tolerance of rotation process. The default is 1e-5.
 
         Raises
         ------
         ValueError
-        If number of rotations are <2.
+            If number of rotations are <2.
 
         Returns
         -------
@@ -306,7 +306,7 @@ class MCA(object):
         Returns
         -------
         ndarray
-        Correlation matrix.
+            Correlation matrix.
 
         """
         if (self.__rotatedSolution):
@@ -321,14 +321,14 @@ class MCA(object):
         Parameters
         ----------
         n : int, optional
-        Number of eigenvalues to return. The default is 5.
+            Number of eigenvalues to return. The default is 5.
 
         Returns
         -------
         values : ndarray
-        Eigenvalues of PCA.
+            Eigenvalues of PCA.
         error : ndarray
-        Uncertainty of eigenvalues according to North's rule of thumb.
+            Uncertainty of eigenvalues according to North's rule of thumb.
 
         """
         values = self.__eigenvalues[:n]
@@ -344,14 +344,14 @@ class MCA(object):
         Parameters
         ----------
         n : int, optioal
-        Number of PCs to return. The default is None.
+            Number of PCs to return. The default is None.
 
         Returns
         -------
         desVar : ndarray
-        Described variance of each PC.
+            Described variance of each PC.
         desVarErr : ndarray
-        Associated uncertainty according to North's `rule of thumb`.
+            Associated uncertainty according to North's `rule of thumb`.
 
         """
         values, error = self.eigenvalues(n)
@@ -366,17 +366,17 @@ class MCA(object):
         Parameters
         ----------
         n : int, optional
-        Number of PCs to be returned. The default is None.
+            Number of PCs to be returned. The default is None.
         scaling : [0,1], optional
-        If 1, scale PCs by square root of eigenvalues. If 0, return
-        unscaled PCs. The default is 0.
+            If 1, scale PCs by square root of eigenvalues. If 0, return
+            unscaled PCs. The default is 0.
 
         Returns
         -------
         pcsLeft : ndarray
-        PCs associated with left input field.
+            PCs associated with left input field.
         pcsRight : ndarray
-        PCs associated with right input field.
+            PCs associated with right input field.
 
         """
         pcsLeft 	= self.__ULeft[:,:n]
@@ -395,17 +395,17 @@ class MCA(object):
         Parameters
         ----------
         n : int, optional
-        Number of EOFs to be returned. The default is None.
+            Number of EOFs to be returned. The default is None.
         scaling : [0,1], optional
-        If 1, scale PCs by square root of eigenvalues. If 0, return
-        unscaled PCs. The default is 0.
+            If 1, scale PCs by square root of eigenvalues. If 0, return
+            unscaled PCs. The default is 0.
 
         Returns
         -------
         eofsLeft : ndarray
-        EOFs associated with left input field.
+            EOFs associated with left input field.
         eofsRight : ndarray
-        EOFs associated with right input field.
+            EOFs associated with right input field.
 
         """
         if n is None:
