@@ -64,14 +64,14 @@ class xMCA(MCA):
         Parameters
         ----------
         left : ndarray
-        Left input data. First dimension needs to be time.
+            Left input data. First dimension needs to be time.
         right : ndarray, optional
-        Right input data. First dimension needs to be time.
-        If none is provided, automatically, right field is assumed to be
-        the same as left field. In this case, MCA reducdes to normal PCA.
-        The default is None.
+            Right input data. First dimension needs to be time.
+            If none is provided, automatically, right field is assumed to be
+            the same as left field. In this case, MCA reducdes to normal PCA.
+            The default is None.
         normalize : boolean, optional
-        Input data is normalized to unit variance. The default is True.
+            Input data is normalized to unit variance. The default is True.
 
         Returns
         -------
@@ -110,12 +110,12 @@ class xMCA(MCA):
         Parameters
         ----------
         A : DataArray
-        Input data.
+            Input data.
 
         Returns
         -------
         bool
-        Input data is of type `DataArray`.
+            Input data is of type `DataArray`.
 
         """
         if (isinstance(data,xr.DataArray)):
@@ -130,15 +130,15 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of eigenvalues to return. If none, then all eigenvalues are returned.
-        The default is None.
+            Number of eigenvalues to return. If none, then all eigenvalues are returned.
+            The default is None.
 
         Returns
         -------
         DataArray
-        Eigenvalues of PCA.
+            Eigenvalues of PCA.
         DataArray
-        Uncertainty of eigenvalues according to North's rule of thumb.
+            Uncertainty of eigenvalues according to North's rule of thumb.
 
         """
         # for n=Nonr, all eigenvalues are returned
@@ -167,14 +167,14 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optioal
-        Number of PCs to return. The default is None.
+            Number of PCs to return. The default is None.
 
         Returns
         -------
         DataArray
-        Described variance of each PC.
+            Described variance of each PC.
         DataArray
-        Associated uncertainty according to North's `rule of thumb`.
+            Associated uncertainty according to North's `rule of thumb`.
 
         """
         desVar, desVarErr 	= MCA.explainedVariance(self, n)
@@ -202,15 +202,15 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of PCs to return. If none, then all PCs are returned.
+            Number of PCs to return. If none, then all PCs are returned.
         The default is None.
 
         Returns
         -------
         DataArray
-        PCs of left input field.
+            PCs of left input field.
         DataArray
-        PCs of right input field.
+            PCs of right input field.
 
         """
         leftData, rightData = MCA.pcs(self, n, scaling=scaling)
@@ -445,19 +445,19 @@ class xMCA(MCA):
         Parameters
         ----------
         signs : list
-        List of +-1s.
+            List of +-1s.
         n : int
-        Length to check against.
+            Length to check against.
 
         Raises
         ------
         ValueError
-        If `n` does not match the length of `sign`.
+            If `n` does not match the length of `sign`.
 
         Returns
         -------
         signs : 1-ndarray
-        Signs in the correct form.
+            Signs in the correct form.
 
         """
         # if nothing provided just take +1 as signs
@@ -500,15 +500,15 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of patterns (modes) to be returned. If None then all patterns
-        are returned. The default is None.
+            Number of patterns (modes) to be returned. If None then all patterns
+            are returned. The default is None.
 
         Returns
         -------
         xr.DataArray
-        Left homogeneous correlation maps.
+            Left homogeneous correlation maps.
         xr.DataArray
-        Right homogeneous correlation maps.
+            Right homogeneous correlation maps.
 
         """
 
@@ -531,15 +531,15 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of patterns (modes) to be returned. If None then all patterns
-        are returned. The default is None.
+            Number of patterns (modes) to be returned. If None then all patterns
+            are returned. The default is None.
 
         Returns
         -------
         xr.DataArray
-        Left heterogeneous correlation maps.
+            Left heterogeneous correlation maps.
         xr.DataArray
-        Right heterogeneous correlation maps.
+            Right heterogeneous correlation maps.
 
         """
         pcsLeft, pcsRight 		= self.pcs(n)
@@ -561,14 +561,14 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Mode of PC and EOF to plot. The default is 1.
+            Mode of PC and EOF to plot. The default is 1.
         right : boolean
-        Plot PC and EOF of right field. The default is False.
+            Plot PC and EOF of right field. The default is False.
         signs : list of int, optional
-        Either +1 or -1 in order to flip the sign of shown PCs/EOFs.
-        The default is None.
+            Either +1 or -1 in order to flip the sign of shown PCs/EOFs.
+            The default is None.
         title : str, optional
-        Title of figure. The default is ''.
+            Title of figure. The default is ''.
 
         Returns
         -------
@@ -779,12 +779,12 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-        Number of PCs and EOFs to plot. The default is 3.
+            Number of PCs and EOFs to plot. The default is 3.
         signs : list of int, optional
-        List of +-1 in order to flip the sign of shown PCs/EOFs.
-        Length of list has to match `n`. The default is None.
+            List of +-1 in order to flip the sign of shown PCs/EOFs.
+            Length of list has to match `n`. The default is None.
         title : str, optional
-        Title of figure. The default is ''.
+            Title of figure. The default is ''.
 
         Returns
         -------
