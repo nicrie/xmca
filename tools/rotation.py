@@ -109,7 +109,7 @@ def promax(A, power=1, maxIter=1000, tol=1e-8):
 	X, R = varimax(X,maxIter=maxIter,tol=tol)
 
     # pre-normalization by communalities (sum of squared rows)
-	h = np.sqrt(np.sum(X**2,axis=1))
+	h = np.sqrt(np.sum(X*X.conjugate(),axis=1))
 	X = np.diag(1./h) @ X
 
     # "Procustes" equation
