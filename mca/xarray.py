@@ -58,7 +58,7 @@ class xMCA(MCA):
     >>> pcsData1, pcsData2 = mca.pcs()
     """
 
-    def __init__(self, left, right=None, normalize=True):
+    def __init__(self, left, right=None, normalize=True, coslat=False):
         """Load data fields and store information about data size/shape.
 
         Parameters
@@ -89,19 +89,36 @@ class xMCA(MCA):
         assert(self.__isXarray(self.__left))
         assert(self.__isXarray(self.__right))
 
-        # store meta information of time steps
+        # store meta information of time steps and coordinates
         self.__timeSteps 	= self.__left.coords['time'].values
-        # store meta information of coordinates
         self.__lonsLeft 	= self.__left.coords['lon'].values
         self.__lonsRight 	= self.__right.coords['lon'].values
         self.__latsLeft 	= self.__left.coords['lat'].values
         self.__latsRight 	= self.__right.coords['lat'].values
 
+        self.__left     = self.__centerData(self.__left)
+        self.__right    = self.__centerData(self.__right)
+
+        self.normalize = normalize
+        if self.normalize:
+            self.__left     = self.__normalizeData(self.__left)
+            self.__right    = self.__normalizeData(self.__right)
+
+
+        if coslat:
+            # coslat correction needs to happen AFTER normalization since
+            # normalization mathematically removes the coslat correction effect
+            self.__left     = self.__applyCosLatCorrection(self.__left)
+            self.__right    = self.__applyCosLatCorrection(self.__right)
+            # Deactivate normalization for array.MCA, otherwise
+            # coslat correction may be overwritten
+            self.normalize = False
+
         dataLeft 	= self.__left.data
         dataRight 	= self.__right.data
 
         # constructor of base class for np.ndarray
-        MCA.__init__(self, dataLeft, dataRight, normalize)
+        MCA.__init__(self, dataLeft, dataRight, self.normalize)
 
 
     def __isXarray(self, data):
@@ -122,6 +139,24 @@ class xMCA(MCA):
             return True
         else:
             raise TypeError('Input data must be xarray.DataArray.')
+
+
+    def __centerData(self, data):
+        return data - data.mean('time')
+
+
+    def __normalizeData(self, data):
+        return data / data.std('time')
+
+
+    def __applyCosLatCorrection(self, data):
+        """Apply area correction to higher latitudes.
+
+        """
+
+        weights     = np.cos(np.deg2rad(data.lat))
+
+        return data * weights
 
 
     def eigenvalues(self, n=None):
