@@ -184,8 +184,47 @@ class MCA(object):
 
         # complexify input data via Hilbert transfrom
         if (useHilbert):
+            # Calculating Hilbert transform via scipy.signal.hilbert is done
+            # through Fast Fourier Transform. If the time series exhibits some
+            # non-periodic behaviour (e.g. a trend) the Hilbert transform
+            # yields extreme "legs" at the beginning/end of the time series.
+            # To encounter this issue, we concatentate some synthetic data
+            # at the beginning/end of each time series which is point-symmetric
+            # (with respect to the first and last data point, respectively)
+            # to the original time series. We then take only the middle part
+            # of the Hilbert transform (corresponding to the original time series)
+            # which exhibits a dampened influence of the "legs".
+            """
+            y0Left, y1Left      = self.__noNanDataLeft[0,:], self.__noNanDataLeft[-1,:]
+            y0Right, y1Right    = self.__noNanDataRight[0,:], self.__noNanDataRight[-1,:]
+
+            dataFrontLeft       = -(self.__noNanDataLeft - y0Left)[::-1] + y0Left
+            dataFrontRight      = -(self.__noNanDataRight - y0Right)[::-1] + y0Right
+
+            dataRearLeft        = -(self.__noNanDataLeft - y1Left)[::-1] + y1Left
+            dataRearRight       = -(self.__noNanDataRight - y1Right)[::-1] + y1Right
+
+            self.__noNanDataLeft    = np.concatenate([dataFrontLeft, self.__noNanDataLeft, dataRearLeft])
+            self.__noNanDataRight   = np.concatenate([dataFrontRight, self.__noNanDataRight, dataRearRight])
+
             self.__noNanDataLeft 	= hilbert(self.__noNanDataLeft,axis=0)
             self.__noNanDataRight 	= hilbert(self.__noNanDataRight,axis=0)
+
+            self.__noNanDataLeft    = self.__noNanDataLeft[self.__observations:(2*self.__observations)]
+            self.__noNanDataRight   = self.__noNanDataRight[self.__observations:(2*self.__observations)]
+
+            # alternative version using axis-symmetry instead of point symmetry
+            """
+
+            self.__noNanDataLeft    = np.concatenate([self.__noNanDataLeft[::-1], self.__noNanDataLeft, self.__noNanDataLeft[::-1]])
+            self.__noNanDataRight   = np.concatenate([self.__noNanDataRight[::-1], self.__noNanDataRight, self.__noNanDataRight[::-1]])
+
+            self.__noNanDataLeft 	= hilbert(self.__noNanDataLeft,axis=0)
+            self.__noNanDataRight 	= hilbert(self.__noNanDataRight,axis=0)
+
+            self.__noNanDataLeft    = self.__noNanDataLeft[self.__observations:(2*self.__observations)]
+            self.__noNanDataRight    = self.__noNanDataRight[self.__observations:(2*self.__observations)]
+
 
         kernel = self.__noNanDataLeft.conjugate().T @ self.__noNanDataRight / self.__observations
 
@@ -292,6 +331,20 @@ class MCA(object):
         self.__rotatedSolution 		= True
 
 
+    def rotationMatrix(self):
+        """
+        Return the rotation matrix.
+
+        Returns
+        -------
+        ndarray
+            Rotation matrix.
+        """
+        if (self.__rotatedSolution):
+            return self.__rotationMatrix
+        else:
+            raise RuntimeError('Rotation matrix does not exist since EOFs were not rotated')
+
     def correlationMatrix(self):
         """
         Return the correlation matrix of rotated PCs.
@@ -305,7 +358,7 @@ class MCA(object):
         if (self.__rotatedSolution):
             return self.__correlationMatrix
         else:
-            raise RuntimeError('Correlation matrix does not exist since PCs were not rotated.')
+            raise RuntimeError('Correlation matrix does not exist since EOFs were not rotated.')
 
 
     def eigenvalues(self,n=None):
