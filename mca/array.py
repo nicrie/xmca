@@ -10,6 +10,8 @@ import numpy as np
 import xarray as xr
 import textwrap
 from scipy.signal import hilbert
+from statsmodels.tsa.forecasting.theta import ThetaModel
+from tqdm import tqdm
 
 from tools.rotation import promax
 
@@ -70,7 +72,8 @@ class MCA(object):
 
         """
         self.__left  = left.copy()
-        self.__right = self.__getRightField(left,right)
+        self.__right = self.__getRightField(right)
+        self.__useMCA = (self.__left is not self.__right)
 
         assert(self.__isArray(self.__left))
         assert(self.__isArray(self.__right))
@@ -114,13 +117,13 @@ class MCA(object):
         self.__rotatedSolution = False
 
 
-    def __getRightField(self,left,right):
+    def __getRightField(self,right):
         """Copy left field if no right field is provided.
 
         Basically, this defines whether MCA or PCA is performed.
         """
         if right is None:
-            return left.copy()
+            return self.__left
         else:
             return right.copy()
 
@@ -172,60 +175,93 @@ class MCA(object):
             raise ValueError('Input field is empty or contains NaN only.')
 
 
-    def solve(self, useHilbert=False):
+    def thetaForecast(self, series, steps=None, seasonalPeriod=365):
+        if steps is None:
+            steps = len(series)
+
+        model = ThetaModel(series, period=seasonalPeriod, deseasonalize=True, use_test=False).fit()
+        forecast = model.forecast(steps=steps, theta=20)
+
+        return forecast
+
+    def extendData(self, data, seasonalPeriod=365):
+
+        extendedData = [self.thetaForecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
+        extendedData = np.array(extendedData).T
+
+        return extendedData
+
+    def complexifyData(self, data, extendSeries=False, seasonalPeriod=365):
+        """Complexify data via Hilbert transform.
+
+        Calculating Hilbert transform via scipy.signal.hilbert is done
+        through Fast Fourier Transform. If the time series exhibits some
+        non-periodic behaviour (e.g. a trend) the Hilbert transform
+        produces extreme "legs" at the beginning/end of the time series.
+        To encounter this issue, we can forecast/backcast the original time
+        series via the Theta model before applying the Hilbert transform.
+        Then, we only take the middle part of the Hilbert transform
+        (corresponding to the original time series) which exhibits
+        a dampened influence of the "legs".
+
+        Parameters
+        ----------
+        data : ndarray
+            Real input data which is to be transformed via Hilbert transform.
+        extendSeries : boolean, optional
+            If True, input time series are extended via forecast/backcast to
+            3 * original length. This helps avoiding boundary effects of FFT.
+
+        Returns
+        -------
+        ndarray
+            Analytical signal of input data.
+
+        """
+
+        if extendSeries:
+            forecast    = self.extendData(data, seasonalPeriod=seasonalPeriod)
+            backcast    = self.extendData(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
+
+            data = np.concatenate([backcast, data, forecast])
+
+        # perform actual Hilbert transform of (extended) time series
+        data = hilbert(data,axis=0)
+
+        if extendSeries:
+            # cut out the first and last third of Hilbert transform
+            # which belong to the forecast/backcast
+            data    = data[self.__observations:(2*self.__observations)]
+            data = self.__centerData(data)
+
+        return data
+
+
+    def solve(self, useHilbert=False, extendSeries=False, seasonalPeriod=365):
         """Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
         ----------
         useHilbert : boolean, optional
             Use Hilbert transform to complexify the input data fields
-            in order to perform complex PCA/MCA
+            in order to perform complex PCA/MCA. Default is false.
+        extendSeries : boolean, optional
+            If True, extend time series by fore/backcasting based on
+            Theta model. New time series will have 3 * original length.
+            Only used for complex time series (useHilbert=True).
+            Default is False.
         """
 
         # complexify input data via Hilbert transfrom
         if (useHilbert):
-            # Calculating Hilbert transform via scipy.signal.hilbert is done
-            # through Fast Fourier Transform. If the time series exhibits some
-            # non-periodic behaviour (e.g. a trend) the Hilbert transform
-            # yields extreme "legs" at the beginning/end of the time series.
-            # To encounter this issue, we concatentate some synthetic data
-            # at the beginning/end of each time series which is point-symmetric
-            # (with respect to the first and last data point, respectively)
-            # to the original time series. We then take only the middle part
-            # of the Hilbert transform (corresponding to the original time series)
-            # which exhibits a dampened influence of the "legs".
-            """
-            y0Left, y1Left      = self.__noNanDataLeft[0,:], self.__noNanDataLeft[-1,:]
-            y0Right, y1Right    = self.__noNanDataRight[0,:], self.__noNanDataRight[-1,:]
+            self.__noNanDataLeft = self.complexifyData(self.__noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            # save computing time if left and right field are the same
+            if self.__useMCA:
+                self.__noNanDataRight = self.complexifyData(self.__noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            else:
+                self.__noNanDataRight = self.__noNanDataLeft
 
-            dataFrontLeft       = -(self.__noNanDataLeft - y0Left)[::-1] + y0Left
-            dataFrontRight      = -(self.__noNanDataRight - y0Right)[::-1] + y0Right
-
-            dataRearLeft        = -(self.__noNanDataLeft - y1Left)[::-1] + y1Left
-            dataRearRight       = -(self.__noNanDataRight - y1Right)[::-1] + y1Right
-
-            self.__noNanDataLeft    = np.concatenate([dataFrontLeft, self.__noNanDataLeft, dataRearLeft])
-            self.__noNanDataRight   = np.concatenate([dataFrontRight, self.__noNanDataRight, dataRearRight])
-
-            self.__noNanDataLeft 	= hilbert(self.__noNanDataLeft,axis=0)
-            self.__noNanDataRight 	= hilbert(self.__noNanDataRight,axis=0)
-
-            self.__noNanDataLeft    = self.__noNanDataLeft[self.__observations:(2*self.__observations)]
-            self.__noNanDataRight   = self.__noNanDataRight[self.__observations:(2*self.__observations)]
-
-            # alternative version using axis-symmetry instead of point symmetry
-            """
-
-            self.__noNanDataLeft    = np.concatenate([self.__noNanDataLeft[::-1], self.__noNanDataLeft, self.__noNanDataLeft[::-1]])
-            self.__noNanDataRight   = np.concatenate([self.__noNanDataRight[::-1], self.__noNanDataRight, self.__noNanDataRight[::-1]])
-
-            self.__noNanDataLeft 	= hilbert(self.__noNanDataLeft,axis=0)
-            self.__noNanDataRight 	= hilbert(self.__noNanDataRight,axis=0)
-
-            self.__noNanDataLeft    = self.__noNanDataLeft[self.__observations:(2*self.__observations)]
-            self.__noNanDataRight    = self.__noNanDataRight[self.__observations:(2*self.__observations)]
-
-
+        # create covariance matrix
         kernel = self.__noNanDataLeft.conjugate().T @ self.__noNanDataRight / self.__observations
 
         # solve eigenvalue problem
