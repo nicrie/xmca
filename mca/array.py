@@ -116,7 +116,6 @@ class MCA(object):
 
         self.__rotatedSolution = False
 
-
     def __getRightField(self,right):
         """Copy left field if no right field is provided.
 

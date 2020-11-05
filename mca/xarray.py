@@ -81,10 +81,7 @@ class xMCA(MCA):
         self.__left  = left.copy()
 
         # for univariate case (normal PCA) left = right
-        if right is None:
-            self.__right = self.__left
-        else:
-            self.__right = right.copy()
+        self.__right = self.__getRightField(right)
 
         assert(self.__isXarray(self.__left))
         assert(self.__isXarray(self.__right))
@@ -95,6 +92,8 @@ class xMCA(MCA):
         self.__lonsRight 	= self.__right.coords['lon'].values
         self.__latsLeft 	= self.__left.coords['lat'].values
         self.__latsRight 	= self.__right.coords['lat'].values
+        self.__nameLeft     = self.__getFieldName(self.__left,'left')
+        self.__nameRight    = self.__getFieldName(self.__right,'right')
 
         self.__left     = self.__centerData(self.__left)
         self.__right    = self.__centerData(self.__right)
@@ -120,6 +119,15 @@ class xMCA(MCA):
         # constructor of base class for np.ndarray
         MCA.__init__(self, dataLeft, dataRight, self.normalize)
 
+    def __getRightField(self,right):
+        """Copy left field if no right field is provided.
+
+        Basically, this defines whether MCA or PCA is performed.
+        """
+        if right is None:
+            return self.__left
+        else:
+            return right.copy()
 
     def __isXarray(self, data):
         """Check if data is of type `xr.DataArray`.
@@ -140,6 +148,11 @@ class xMCA(MCA):
         else:
             raise TypeError('Input data must be xarray.DataArray.')
 
+    def __getFieldName(self, dataArray, backupName='undefined'):
+        name = dataArray.name
+        if name is None:
+            name = backupName
+        return name
 
     def __centerData(self, data):
         return data - data.mean('time')
@@ -191,7 +204,7 @@ class xMCA(MCA):
         error = xr.DataArray(err,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'uncertainty of eigenvalues')
+            name 	= 'error-eigenvalues')
 
         return values, error
 
@@ -222,11 +235,11 @@ class xMCA(MCA):
         values = xr.DataArray(desVar,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'described variance')
+            name 	= 'explained-variance')
         error = xr.DataArray(desVarErr,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'uncertainty of described variance')
+            name 	= 'error-explained-variance')
 
         return values, error
 
@@ -260,14 +273,16 @@ class xMCA(MCA):
           coords = {
           'time' : self.__timeSteps,
           'mode' : modes
-          })
+          },
+          name = '-'.join([self.__nameLeft,'pcs']))
 
         rightPcs = xr.DataArray(rightData,
           dims 	= ['time','mode'],
           coords = {
           'time' : self.__timeSteps,
           'mode' : modes
-          })
+          },
+          name = '-'.join([self.__nameRight,'pcs']))
 
         return leftPcs, rightPcs
 
@@ -303,7 +318,8 @@ class xMCA(MCA):
           'lon' : self.__lonsLeft,
           'lat' : self.__latsLeft,
           'mode' : modes
-          })
+          },
+          name = '-'.join([self.__nameLeft,'eofs']))
 
         rightEofs = xr.DataArray(rightData,
           dims 	= ['lat','lon','mode'],
@@ -311,7 +327,8 @@ class xMCA(MCA):
           'lon' : self.__lonsRight,
           'lat' : self.__latsRight,
           'mode' : modes
-          })
+          },
+          name = '-'.join([self.__nameRight,'eofs']))
 
         return leftEofs, rightEofs
 
@@ -337,6 +354,9 @@ class xMCA(MCA):
 
         amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
         amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
+
+        amplitudeLeft.name  = '-'.join([self.__nameLeft,'spatial-amplitude'])
+        amplitudeRight.name = '-'.join([self.__nameRight,'spatial-amplitude'])
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -364,6 +384,9 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
+        phaseLeft.name  = '-'.join([self.__nameLeft,'spatial-phase'])
+        phaseRight.name = '-'.join([self.__nameRight,'spatial-phase'])
+
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
 
@@ -388,6 +411,9 @@ class xMCA(MCA):
 
         amplitudeLeft   = np.sqrt(pcsLeft * pcsLeft.conjugate())
         amplitudeRight  = np.sqrt(pcsRight * pcsRight.conjugate())
+
+        amplitudeLeft.name  = '-'.join([self.__nameLeft,'temporal-amplitude'])
+        amplitudeRight.name = '-'.join([self.__nameRight,'temporal-amplitude'])
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -415,12 +441,11 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
         phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)
 
+        phaseLeft.name  = '-'.join([self.__nameLeft,'temporal-phase'])
+        phaseRight.name = '-'.join([self.__nameRight,'temporal-phase'])
+
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
-
-
-
-
 
 
     def __getMapBoundaries(self, data):
