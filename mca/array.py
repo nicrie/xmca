@@ -119,6 +119,7 @@ class MCA(object):
         self._nRotations        = 0
         self._power             = 0
 
+
     def _getRightField(self,right):
         """Copy left field if no right field is provided.
 
@@ -129,11 +130,13 @@ class MCA(object):
         else:
             return right.copy()
 
+
     def _isSameArray(self, arr1 ,arr2):
         if arr1.shape == arr2.shape:
             return ((np.isnan(arr1) & np.isnan(arr2)) | (arr1 == arr2)).all()
         else:
             return False
+
 
     def _isArray(self,data):
         if (isinstance(data,np.ndarray)):
@@ -182,7 +185,7 @@ class MCA(object):
             raise ValueError('Input field is empty or contains NaN only.')
 
 
-    def thetaForecast(self, series, steps=None, seasonalPeriod=365):
+    def _thetaForecast(self, series, steps=None, seasonalPeriod=365):
         if steps is None:
             steps = len(series)
 
@@ -191,14 +194,16 @@ class MCA(object):
 
         return forecast
 
-    def extendData(self, data, seasonalPeriod=365):
 
-        extendedData = [self.thetaForecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
+    def _extendData(self, data, seasonalPeriod=365):
+
+        extendedData = [self._thetaForecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
         extendedData = np.array(extendedData).T
 
         return extendedData
 
-    def complexifyData(self, data, extendSeries=False, seasonalPeriod=365):
+
+    def _complexifyData(self, data, extendSeries=False, seasonalPeriod=365):
         """Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -227,8 +232,8 @@ class MCA(object):
         """
 
         if extendSeries:
-            forecast    = self.extendData(data, seasonalPeriod=seasonalPeriod)
-            backcast    = self.extendData(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
+            forecast    = self._extendData(data, seasonalPeriod=seasonalPeriod)
+            backcast    = self._extendData(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
 
             data = np.concatenate([backcast, data, forecast])
 
@@ -261,7 +266,7 @@ class MCA(object):
         self._useHilbert = useHilbert
         # complexify input data via Hilbert transform
         if (self._useHilbert):
-            self._noNanDataLeft = self.complexifyData(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            self._noNanDataLeft = self._complexifyData(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             # save computing time if left and right field are the same
             if self._useMCA:
                 self._noNanDataRight = self.complexifyData(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
@@ -389,6 +394,7 @@ class MCA(object):
             return self._rotationMatrix
         else:
             raise RuntimeError('Rotation matrix does not exist since EOFs were not rotated')
+
 
     def correlationMatrix(self):
         """
@@ -520,6 +526,7 @@ class MCA(object):
 
         return eofsLeft, eofsRight
 
+
     def spatialAmplitude(self, n=None):
         """Return the spatial amplitude fields for the first `n` EOFs.
 
@@ -543,6 +550,7 @@ class MCA(object):
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
+
 
     def spatialPhase(self, n=None):
         """Return the spatial phase fields for the first `n` EOFs.
@@ -569,6 +577,7 @@ class MCA(object):
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
 
+
     def temporalAmplitude(self, n=None):
         """Return the temporal amplitude time series for the first `n` PCs.
 
@@ -593,6 +602,7 @@ class MCA(object):
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
+
 
     def temporalPhase(self, n=None):
         """Return the temporal phase function for the first `n` PCs.
