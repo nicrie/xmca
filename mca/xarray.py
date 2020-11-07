@@ -8,6 +8,8 @@ Complex rotated maximum covariance analysis of two xarray DataArrays.
 # =============================================================================
 # Imports
 # =============================================================================
+import os
+
 import numpy as np
 import xarray as xr
 import matplotlib as mpl
@@ -78,58 +80,49 @@ class xMCA(MCA):
         None.
 
         """
-        self.__left  = left.copy()
+        self._left  = left.copy()
 
         # for univariate case (normal PCA) left = right
-        self.__right = self.__getRightField(right)
+        self._right = self._getRightField(right)
 
-        assert(self.__isXarray(self.__left))
-        assert(self.__isXarray(self.__right))
+        assert(self._isXarray(self._left))
+        assert(self._isXarray(self._right))
 
         # store meta information of time steps and coordinates
-        self.__timeSteps 	= self.__left.coords['time'].values
-        self.__lonsLeft 	= self.__left.coords['lon'].values
-        self.__lonsRight 	= self.__right.coords['lon'].values
-        self.__latsLeft 	= self.__left.coords['lat'].values
-        self.__latsRight 	= self.__right.coords['lat'].values
-        self.__nameLeft     = self.__getFieldName(self.__left,'left')
-        self.__nameRight    = self.__getFieldName(self.__right,'right')
+        self._timeSteps 	= self._left.coords['time'].values
+        self._lonsLeft 	    = self._left.coords['lon'].values
+        self._lonsRight 	= self._right.coords['lon'].values
+        self._latsLeft 	    = self._left.coords['lat'].values
+        self._latsRight 	= self._right.coords['lat'].values
+        self._nameLeft      = self._getFieldName(self._left,'left')
+        self._nameRight     = self._getFieldName(self._right,'right')
 
-        self.__left     = self.__centerData(self.__left)
-        self.__right    = self.__centerData(self.__right)
+        self._left     = self._centerXarray(self._left)
+        self._right    = self._centerXarray(self._right)
 
         self.normalize = normalize
         if self.normalize:
-            self.__left     = self.__normalizeData(self.__left)
-            self.__right    = self.__normalizeData(self.__right)
+            self._left     = self._normalizeXarray(self._left)
+            self._right    = self._normalizeXarray(self._right)
 
 
         if coslat:
             # coslat correction needs to happen AFTER normalization since
             # normalization mathematically removes the coslat correction effect
-            self.__left     = self.__applyCosLatCorrection(self.__left)
-            self.__right    = self.__applyCosLatCorrection(self.__right)
+            self._left     = self._applyCosLatCorrection(self._left)
+            self._right    = self._applyCosLatCorrection(self._right)
             # Deactivate normalization for array.MCA, otherwise
             # coslat correction may be overwritten
             self.normalize = False
 
-        dataLeft 	= self.__left.data
-        dataRight 	= self.__right.data
+        dataLeft 	= self._left.data
+        dataRight 	= self._right.data
 
         # constructor of base class for np.ndarray
         MCA.__init__(self, dataLeft, dataRight, self.normalize)
 
-    def __getRightField(self,right):
-        """Copy left field if no right field is provided.
 
-        Basically, this defines whether MCA or PCA is performed.
-        """
-        if right is None:
-            return self.__left
-        else:
-            return right.copy()
-
-    def __isXarray(self, data):
+    def _isXarray(self, data):
         """Check if data is of type `xr.DataArray`.
 
         Parameters
@@ -148,21 +141,21 @@ class xMCA(MCA):
         else:
             raise TypeError('Input data must be xarray.DataArray.')
 
-    def __getFieldName(self, dataArray, backupName='undefined'):
+    def _getFieldName(self, dataArray, backupName='undefined'):
         name = dataArray.name
         if name is None:
             name = backupName
         return name
 
-    def __centerData(self, data):
-        return data - data.mean('time')
+    def _centerXarray(self, xarray):
+        return xarray - xarray.mean('time')
 
 
-    def __normalizeData(self, data):
-        return data / data.std('time')
+    def _normalizeXarray(self, xarray):
+        return xarray / xarray.std('time')
 
 
-    def __applyCosLatCorrection(self, data):
+    def _applyCosLatCorrection(self, data):
         """Apply area correction to higher latitudes.
 
         """
@@ -271,18 +264,18 @@ class xMCA(MCA):
         leftPcs = xr.DataArray(leftData,
           dims 	= ['time','mode'],
           coords = {
-          'time' : self.__timeSteps,
+          'time' : self._timeSteps,
           'mode' : modes
           },
-          name = '-'.join([self.__nameLeft,'pcs']))
+          name = '-'.join([self._nameLeft,'pcs']))
 
         rightPcs = xr.DataArray(rightData,
           dims 	= ['time','mode'],
           coords = {
-          'time' : self.__timeSteps,
+          'time' : self._timeSteps,
           'mode' : modes
           },
-          name = '-'.join([self.__nameRight,'pcs']))
+          name = '-'.join([self._nameRight,'pcs']))
 
         return leftPcs, rightPcs
 
@@ -315,20 +308,20 @@ class xMCA(MCA):
         leftEofs = xr.DataArray(leftData,
           dims 	= ['lat','lon','mode'],
           coords = {
-          'lon' : self.__lonsLeft,
-          'lat' : self.__latsLeft,
+          'lon' : self._lonsLeft,
+          'lat' : self._latsLeft,
           'mode' : modes
           },
-          name = '-'.join([self.__nameLeft,'eofs']))
+          name = '-'.join([self._nameLeft,'eofs']))
 
         rightEofs = xr.DataArray(rightData,
           dims 	= ['lat','lon','mode'],
           coords = {
-          'lon' : self.__lonsRight,
-          'lat' : self.__latsRight,
+          'lon' : self._lonsRight,
+          'lat' : self._latsRight,
           'mode' : modes
           },
-          name = '-'.join([self.__nameRight,'eofs']))
+          name = '-'.join([self._nameRight,'eofs']))
 
         return leftEofs, rightEofs
 
@@ -355,8 +348,8 @@ class xMCA(MCA):
         amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
         amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
 
-        amplitudeLeft.name  = '-'.join([self.__nameLeft,'spatial-amplitude'])
-        amplitudeRight.name = '-'.join([self.__nameRight,'spatial-amplitude'])
+        amplitudeLeft.name  = '-'.join([self._nameLeft,'spatial-amplitude'])
+        amplitudeRight.name = '-'.join([self._nameRight,'spatial-amplitude'])
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -384,8 +377,8 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
-        phaseLeft.name  = '-'.join([self.__nameLeft,'spatial-phase'])
-        phaseRight.name = '-'.join([self.__nameRight,'spatial-phase'])
+        phaseLeft.name  = '-'.join([self._nameLeft,'spatial-phase'])
+        phaseRight.name = '-'.join([self._nameRight,'spatial-phase'])
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
@@ -412,8 +405,8 @@ class xMCA(MCA):
         amplitudeLeft   = np.sqrt(pcsLeft * pcsLeft.conjugate())
         amplitudeRight  = np.sqrt(pcsRight * pcsRight.conjugate())
 
-        amplitudeLeft.name  = '-'.join([self.__nameLeft,'temporal-amplitude'])
-        amplitudeRight.name = '-'.join([self.__nameRight,'temporal-amplitude'])
+        amplitudeLeft.name  = '-'.join([self._nameLeft,'temporal-amplitude'])
+        amplitudeRight.name = '-'.join([self._nameRight,'temporal-amplitude'])
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -441,14 +434,14 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
         phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)
 
-        phaseLeft.name  = '-'.join([self.__nameLeft,'temporal-phase'])
-        phaseRight.name = '-'.join([self.__nameRight,'temporal-phase'])
+        phaseLeft.name  = '-'.join([self._nameLeft,'temporal-phase'])
+        phaseRight.name = '-'.join([self._nameRight,'temporal-phase'])
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
 
 
-    def __getMapBoundaries(self, data):
+    def _getMapBoundaries(self, data):
         assert(isinstance(data, xr.DataArray))
 
         east 	= data.coords['lon'].min()
@@ -460,15 +453,15 @@ class xMCA(MCA):
         return boundaries
 
 
-    def __normalizeEOFto1(self, data):
+    def _normalizeEOFto1(self, data):
         return data / abs(data).max(['lon','lat'])
 
 
-    def __normalizePCto1(self, data):
+    def _normalizePCto1(self, data):
         return data / abs(data).max(['time'])
 
 
-    def __createFigure(self, nrows=3, coltypes=['t','s'], cenLon=0):
+    def _createFigure(self, nrows=3, coltypes=['t','s'], cenLon=0):
         nRows, nCols = [nrows, len(coltypes)]
 
         # positions of temporal plots
@@ -499,7 +492,7 @@ class xMCA(MCA):
         return fig, axesPC, axesEOF
 
 
-    def __validateSigns(self, signs, n):
+    def _validateSigns(self, signs, n):
         """Check if list of signs match the length n.
 
         Parameters
@@ -532,16 +525,16 @@ class xMCA(MCA):
         return signs
 
 
-    def __flipSigns(self, data, signs):
+    def _flipSigns(self, data, signs):
         modes = data['mode'].size
-        signs = self.__validateSigns(signs, modes)
+        signs = self._validateSigns(signs, modes)
 
         return signs * data
 
 
-    def __calculateCorrelation(self, x, y):
-        assert(self.__isXarray(x))
-        assert(self.__isXarray(y))
+    def _calculateCorrelation(self, x, y):
+        assert(self._isXarray(x))
+        assert(self._isXarray(y))
 
         x = x - x.mean('time')
         y = y - y.mean('time')
@@ -575,11 +568,11 @@ class xMCA(MCA):
         pcsLeft, pcsRight 		= self.pcs(n)
         pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
 
-        fieldLeft  = self.__left
-        fieldRight = self.__right
+        fieldLeft  = self._left
+        fieldRight = self._right
 
-        homPatternsLeft 	= self.__calculateCorrelation(fieldLeft,pcsLeft)
-        homPatternsRight 	= self.__calculateCorrelation(fieldRight,pcsRight)
+        homPatternsLeft 	= self._calculateCorrelation(fieldLeft,pcsLeft)
+        homPatternsRight 	= self._calculateCorrelation(fieldRight,pcsRight)
 
         return homPatternsLeft, homPatternsRight
 
@@ -605,11 +598,11 @@ class xMCA(MCA):
         pcsLeft, pcsRight 		= self.pcs(n)
         pcsLeft, pcsRight 		= [pcsLeft.real, pcsRight.real]
 
-        fieldLeft  = self.__left
-        fieldRight = self.__right
+        fieldLeft  = self._left
+        fieldRight = self._right
 
-        hetPatternsLeft 	= self.__calculateCorrelation(fieldLeft,pcsRight)
-        hetPatternsRight 	= self.__calculateCorrelation(fieldRight,pcsLeft)
+        hetPatternsLeft 	= self._calculateCorrelation(fieldLeft,pcsRight)
+        hetPatternsRight 	= self._calculateCorrelation(fieldRight,pcsLeft)
 
         return hetPatternsLeft, hetPatternsRight
 
@@ -646,20 +639,20 @@ class xMCA(MCA):
 
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        eofsLeft 		= self.__normalizeEOFto1(eofsLeft)
-        eofsRight 		= self.__normalizeEOFto1(eofsRight)
-        pcsLeft 		= self.__normalizePCto1(pcsLeft)
-        pcsRight 		= self.__normalizePCto1(pcsRight)
+        eofsLeft 		= self._normalizeEOFto1(eofsLeft)
+        eofsRight 		= self._normalizeEOFto1(eofsRight)
+        pcsLeft 		= self._normalizePCto1(pcsLeft)
+        pcsRight 		= self._normalizePCto1(pcsRight)
 
         # flip signs of PCs and EOFs, if needed
-        eofsLeft 	= self.__flipSigns(eofsLeft, signs)
-        eofsRight 	= self.__flipSigns(eofsRight, signs)
-        pcsLeft 	= self.__flipSigns(pcsLeft, signs)
-        pcsRight 	= self.__flipSigns(pcsRight, signs)
+        eofsLeft 	= self._flipSigns(eofsLeft, signs)
+        eofsRight 	= self._flipSigns(eofsRight, signs)
+        pcsLeft 	= self._flipSigns(pcsLeft, signs)
+        pcsRight 	= self._flipSigns(pcsRight, signs)
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft  = self.__getMapBoundaries(eofsLeft)
-        mapBoundariesRight = self.__getMapBoundaries(eofsRight)
+        mapBoundariesLeft  = self._getMapBoundaries(eofsLeft)
+        mapBoundariesRight = self._getMapBoundaries(eofsRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
@@ -669,9 +662,9 @@ class xMCA(MCA):
         # multiple projections at the same time
 
         if right:
-            fig, axesPC, axesEOF = self.__createFigure(2,['t','s'],cenLon)
+            fig, axesPC, axesEOF = self._createFigure(2,['t','s'],cenLon)
         else:
-            fig, axesPC, axesEOF = self.__createFigure(1,['t','s'],cenLon)
+            fig, axesPC, axesEOF = self._createFigure(1,['t','s'],cenLon)
 
 
 
@@ -753,10 +746,10 @@ class xMCA(MCA):
 
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        amplitudeLeft   = self.__normalizeEOFto1(amplitudeLeft)
-        amplitudeRight  = self.__normalizeEOFto1(amplitudeRight)
-        pcsLeft         = self.__normalizePCto1(pcsLeft)
-        pcsRight        = self.__normalizePCto1(pcsRight)
+        amplitudeLeft   = self._normalizeEOFto1(amplitudeLeft)
+        amplitudeRight  = self._normalizeEOFto1(amplitudeRight)
+        pcsLeft         = self._normalizePCto1(pcsLeft)
+        pcsRight        = self._normalizePCto1(pcsRight)
 
         # apply amplitude threshold
         amplitudeLeft   = amplitudeLeft.where(amplitudeLeft > threshold)
@@ -765,8 +758,8 @@ class xMCA(MCA):
         phaseRight      = phaseRight.where(amplitudeRight > threshold)
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft  = self.__getMapBoundaries(amplitudeLeft)
-        mapBoundariesRight = self.__getMapBoundaries(amplitudeRight)
+        mapBoundariesLeft  = self._getMapBoundaries(amplitudeLeft)
+        mapBoundariesRight = self._getMapBoundaries(amplitudeRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
@@ -777,9 +770,9 @@ class xMCA(MCA):
 
         # create figure environment
         if right:
-            fig, axesPC, axesEOF = self.__createFigure(2,['t','s','s'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(2,['t','s','s'], cenLon)
         else:
-            fig, axesPC, axesEOF = self.__createFigure(1,['t','s','s'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(1,['t','s','s'], cenLon)
 
 
 
@@ -862,20 +855,20 @@ class xMCA(MCA):
 
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        eofsLeft 		= self.__normalizeEOFto1(eofsLeft)
-        eofsRight 		= self.__normalizeEOFto1(eofsRight)
-        pcsLeft 		= self.__normalizePCto1(pcsLeft)
-        pcsRight 		= self.__normalizePCto1(pcsRight)
+        eofsLeft 		= self._normalizeEOFto1(eofsLeft)
+        eofsRight 		= self._normalizeEOFto1(eofsRight)
+        pcsLeft 		= self._normalizePCto1(pcsLeft)
+        pcsRight 		= self._normalizePCto1(pcsRight)
 
         # flip signs of PCs and EOFs, if needed
-        eofsLeft 	= self.__flipSigns(eofsLeft, signs)
-        eofsRight 	= self.__flipSigns(eofsRight, signs)
-        pcsLeft 	= self.__flipSigns(pcsLeft, signs)
-        pcsRight 	= self.__flipSigns(pcsRight, signs)
+        eofsLeft 	= self._flipSigns(eofsLeft, signs)
+        eofsRight 	= self._flipSigns(eofsRight, signs)
+        pcsLeft 	= self._flipSigns(pcsLeft, signs)
+        pcsRight 	= self._flipSigns(pcsRight, signs)
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft = self.__getMapBoundaries(eofsLeft)
-        mapBoundariesRight = self.__getMapBoundaries(eofsRight)
+        mapBoundariesLeft = self._getMapBoundaries(eofsLeft)
+        mapBoundariesRight = self._getMapBoundaries(eofsRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
@@ -885,9 +878,9 @@ class xMCA(MCA):
         # multiple projections at the same time
 
         if right:
-            fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','t'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(n,['t','s','s','t'], cenLon)
         else:
-            fig, axesPC, axesEOF = self.__createFigure(n,['t','s'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(n,['t','s'], cenLon)
 
 
         # plot PCs/EOFs
@@ -963,10 +956,10 @@ class xMCA(MCA):
 
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        amplitudeLeft 		= self.__normalizeEOFto1(amplitudeLeft)
-        amplitudeRight 		= self.__normalizeEOFto1(amplitudeRight)
-        pcsLeft 		= self.__normalizePCto1(pcsLeft)
-        pcsRight 		= self.__normalizePCto1(pcsRight)
+        amplitudeLeft 		= self._normalizeEOFto1(amplitudeLeft)
+        amplitudeRight 		= self._normalizeEOFto1(amplitudeRight)
+        pcsLeft 		= self._normalizePCto1(pcsLeft)
+        pcsRight 		= self._normalizePCto1(pcsRight)
 
         # apply amplitude threshold
         amplitudeLeft   = amplitudeLeft.where(amplitudeLeft > threshold)
@@ -976,8 +969,8 @@ class xMCA(MCA):
 
 
         # map boundaries as [east, west, south, north]
-        mapBoundariesLeft = self.__getMapBoundaries(amplitudeLeft)
-        mapBoundariesRight = self.__getMapBoundaries(amplitudeRight)
+        mapBoundariesLeft = self._getMapBoundaries(amplitudeLeft)
+        mapBoundariesRight = self._getMapBoundaries(amplitudeRight)
 
         # mapProjection and center longitude for
         mapProjection = ccrs.PlateCarree()
@@ -988,9 +981,9 @@ class xMCA(MCA):
 
         # create figure environment
         if right:
-            fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s','s','s','t'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(n,['t','s','s','s','s','t'], cenLon)
         else:
-            fig, axesPC, axesEOF = self.__createFigure(n,['t','s','s'], cenLon)
+            fig, axesPC, axesEOF = self._createFigure(n,['t','s','s'], cenLon)
 
 
 
@@ -1056,3 +1049,61 @@ class xMCA(MCA):
 
         fig.subplots_adjust(wspace = 0.1, hspace = 0.17, left = 0.05)
         fig.suptitle(title)
+
+
+    def splitComplex(self, data_array):
+        ds = xr.Dataset({'real': data_array.real, 'imag': data_array.imag})
+        return ds
+
+    def toNetcdf(self, dataArray, path, *args, **kwargs):
+        fileName    = '.'.join([dataArray.name,'nc'])
+        powerIdx    = 'p{:02}'.format(self._power)
+        rotIdx      = 'r{:02}'.format(self._nRotations)
+        complexIdx  = 'c{:}'.format(int(self._useHilbert))
+        if self._useMCA:
+            methodIdx = 'mca'
+        else:
+            methodIdx = 'pca'
+
+        fileName    = '-'.join([methodIdx,complexIdx,rotIdx,powerIdx,fileName])
+        finalPath   = os.path.join(path,fileName)
+
+        if self._useHilbert:
+            dataSet = self.splitComplex(dataArray)
+        else:
+            dataSet = dataArray
+
+        dataSet.to_netcdf(path=finalPath, *args, **kwargs)
+
+    def saveAnalysis(self, path=None):
+        if self._useMCA:
+            analysisName = '-'.join([self._nameLeft,self._nameRight])
+        else:
+            analysisName = self._nameLeft
+
+        if path is None:
+            path = os.getcwd()
+        outputDirectory = os.path.join(path, 'output')
+        analysisDirectory = os.path.join(outputDirectory,analysisName)
+
+        if not os.path.exists(outputDirectory):
+            os.makedirs(outputDirectory)
+        if not os.path.exists(analysisDirectory):
+            os.makedirs(analysisDirectory)
+
+        self.toNetcdf(self.eofs()[0],analysisDirectory)
+        self.toNetcdf(self.pcs()[0],analysisDirectory)
+        self.toNetcdf(self.eigenvalues()[0],analysisDirectory)
+        self.toNetcdf(self.explainedVariance()[0],analysisDirectory)
+        self.toNetcdf(self.spatialAmplitude()[0],analysisDirectory)
+        self.toNetcdf(self.spatialPhase()[0],analysisDirectory)
+        self.toNetcdf(self.temporalAmplitude()[0],analysisDirectory)
+        self.toNetcdf(self.temporalPhase()[0],analysisDirectory)
+
+        if self._useMCA:
+            self.toNetcdf(self.eofs()[1],analysisDirectory)
+            self.toNetcdf(self.pcs()[1],analysisDirectory)
+            self.toNetcdf(self.spatialAmplitude()[1],analysisDirectory)
+            self.toNetcdf(self.spatialPhase()[1],analysisDirectory)
+            self.toNetcdf(self.temporalAmplitude()[1],analysisDirectory)
+            self.toNetcdf(self.temporalPhase()[1],analysisDirectory)

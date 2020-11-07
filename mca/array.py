@@ -71,87 +71,95 @@ class MCA(object):
 
 
         """
-        self.__left  = left.copy()
-        self.__right = self.__getRightField(right)
-        self.__useMCA = (self.__left is not self.__right)
+        self._left      = left.copy()
+        self._right     = self._getRightField(right)
+        self._useMCA    = not self._isSameArray(self._left, self._right)
 
-        assert(self.__isArray(self.__left))
-        assert(self.__isArray(self.__right))
-        assert(self.__hasSameTimeDimensions(self.__left, self.__right))
+        assert(self._isArray(self._left))
+        assert(self._isArray(self._right))
+        assert(self._hasSameTimeDimensions(self._left, self._right))
 
 
-        self.__observations 		= self.__left.shape[0]
-        self.__originalShapeLeft 	= self.__left.shape[1:]
-        self.__originalShapeRight 	= self.__right.shape[1:]
+        self._observations 		= self._left.shape[0]
+        self._originalShapeLeft 	= self._left.shape[1:]
+        self._originalShapeRight 	= self._right.shape[1:]
 
-        self.__variablesLeft 		= np.product(self.__originalShapeLeft)
-        self.__variablesRight 		= np.product(self.__originalShapeRight)
+        self._variablesLeft 		= np.product(self._originalShapeLeft)
+        self._variablesRight 		= np.product(self._originalShapeRight)
 
         # create 2D matrix in order to perform PCA
-        self.__left 	= self.__left.reshape(self.__observations,self.__variablesLeft)
-        self.__right 	= self.__right.reshape(self.__observations,self.__variablesRight)
+        self._left 	= self._left.reshape(self._observations,self._variablesLeft)
+        self._right 	= self._right.reshape(self._observations,self._variablesRight)
 
         # check for NaN time steps
-        assert(self.__hasNoNanTimeSteps(self.__left))
-        assert(self.__hasNoNanTimeSteps(self.__right))
+        assert(self._hasNoNanTimeSteps(self._left))
+        assert(self._hasNoNanTimeSteps(self._right))
 
         # center input data to zero mean (remove mean)
-        self.__left 	= self.__centerData(self.__left)
-        self.__right 	= self.__centerData(self.__right)
+        self._left 	= self._centerArray(self._left)
+        self._right 	= self._centerArray(self._right)
 
         # normalize input data to unit variance
         if (normalize):
-            self.__left  = self.__normalizeData(self.__left)
-            self.__right = self.__normalizeData(self.__right)
+            self._left  = self._normalizeArray(self._left)
+            self._right = self._normalizeArray(self._right)
 
         # remove NaNs in data fields
-        self.__noNanIndexLeft 	= np.where(~(np.isnan(self.__left[0])))[0]
-        self.__noNanIndexRight 	= np.where(~(np.isnan(self.__right[0])))[0]
+        self._noNanIndexLeft 	= np.where(~(np.isnan(self._left[0])))[0]
+        self._noNanIndexRight 	= np.where(~(np.isnan(self._right[0])))[0]
 
-        self.__noNanDataLeft 	= self.__left[:,self.__noNanIndexLeft]
-        self.__noNanDataRight 	= self.__right[:,self.__noNanIndexRight]
+        self._noNanDataLeft 	= self._left[:,self._noNanIndexLeft]
+        self._noNanDataRight 	= self._right[:,self._noNanIndexRight]
 
-        assert(self.__isNotEmpty(self.__noNanDataLeft))
-        assert(self.__isNotEmpty(self.__noNanDataRight))
+        assert(self._isNotEmpty(self._noNanDataLeft))
+        assert(self._isNotEmpty(self._noNanDataRight))
 
-        self.__rotatedSolution = False
+        # meta information on rotation
+        self._rotatedSolution   = False
+        self._nRotations        = 0
+        self._power             = 0
 
-    def __getRightField(self,right):
+    def _getRightField(self,right):
         """Copy left field if no right field is provided.
 
         Basically, this defines whether MCA or PCA is performed.
         """
         if right is None:
-            return self.__left
+            return self._left
         else:
             return right.copy()
 
+    def _isSameArray(self, arr1 ,arr2):
+        if arr1.shape == arr2.shape:
+            return ((np.isnan(arr1) & np.isnan(arr2)) | (arr1 == arr2)).all()
+        else:
+            return False
 
-    def __isArray(self,data):
+    def _isArray(self,data):
         if (isinstance(data,np.ndarray)):
             return True
         else:
             raise TypeError('Data needs to be np.ndarray.')
 
 
-    def __hasSameTimeDimensions(self, left, right):
+    def _hasSameTimeDimensions(self, left, right):
         if (left.shape[0] == right.shape[0]):
             return True
         else:
             raise ValueError('Both input fields need to have same time dimensions.')
 
 
-    def __centerData(self, data, normalize=False):
+    def _centerArray(self, array):
         """Remove the mean of an array along the first dimension."""
-        return data - data.mean(axis=0)
+        return array - array.mean(axis=0)
 
 
-    def __normalizeData(self, data):
+    def _normalizeArray(self, array):
         """Normalize the array along the first dimension (divide by std)."""
-        return data / data.std(axis=0)
+        return array / array.std(axis=0)
 
 
-    def __hasNoNanTimeSteps(self, data):
+    def _hasNoNanTimeSteps(self, data):
         """Check if data contains a nan time step.
 
         A nan time step is a time step for which the values of every station
@@ -167,7 +175,7 @@ class MCA(object):
             return True
 
 
-    def __isNotEmpty(self, index):
+    def _isNotEmpty(self, index):
         if (index.size > 0):
             return True
         else:
@@ -230,8 +238,8 @@ class MCA(object):
         if extendSeries:
             # cut out the first and last third of Hilbert transform
             # which belong to the forecast/backcast
-            data    = data[self.__observations:(2*self.__observations)]
-            data = self.__centerData(data)
+            data    = data[self._observations:(2*self._observations)]
+            data = self._centerArray(data)
 
         return data
 
@@ -250,40 +258,40 @@ class MCA(object):
             Only used for complex time series (useHilbert=True).
             Default is False.
         """
-
-        # complexify input data via Hilbert transfrom
-        if (useHilbert):
-            self.__noNanDataLeft = self.complexifyData(self.__noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+        self._useHilbert = useHilbert
+        # complexify input data via Hilbert transform
+        if (self._useHilbert):
+            self._noNanDataLeft = self.complexifyData(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             # save computing time if left and right field are the same
-            if self.__useMCA:
-                self.__noNanDataRight = self.complexifyData(self.__noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            if self._useMCA:
+                self._noNanDataRight = self.complexifyData(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             else:
-                self.__noNanDataRight = self.__noNanDataLeft
+                self._noNanDataRight = self._noNanDataLeft
 
         # create covariance matrix
-        kernel = self.__noNanDataLeft.conjugate().T @ self.__noNanDataRight / self.__observations
+        kernel = self._noNanDataLeft.conjugate().T @ self._noNanDataRight / self._observations
 
         # solve eigenvalue problem
         VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
         VRight = VTRight.conjugate().T
 
-        S = np.sqrt(np.diag(eigenvalues) * self.__observations)
+        S = np.sqrt(np.diag(eigenvalues) * self._observations)
         Si = np.diag(1./np.diag(S))
 
-        self.__eigenvalues = eigenvalues
-        self.__eigensum = eigenvalues.sum()
+        self._eigenvalues = eigenvalues
+        self._eigensum = eigenvalues.sum()
 
         # standardized EOF fields
-        self.__VLeft 	= VLeft
-        self.__VRight 	= VRight
+        self._VLeft 	= VLeft
+        self._VRight 	= VRight
 
         # loadings // EOF fields
-        self.__LLeft 	= VLeft @ S
-        self.__LRight 	= VRight @ S
+        self._LLeft 	= VLeft @ S
+        self._LRight 	= VRight @ S
 
         # get PC scores by projecting data fields on loadings
-        self.__ULeft 	= self.__noNanDataLeft @ VLeft @ Si
-        self.__URight 	= self.__noNanDataRight @ VRight @ Si
+        self._ULeft 	= self._noNanDataLeft @ VLeft @ Si
+        self._URight 	= self._noNanDataRight @ VRight @ Si
 
 
     def rotate(self, nRotations, power=1, tol=1e-5):
@@ -321,15 +329,15 @@ class MCA(object):
             raise ValueError('Power must be >=1')
 
         # rotate loadings (Cheng and Dunkerton 1995)
-        L = np.concatenate((self.__LLeft[:,:nRotations], self.__LRight[:,:nRotations]))
+        L = np.concatenate((self._LLeft[:,:nRotations], self._LRight[:,:nRotations]))
         Lr, R, Phi = promax(L, power, maxIter=1000, tol=tol)
-        LLeft 	= Lr[:self.__noNanIndexLeft.size,:]
-        LRight 	= Lr[self.__noNanIndexLeft.size:,:]
+        LLeft 	= Lr[:self._noNanIndexLeft.size,:]
+        LRight 	= Lr[self._noNanIndexLeft.size:,:]
 
         # calculate variance/reconstruct "eigenvalues"
         wLeft = np.linalg.norm(LLeft,axis=0)
         wRight = np.linalg.norm(LRight,axis=0)
-        variance = wLeft * wRight / self.__observations
+        variance = wLeft * wRight / self._observations
         varIdx = np.argsort(variance)[::-1]
 
         # pull loadings from EOFs
@@ -340,30 +348,32 @@ class MCA(object):
         # If rotation is orthogonal: R.T = R
         # If rotation is oblique (p>1): R^(-1).T = R
         if(power==1):
-            ULeft 	= self.__ULeft[:,:nRotations] @ R
-            URight 	= self.__URight[:,:nRotations] @ R
+            ULeft 	= self._ULeft[:,:nRotations] @ R
+            URight 	= self._URight[:,:nRotations] @ R
         else:
-            ULeft 	= self.__ULeft[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
-            URight 	= self.__URight[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
+            ULeft 	= self._ULeft[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
+            URight 	= self._URight[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
 
 
         # store rotated pcs, eofs and "eigenvalues"
         # and sort according to described variance
-        self.__eigenvalues 	= variance[varIdx]
+        self._eigenvalues 	= variance[varIdx]
         # Standardized EOFs
-        self.__VLeft 		= VLeft[:,varIdx]
-        self.__VRight 		= VRight[:,varIdx]
+        self._VLeft 		= VLeft[:,varIdx]
+        self._VRight 		= VRight[:,varIdx]
         # EOF loadings
-        self.__LLeft 		= LLeft[:,varIdx]
-        self.__LRight 		= LRight[:,varIdx]
+        self._LLeft 		= LLeft[:,varIdx]
+        self._LRight 		= LRight[:,varIdx]
         # Standardized PC scores
-        self.__ULeft 		= ULeft[:,varIdx]
-        self.__URight 		= URight[:,varIdx]
+        self._ULeft 		= ULeft[:,varIdx]
+        self._URight 		= URight[:,varIdx]
 
-        # store rotation matrix and correlation matrix of PCs
-        self.__rotationMatrix 		= R
-        self.__correlationMatrix 	= Phi[varIdx,varIdx]
-        self.__rotatedSolution 		= True
+        # store rotation and correlation matrix of PCs + meta information
+        self._rotationMatrix 		= R
+        self._correlationMatrix 	= Phi[varIdx,varIdx]
+        self._rotatedSolution 		= True
+        self._nRotations            = nRotations
+        self._power                 = power
 
 
     def rotationMatrix(self):
@@ -375,8 +385,8 @@ class MCA(object):
         ndarray
             Rotation matrix.
         """
-        if (self.__rotatedSolution):
-            return self.__rotationMatrix
+        if (self._rotatedSolution):
+            return self._rotationMatrix
         else:
             raise RuntimeError('Rotation matrix does not exist since EOFs were not rotated')
 
@@ -390,8 +400,8 @@ class MCA(object):
             Correlation matrix.
 
         """
-        if (self.__rotatedSolution):
-            return self.__correlationMatrix
+        if (self._rotatedSolution):
+            return self._correlationMatrix
         else:
             raise RuntimeError('Correlation matrix does not exist since EOFs were not rotated.')
 
@@ -412,9 +422,9 @@ class MCA(object):
             Uncertainty of eigenvalues according to North's rule of thumb.
 
         """
-        values = self.__eigenvalues[:n]
+        values = self._eigenvalues[:n]
         # error according to North's Rule of Thumb
-        error = np.sqrt(2/self.__observations) * values
+        error = np.sqrt(2/self._observations) * values
 
         return values, error
 
@@ -436,8 +446,8 @@ class MCA(object):
 
         """
         values, error = self.eigenvalues(n)
-        desVar 		= values / self.__eigensum * 100
-        desVarErr 	= error / self.__eigensum * 100
+        desVar 		= values / self._eigensum * 100
+        desVarErr 	= error / self._eigensum * 100
         return desVar, desVarErr
 
 
@@ -460,12 +470,12 @@ class MCA(object):
             PCs associated with right input field.
 
         """
-        pcsLeft 	= self.__ULeft[:,:n]
-        pcsRight 	= self.__URight[:,:n]
+        pcsLeft 	= self._ULeft[:,:n]
+        pcsRight 	= self._URight[:,:n]
 
         if (scaling==1):
-            pcsLeft 	= pcsLeft * np.sqrt(self.__eigenvalues[:n])
-            pcsRight 	= pcsRight * np.sqrt(self.__eigenvalues[:n])
+            pcsLeft 	= pcsLeft * np.sqrt(self._eigenvalues[:n])
+            pcsRight 	= pcsRight * np.sqrt(self._eigenvalues[:n])
 
         return pcsLeft, pcsRight
 
@@ -490,23 +500,23 @@ class MCA(object):
 
         """
         if n is None:
-            n = self.__eigenvalues.size
+            n = self._eigenvalues.size
 
         # create data fields with original NaNs
-        dtype = self.__VLeft.dtype
-        eofsLeft  	= np.zeros([self.__variablesLeft, n],dtype=dtype) * np.nan
-        eofsRight  	= np.zeros([self.__variablesRight, n],dtype=dtype) * np.nan
+        dtype = self._VLeft.dtype
+        eofsLeft  	= np.zeros([self._variablesLeft, n],dtype=dtype) * np.nan
+        eofsRight  	= np.zeros([self._variablesRight, n],dtype=dtype) * np.nan
 
-        eofsLeft[self.__noNanIndexLeft,:] = self.__VLeft[:,:n]
-        eofsRight[self.__noNanIndexRight,:] = self.__VRight[:,:n]
+        eofsLeft[self._noNanIndexLeft,:] = self._VLeft[:,:n]
+        eofsRight[self._noNanIndexRight,:] = self._VRight[:,:n]
 
         # reshape data fields to have original input shape
-        eofsLeft 	= eofsLeft.reshape(self.__originalShapeLeft + (n,))
-        eofsRight 	= eofsRight.reshape(self.__originalShapeRight + (n,))
+        eofsLeft 	= eofsLeft.reshape(self._originalShapeLeft + (n,))
+        eofsRight 	= eofsRight.reshape(self._originalShapeRight + (n,))
 
         if (scaling==1):
-            eofsLeft 	= eofsLeft * np.sqrt(self.__eigenvalues[:n])
-            eofsRight 	= eofsRight * np.sqrt(self.__eigenvalues[:n])
+            eofsLeft 	= eofsLeft * np.sqrt(self._eigenvalues[:n])
+            eofsRight 	= eofsRight * np.sqrt(self._eigenvalues[:n])
 
         return eofsLeft, eofsRight
 
