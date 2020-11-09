@@ -72,7 +72,7 @@ class MCA(object):
 
         """
         self._left      = left.copy()
-        self._right     = self._getRightField(right)
+        self._right     = self._left if right is None else right.copy()
         self._useMCA    = not self._isSameArray(self._left, self._right)
 
         assert(self._isArray(self._left))
@@ -80,15 +80,15 @@ class MCA(object):
         assert(self._hasSameTimeDimensions(self._left, self._right))
 
 
-        self._observations 		= self._left.shape[0]
-        self._originalShapeLeft 	= self._left.shape[1:]
+        self._observations          = self._left.shape[0]
+        self._originalShapeLeft     = self._left.shape[1:]
         self._originalShapeRight 	= self._right.shape[1:]
 
         self._variablesLeft 		= np.product(self._originalShapeLeft)
         self._variablesRight 		= np.product(self._originalShapeRight)
 
         # create 2D matrix in order to perform PCA
-        self._left 	= self._left.reshape(self._observations,self._variablesLeft)
+        self._left 	    = self._left.reshape(self._observations,self._variablesLeft)
         self._right 	= self._right.reshape(self._observations,self._variablesRight)
 
         # check for NaN time steps
@@ -96,7 +96,7 @@ class MCA(object):
         assert(self._hasNoNanTimeSteps(self._right))
 
         # center input data to zero mean (remove mean)
-        self._left 	= self._centerArray(self._left)
+        self._left 	    = self._centerArray(self._left)
         self._right 	= self._centerArray(self._right)
 
         # normalize input data to unit variance
@@ -104,12 +104,9 @@ class MCA(object):
             self._left  = self._normalizeArray(self._left)
             self._right = self._normalizeArray(self._right)
 
-        # remove NaNs in data fields
-        self._noNanIndexLeft 	= np.where(~(np.isnan(self._left[0])))[0]
-        self._noNanIndexRight 	= np.where(~(np.isnan(self._right[0])))[0]
-
-        self._noNanDataLeft 	= self._left[:,self._noNanIndexLeft]
-        self._noNanDataRight 	= self._right[:,self._noNanIndexRight]
+        # remove NaNs columns in data fields
+        self._noNanDataLeft, self._noNanIndexLeft   = self._removeNanColumns(self._left)
+        self._noNanDataRight, self._noNanIndexRight = self._removeNanColumns(self._right)
 
         assert(self._isNotEmpty(self._noNanDataLeft))
         assert(self._isNotEmpty(self._noNanDataRight))
@@ -120,15 +117,10 @@ class MCA(object):
         self._power             = 0
 
 
-    def _getRightField(self,right):
-        """Copy left field if no right field is provided.
-
-        Basically, this defines whether MCA or PCA is performed.
-        """
-        if right is None:
-            return self._left
-        else:
-            return right.copy()
+    def _removeNanColumns(self, array):
+        noNanIndex = np.where(~(np.isnan(array[0])))[0]
+        noNanData  = array[:,noNanIndex]
+        return noNanData, noNanIndex
 
 
     def _isSameArray(self, arr1 ,arr2):
@@ -269,7 +261,7 @@ class MCA(object):
             self._noNanDataLeft = self._complexifyData(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             # save computing time if left and right field are the same
             if self._useMCA:
-                self._noNanDataRight = self.complexifyData(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+                self._noNanDataRight = self._complexifyData(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             else:
                 self._noNanDataRight = self._noNanDataLeft
 
@@ -336,8 +328,8 @@ class MCA(object):
         # rotate loadings (Cheng and Dunkerton 1995)
         L = np.concatenate((self._LLeft[:,:nRotations], self._LRight[:,:nRotations]))
         Lr, R, Phi = promax(L, power, maxIter=1000, tol=tol)
-        LLeft 	= Lr[:self._noNanIndexLeft.size,:]
-        LRight 	= Lr[self._noNanIndexLeft.size:,:]
+        LLeft 	= Lr[:self._VLeft.shape[0],:]
+        LRight 	= Lr[self._VLeft.shape[0]:,:]
 
         # calculate variance/reconstruct "eigenvalues"
         wLeft = np.linalg.norm(LLeft,axis=0)
@@ -628,3 +620,41 @@ class MCA(object):
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
+
+
+    def loadAnalysis(self, eofs=None, pcs=None, eigenvalues=None):
+        # standardized fields // EOF fields + PCs
+        if all(isinstance(var,list) for var in [eofs,pcs]):
+            eofsLeft, eofsRight = [eofs[0], eofs[1]]
+            pcsLeft, pcsRight   = [pcs[0], pcs[1]]
+        else:
+            eofsLeft, eofsRight = [eofs, eofs]
+            pcsLeft, pcsRight   = [pcs, pcs]
+
+        self._observations          = pcsLeft.shape[0]
+        self._originalShapeLeft     = eofsLeft.shape[:-1]
+        self._originalShapeRight 	= eofsRight.shape[:-1]
+        nModes                      = eofsRight.shape[-1]
+
+        self._variablesLeft 		= np.product(self._originalShapeLeft)
+        self._variablesRight 		= np.product(self._originalShapeRight)
+
+        eofsLeft    = eofsLeft.reshape(self._variablesLeft, nModes)
+        eofsRight   = eofsRight.reshape(self._variablesRight, nModes)
+
+        VLeftT, self._noNanIndexLeft   = self._removeNanColumns(eofsLeft.T)
+        VRightT, self._noNanIndexRight = self._removeNanColumns(eofsRight.T)
+        self._VLeft     = VLeftT
+        self._VRight    = VRightT
+
+        S   = np.sqrt(np.diag(eigenvalues) * self._observations)
+        Si  = np.diag(1./np.diag(S))
+
+        self._eigenvalues   = eigenvalues
+        self._eigensum      = eigenvalues.sum()
+
+        self._ULeft, self._URight = [pcsLeft, pcsRight]
+
+        # loadings // EOF fields
+        self._LLeft 	= self._VLeft @ S
+        self._LRight 	= self._VRight @ S

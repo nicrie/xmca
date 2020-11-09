@@ -80,46 +80,53 @@ class xMCA(MCA):
         None.
 
         """
-        self._left  = left.copy()
+        left  = left.copy()
+        right = left if right is None else right.copy()
 
-        # for univariate case (normal PCA) left = right
-        self._right = self._getRightField(right)
+        assert(self._isXarray(left))
+        assert(self._isXarray(right))
 
-        assert(self._isXarray(self._left))
-        assert(self._isXarray(self._right))
-
-        # store meta information of time steps and coordinates
-        self._timeSteps 	= self._left.coords['time'].values
-        self._lonsLeft 	    = self._left.coords['lon'].values
-        self._lonsRight 	= self._right.coords['lon'].values
-        self._latsLeft 	    = self._left.coords['lat'].values
-        self._latsRight 	= self._right.coords['lat'].values
-        self._nameLeft      = self._getFieldName(self._left,'left')
-        self._nameRight     = self._getFieldName(self._right,'right')
-
-        self._left     = self._centerXarray(self._left)
-        self._right    = self._centerXarray(self._right)
+        left     = self._centerDataArray(left)
+        right    = self._centerDataArray(right)
 
         self.normalize = normalize
         if self.normalize:
-            self._left     = self._normalizeXarray(self._left)
-            self._right    = self._normalizeXarray(self._right)
+            left     = self._normalizeDataArray(left)
+            right    = self._normalizeDataArray(right)
 
 
         if coslat:
             # coslat correction needs to happen AFTER normalization since
             # normalization mathematically removes the coslat correction effect
-            self._left     = self._applyCosLatCorrection(self._left)
-            self._right    = self._applyCosLatCorrection(self._right)
+            left     = self._applyCosLatCorrection(left)
+            right    = self._applyCosLatCorrection(right)
             # Deactivate normalization for array.MCA, otherwise
             # coslat correction may be overwritten
             self.normalize = False
 
-        dataLeft 	= self._left.data
-        dataRight 	= self._right.data
-
         # constructor of base class for np.ndarray
-        MCA.__init__(self, dataLeft, dataRight, self.normalize)
+        MCA.__init__(self, left.data, right.data, self.normalize)
+
+        # store meta information of DataArrays
+        self._timeSteps 	= left.coords['time'].values
+        self._lonsLeft 	    = left.coords['lon'].values
+        self._lonsRight 	= right.coords['lon'].values
+        self._latsLeft 	    = left.coords['lat'].values
+        self._latsRight 	= right.coords['lat'].values
+
+        # store meta information about analysis
+        self._attrs = {
+            'analysis'      : 'mca' if self._useMCA else 'pca',
+            'left_field'  : self._getFieldAttr(left,'left_field','left_field'),
+            'right_field' : self._getFieldAttr(right,'right_field','right_field')
+        }
+
+
+    def set_field_names(self, left_field = None, right_field = None):
+        if left_field is not None:
+            self._attrs['left_field']     = left_field
+        if right_field is not None:
+            self._attrs['right_field']    = right_field
 
 
     def _isXarray(self, data):
@@ -136,22 +143,21 @@ class xMCA(MCA):
             Input data is of type `DataArray`.
 
         """
-        if (isinstance(data,xr.DataArray)):
-            return True
-        else:
-            raise TypeError('Input data must be xarray.DataArray.')
+        return (isinstance(data,xr.DataArray))
 
-    def _getFieldName(self, dataArray, backupName='undefined'):
-        name = dataArray.name
-        if name is None:
-            name = backupName
-        return name
 
-    def _centerXarray(self, xarray):
+    def _getFieldAttr(self, dataArray, attr, fallback='undefined'):
+        try:
+            return dataArray.attrs[attr]
+        except KeyError:
+            return fallback
+
+
+    def _centerDataArray(self, xarray):
         return xarray - xarray.mean('time')
 
 
-    def _normalizeXarray(self, xarray):
+    def _normalizeDataArray(self, xarray):
         return xarray / xarray.std('time')
 
 
@@ -163,6 +169,7 @@ class xMCA(MCA):
         weights     = np.cos(np.deg2rad(data.lat))
 
         return data * weights
+
 
 
     def eigenvalues(self, n=None):
@@ -190,14 +197,20 @@ class xMCA(MCA):
             n = val.size
 
         modes = list(range(1,n+1))
+        attrs = self._attrs
+        attrs['name'] = 'eigenvalues'
         values = xr.DataArray(val,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'eigenvalues')
+            name 	= attrs['name'],
+            attrs   = attrs)
+
+        attrs['name'] = 'error_eigenvalues'
         error = xr.DataArray(err,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'error-eigenvalues')
+            name 	= attrs['name'],
+            attrs   = attrs)
 
         return values, error
 
@@ -225,14 +238,21 @@ class xMCA(MCA):
             n = desVar.size
 
         modes = list(range(1,n+1))
+
+        attrs = self._attrs
+        attrs['name'] = 'explained_variance'
         values = xr.DataArray(desVar,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'explained-variance')
+            name 	= attrs['name'],
+            attrs   = attrs)
+
+        attrs['name'] = 'error_explained_variance'
         error = xr.DataArray(desVarErr,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'error-explained-variance')
+            name 	= attrs['name'],
+            attrs   = attrs)
 
         return values, error
 
@@ -261,21 +281,22 @@ class xMCA(MCA):
 
         modes = list(range(1,n+1))
 
-        leftPcs = xr.DataArray(leftData,
-          dims 	= ['time','mode'],
-          coords = {
-          'time' : self._timeSteps,
-          'mode' : modes
-          },
-          name = '-'.join([self._nameLeft,'pcs']))
+        attrs = self._attrs
+        attrs['name'] = '_'.join([attrs['left_field'],'pcs'])
+        leftPcs = xr.DataArray(
+            data        = leftData,
+            dims        = ['time','mode'],
+            coords      = {'time' : self._timeSteps, 'mode' : modes},
+            name        = attrs['name'],
+            attrs       = attrs)
 
-        rightPcs = xr.DataArray(rightData,
-          dims 	= ['time','mode'],
-          coords = {
-          'time' : self._timeSteps,
-          'mode' : modes
-          },
-          name = '-'.join([self._nameRight,'pcs']))
+        attrs['name'] = '_'.join([attrs['right_field'],'pcs'])
+        rightPcs = xr.DataArray(
+            data        = rightData,
+            dims        = ['time','mode'],
+            coords      = {'time' : self._timeSteps, 'mode' : modes},
+            name        = attrs['name'],
+            attrs       = attrs)
 
         return leftPcs, rightPcs
 
@@ -304,24 +325,28 @@ class xMCA(MCA):
 
         modes = list(range(1,n+1))
 
+        attrs = self._attrs
+        attrs['name'] = '_'.join([attrs['left_field'],'eofs'])
+        leftEofs = xr.DataArray(
+            data    = leftData,
+            dims    = ['lat','lon','mode'],
+            coords  = {
+                'lon' : self._lonsLeft,
+                'lat' : self._latsLeft,
+                'mode' : modes},
+            name    = attrs['name'],
+            attrs   = attrs)
 
-        leftEofs = xr.DataArray(leftData,
-          dims 	= ['lat','lon','mode'],
-          coords = {
-          'lon' : self._lonsLeft,
-          'lat' : self._latsLeft,
-          'mode' : modes
-          },
-          name = '-'.join([self._nameLeft,'eofs']))
-
-        rightEofs = xr.DataArray(rightData,
-          dims 	= ['lat','lon','mode'],
-          coords = {
-          'lon' : self._lonsRight,
-          'lat' : self._latsRight,
-          'mode' : modes
-          },
-          name = '-'.join([self._nameRight,'eofs']))
+        attrs['name'] = '_'.join([attrs['right_field'],'eofs'])
+        rightEofs = xr.DataArray(
+            data    = rightData,
+            dims 	= ['lat','lon','mode'],
+            coords  = {
+                'lon' : self._lonsRight,
+                'lat' : self._latsRight,
+                'mode' : modes},
+            name    = attrs['name'],
+            attrs   = attrs)
 
         return leftEofs, rightEofs
 
@@ -348,8 +373,16 @@ class xMCA(MCA):
         amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
         amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
 
-        amplitudeLeft.name  = '-'.join([self._nameLeft,'spatial-amplitude'])
-        amplitudeRight.name = '-'.join([self._nameRight,'spatial-amplitude'])
+        attrs = self._attrs
+
+        attrs['name'] = '_'.join([attrs['left_field'],'spatial_amplitude'])
+        amplitudeLeft.name  = attrs['name']
+        amplitudeLeft.attrs = attrs
+
+        attrs['name'] = '_'.join([attrs['right_field'],'spatial_amplitude'])
+        amplitudeRight.name = attrs['name']
+        amplitudeRight.attrs = attrs
+
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -377,11 +410,19 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
 
-        phaseLeft.name  = '-'.join([self._nameLeft,'spatial-phase'])
-        phaseRight.name = '-'.join([self._nameRight,'spatial-phase'])
+        attrs = self._attrs
+
+        attrs['name'] = '_'.join([attrs['left_field'],'spatial_phase'])
+        phaseLeft.name  = attrs['name']
+        phaseLeft.attrs = attrs
+
+        attrs['name'] = '_'.join([attrs['right_field'],'spatial_phase'])
+        phaseRight.name = attrs['name']
+        phaseRight.attrs = attrs
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
+
 
     def temporalAmplitude(self, n=None):
         """Return the temporal amplitude functions for the first `n` PCs.
@@ -405,8 +446,15 @@ class xMCA(MCA):
         amplitudeLeft   = np.sqrt(pcsLeft * pcsLeft.conjugate())
         amplitudeRight  = np.sqrt(pcsRight * pcsRight.conjugate())
 
-        amplitudeLeft.name  = '-'.join([self._nameLeft,'temporal-amplitude'])
-        amplitudeRight.name = '-'.join([self._nameRight,'temporal-amplitude'])
+        attrs = self._attrs
+
+        attrs['name'] = '_'.join([attrs['left_field'],'temporal_amplitude'])
+        amplitudeLeft.name  = attrs['name']
+        amplitudeLeft.attrs = attrs
+
+        attrs['name'] = '_'.join([attrs['right_field'],'temporal_amplitude'])
+        amplitudeRight.name = attrs['name']
+        amplitudeRight.attrs = attrs
 
         # use the real part to force a real output
         return amplitudeLeft.real, amplitudeRight.real
@@ -434,8 +482,15 @@ class xMCA(MCA):
         phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
         phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)
 
-        phaseLeft.name  = '-'.join([self._nameLeft,'temporal-phase'])
-        phaseRight.name = '-'.join([self._nameRight,'temporal-phase'])
+        attrs = self._attrs
+
+        attrs['name'] = '_'.join([attrs['left_field'],'temporal_phase'])
+        phaseLeft.name  = attrs['name']
+        phaseLeft.attrs = attrs
+
+        attrs['name'] = '_'.join([attrs['right_field'],'temporal_phase'])
+        phaseRight.name = attrs['name']
+        phaseRight.attrs = attrs
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
@@ -1052,39 +1107,43 @@ class xMCA(MCA):
 
 
     def splitComplex(self, data_array):
-        ds = xr.Dataset({'real': data_array.real, 'imag': data_array.imag})
+        ds = xr.Dataset(
+            data_vars = {
+                'real': data_array.real,
+                'imag': data_array.imag},
+            attrs = data_array.attrs)
+
         return ds
 
-    def toNetcdf(self, dataArray, path, *args, **kwargs):
-        fileName    = '.'.join([dataArray.name,'nc'])
-        powerIdx    = 'p{:02}'.format(self._power)
-        rotIdx      = 'r{:02}'.format(self._nRotations)
-        complexIdx  = 'c{:}'.format(int(self._useHilbert))
-        if self._useMCA:
-            methodIdx = 'mca'
-        else:
-            methodIdx = 'pca'
 
-        fileName    = '-'.join([methodIdx,complexIdx,rotIdx,powerIdx,fileName])
+    def toNetcdf(self, dataArray, path, *args, **kwargs):
+        methodIdx   = self._attrs['analysis']
+        complexIdx  = 'c{:}'.format(int(self._useHilbert))
+        rotIdx      = 'r{:02}'.format(self._nRotations)
+        powerIdx    = 'p{:02}'.format(self._power)
+        fileName    = '.'.join([dataArray.attrs['name'],'nc'])
+
+        fileName    = '_'.join([methodIdx,complexIdx,rotIdx,powerIdx,fileName])
         finalPath   = os.path.join(path,fileName)
 
-        if self._useHilbert:
+        if dataArray.dtype == np.complex:
             dataSet = self.splitComplex(dataArray)
         else:
-            dataSet = dataArray
+            dataSet = dataArray.to_dataset(promote_attrs=True)
 
         dataSet.to_netcdf(path=finalPath, *args, **kwargs)
 
+
     def saveAnalysis(self, path=None):
-        if self._useMCA:
-            analysisName = '-'.join([self._nameLeft,self._nameRight])
-        else:
-            analysisName = self._nameLeft
+        analysisName= self._attrs['analysis']
+        folder_pca  = self._attrs['left_field']
+        folder_mca  = '_'.join([folder_pca, self._attrs['right_field']])
+        folder_name = folder_mca if self._useMCA else folder_pca
 
         if path is None:
             path = os.getcwd()
-        outputDirectory = os.path.join(path, 'output')
-        analysisDirectory = os.path.join(outputDirectory,analysisName)
+        outputDirectory = os.path.join(path, analysisName)
+        analysisDirectory = os.path.join(outputDirectory,folder_name)
 
         if not os.path.exists(outputDirectory):
             os.makedirs(outputDirectory)
@@ -1094,16 +1153,59 @@ class xMCA(MCA):
         self.toNetcdf(self.eofs()[0],analysisDirectory)
         self.toNetcdf(self.pcs()[0],analysisDirectory)
         self.toNetcdf(self.eigenvalues()[0],analysisDirectory)
-        self.toNetcdf(self.explainedVariance()[0],analysisDirectory)
-        self.toNetcdf(self.spatialAmplitude()[0],analysisDirectory)
-        self.toNetcdf(self.spatialPhase()[0],analysisDirectory)
-        self.toNetcdf(self.temporalAmplitude()[0],analysisDirectory)
-        self.toNetcdf(self.temporalPhase()[0],analysisDirectory)
 
         if self._useMCA:
             self.toNetcdf(self.eofs()[1],analysisDirectory)
             self.toNetcdf(self.pcs()[1],analysisDirectory)
-            self.toNetcdf(self.spatialAmplitude()[1],analysisDirectory)
-            self.toNetcdf(self.spatialPhase()[1],analysisDirectory)
-            self.toNetcdf(self.temporalAmplitude()[1],analysisDirectory)
-            self.toNetcdf(self.temporalPhase()[1],analysisDirectory)
+
+    def _datasetToDataArray(self, dataset):
+        if self._isXarray(dataset):
+            return dataset
+        else:
+            try:
+                data_array =  dataset['real'] + 1j * dataset['imag']
+            except KeyError:
+                raise KeyError('xr.Dataset needs two variables called \'real\' and \'imag\'.')
+            except TypeError:
+                raise TypeError("The input type seems incorrect. Take xr.DataArray or xr.Dataset")
+
+            data_array.attrs = dataset.attrs
+            return data_array
+
+    def loadAnalysis(self, eofs=None, pcs=None, eigenvalues=None):
+        # standardized fields // EOF fields + PCs
+        if all(isinstance(var,list) for var in [eofs,pcs]):
+            eofsLeft, eofsRight = [eofs[0], eofs[1]]
+            pcsLeft, pcsRight   = [pcs[0], pcs[1]]
+            self._useMCA        = True
+        else:
+            eofsLeft, eofsRight = [eofs, eofs]
+            pcsLeft, pcsRight   = [pcs, pcs]
+            self._useMCA        = False
+
+        eofsLeft    = self._datasetToDataArray(eofsLeft)
+        eofsRight   = self._datasetToDataArray(eofsRight)
+        pcsLeft     = self._datasetToDataArray(pcsLeft)
+        pcsRight    = self._datasetToDataArray(pcsRight)
+        eigenvalues = self._datasetToDataArray(eigenvalues)
+
+        # store meta information of time steps and coordinates
+        self._timeSteps 	= pcsLeft.coords['time'].values
+        self._lonsLeft 	    = eofsLeft.coords['lon'].values
+        self._lonsRight 	= eofsRight.coords['lon'].values
+        self._latsLeft 	    = eofsLeft.coords['lat'].values
+        self._latsRight 	= eofsRight.coords['lat'].values
+
+        # store meta information about analysis
+        self._attrs = {
+            'analysis'    : 'mca' if self._useMCA else 'pca',
+            'left_field'  : self._getFieldAttr(eofsLeft,'left_field','left_field'),
+            'right_field' : self._getFieldAttr(eofsRight,'right_field','right_field')
+        }
+
+
+        MCA.loadAnalysis(
+            self,
+            eofs = [eofsLeft.data, eofsRight.data],
+            pcs =  [pcsLeft.data, pcsRight.data],
+            eigenvalues = eigenvalues.data)
