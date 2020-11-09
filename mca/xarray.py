@@ -202,14 +202,14 @@ class xMCA(MCA):
         values = xr.DataArray(val,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= attrs['name'],
+            name 	= attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         attrs['name'] = 'error_eigenvalues'
         error = xr.DataArray(err,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= attrs['name'],
+            name 	= attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         return values, error
@@ -244,14 +244,14 @@ class xMCA(MCA):
         values = xr.DataArray(desVar,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= attrs['name'],
+            name 	= attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         attrs['name'] = 'error_explained_variance'
         error = xr.DataArray(desVarErr,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= attrs['name'],
+            name 	= attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         return values, error
@@ -287,7 +287,7 @@ class xMCA(MCA):
             data        = leftData,
             dims        = ['time','mode'],
             coords      = {'time' : self._timeSteps, 'mode' : modes},
-            name        = attrs['name'],
+            name        = attrs['name'].replace('_',' '),
             attrs       = attrs)
 
         attrs['name'] = '_'.join([attrs['right_field'],'pcs'])
@@ -295,7 +295,7 @@ class xMCA(MCA):
             data        = rightData,
             dims        = ['time','mode'],
             coords      = {'time' : self._timeSteps, 'mode' : modes},
-            name        = attrs['name'],
+            name        = attrs['name'].replace('_',' '),
             attrs       = attrs)
 
         return leftPcs, rightPcs
@@ -334,7 +334,7 @@ class xMCA(MCA):
                 'lon' : self._lonsLeft,
                 'lat' : self._latsLeft,
                 'mode' : modes},
-            name    = attrs['name'],
+            name    = attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         attrs['name'] = '_'.join([attrs['right_field'],'eofs'])
@@ -345,7 +345,7 @@ class xMCA(MCA):
                 'lon' : self._lonsRight,
                 'lat' : self._latsRight,
                 'mode' : modes},
-            name    = attrs['name'],
+            name    = attrs['name'].replace('_',' '),
             attrs   = attrs)
 
         return leftEofs, rightEofs
@@ -376,11 +376,11 @@ class xMCA(MCA):
         attrs = self._attrs
 
         attrs['name'] = '_'.join([attrs['left_field'],'spatial_amplitude'])
-        amplitudeLeft.name  = attrs['name']
+        amplitudeLeft.name  = attrs['name'].replace('_',' ')
         amplitudeLeft.attrs = attrs
 
         attrs['name'] = '_'.join([attrs['right_field'],'spatial_amplitude'])
-        amplitudeRight.name = attrs['name']
+        amplitudeRight.name = attrs['name'].replace('_',' ')
         amplitudeRight.attrs = attrs
 
 
@@ -413,11 +413,11 @@ class xMCA(MCA):
         attrs = self._attrs
 
         attrs['name'] = '_'.join([attrs['left_field'],'spatial_phase'])
-        phaseLeft.name  = attrs['name']
+        phaseLeft.name  = attrs['name'].replace('_',' ')
         phaseLeft.attrs = attrs
 
         attrs['name'] = '_'.join([attrs['right_field'],'spatial_phase'])
-        phaseRight.name = attrs['name']
+        phaseRight.name = attrs['name'].replace('_',' ')
         phaseRight.attrs = attrs
 
         # use the real part to force a real output
@@ -449,11 +449,11 @@ class xMCA(MCA):
         attrs = self._attrs
 
         attrs['name'] = '_'.join([attrs['left_field'],'temporal_amplitude'])
-        amplitudeLeft.name  = attrs['name']
+        amplitudeLeft.name  = attrs['name'].replace('_',' ')
         amplitudeLeft.attrs = attrs
 
         attrs['name'] = '_'.join([attrs['right_field'],'temporal_amplitude'])
-        amplitudeRight.name = attrs['name']
+        amplitudeRight.name = attrs['name'].replace('_',' ')
         amplitudeRight.attrs = attrs
 
         # use the real part to force a real output
