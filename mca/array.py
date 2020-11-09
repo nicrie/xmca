@@ -644,8 +644,8 @@ class MCA(object):
 
         VLeftT, self._noNanIndexLeft   = self._removeNanColumns(eofsLeft.T)
         VRightT, self._noNanIndexRight = self._removeNanColumns(eofsRight.T)
-        self._VLeft     = VLeftT
-        self._VRight    = VRightT
+        self._VLeft     = VLeftT.T
+        self._VRight    = VRightT.T
 
         S   = np.sqrt(np.diag(eigenvalues) * self._observations)
         Si  = np.diag(1./np.diag(S))
