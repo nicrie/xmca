@@ -73,43 +73,43 @@ class MCA(object):
         """
         self._left      = left.copy()
         self._right     = self._left if right is None else right.copy()
-        self._useMCA    = not self._isSameArray(self._left, self._right)
+        self._use_MCA    = not self._arrays_are_equal(self._left, self._right)
 
-        assert(self._isArray(self._left))
-        assert(self._isArray(self._right))
-        assert(self._hasSameTimeDimensions(self._left, self._right))
+        assert(self._is_array(self._left))
+        assert(self._is_array(self._right))
+        assert(self._time_dimensions_are_equal(self._left, self._right))
 
 
         self._observations          = self._left.shape[0]
-        self._originalShapeLeft     = self._left.shape[1:]
-        self._originalShapeRight 	= self._right.shape[1:]
+        self._left_original_spatial_shape     = self._left.shape[1:]
+        self._right_original_spatial_shape 	= self._right.shape[1:]
 
-        self._variablesLeft 		= np.product(self._originalShapeLeft)
-        self._variablesRight 		= np.product(self._originalShapeRight)
+        self._left_variables 		= np.product(self._left_original_spatial_shape)
+        self._right_variables 		= np.product(self._right_original_spatial_shape)
 
         # create 2D matrix in order to perform PCA
-        self._left 	    = self._left.reshape(self._observations,self._variablesLeft)
-        self._right 	= self._right.reshape(self._observations,self._variablesRight)
+        self._left 	    = self._left.reshape(self._observations,self._left_variables)
+        self._right 	= self._right.reshape(self._observations,self._right_variables)
 
         # check for NaN time steps
-        assert(self._hasNoNanTimeSteps(self._left))
-        assert(self._hasNoNanTimeSteps(self._right))
+        assert(self._has_no_nan_timesteps(self._left))
+        assert(self._has_no_nan_timesteps(self._right))
 
         # center input data to zero mean (remove mean)
-        self._left 	    = self._centerArray(self._left)
-        self._right 	= self._centerArray(self._right)
+        self._left 	    = self._center_array(self._left)
+        self._right 	= self._center_array(self._right)
 
         # normalize input data to unit variance
         if (normalize):
-            self._left  = self._normalizeArray(self._left)
-            self._right = self._normalizeArray(self._right)
+            self._left  = self._normalize_array(self._left)
+            self._right = self._normalize_array(self._right)
 
         # remove NaNs columns in data fields
-        self._noNanDataLeft, self._noNanIndexLeft   = self._removeNanColumns(self._left)
-        self._noNanDataRight, self._noNanIndexRight = self._removeNanColumns(self._right)
+        self._noNanDataLeft, self._noNanIndexLeft   = self._remove_nan_columns(self._left)
+        self._noNanDataRight, self._noNanIndexRight = self._remove_nan_columns(self._right)
 
-        assert(self._isNotEmpty(self._noNanDataLeft))
-        assert(self._isNotEmpty(self._noNanDataRight))
+        assert(self._is_not_empty(self._noNanDataLeft))
+        assert(self._is_not_empty(self._noNanDataRight))
 
         # meta information on rotation
         self._rotatedSolution   = False
@@ -117,44 +117,44 @@ class MCA(object):
         self._power             = 0
 
 
-    def _removeNanColumns(self, array):
+    def _remove_nan_columns(self, array):
         noNanIndex = np.where(~(np.isnan(array[0])))[0]
         noNanData  = array[:,noNanIndex]
         return noNanData, noNanIndex
 
 
-    def _isSameArray(self, arr1 ,arr2):
+    def _arrays_are_equal(self, arr1 ,arr2):
         if arr1.shape == arr2.shape:
             return ((np.isnan(arr1) & np.isnan(arr2)) | (arr1 == arr2)).all()
         else:
             return False
 
 
-    def _isArray(self,data):
+    def _is_array(self,data):
         if (isinstance(data,np.ndarray)):
             return True
         else:
             raise TypeError('Data needs to be np.ndarray.')
 
 
-    def _hasSameTimeDimensions(self, left, right):
+    def _time_dimensions_are_equal(self, left, right):
         if (left.shape[0] == right.shape[0]):
             return True
         else:
             raise ValueError('Both input fields need to have same time dimensions.')
 
 
-    def _centerArray(self, array):
+    def _center_array(self, array):
         """Remove the mean of an array along the first dimension."""
         return array - array.mean(axis=0)
 
 
-    def _normalizeArray(self, array):
+    def _normalize_array(self, array):
         """Normalize the array along the first dimension (divide by std)."""
         return array / array.std(axis=0)
 
 
-    def _hasNoNanTimeSteps(self, data):
+    def _has_no_nan_timesteps(self, data):
         """Check if data contains a nan time step.
 
         A nan time step is a time step for which the values of every station
@@ -170,14 +170,14 @@ class MCA(object):
             return True
 
 
-    def _isNotEmpty(self, index):
+    def _is_not_empty(self, index):
         if (index.size > 0):
             return True
         else:
             raise ValueError('Input field is empty or contains NaN only.')
 
 
-    def _thetaForecast(self, series, steps=None, seasonalPeriod=365):
+    def _theta_forecast(self, series, steps=None, seasonalPeriod=365):
         if steps is None:
             steps = len(series)
 
@@ -187,15 +187,15 @@ class MCA(object):
         return forecast
 
 
-    def _extendData(self, data, seasonalPeriod=365):
+    def _extend_data(self, data, seasonalPeriod=365):
 
-        extendedData = [self._thetaForecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
+        extendedData = [self._theta_forecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
         extendedData = np.array(extendedData).T
 
         return extendedData
 
 
-    def _complexifyData(self, data, extendSeries=False, seasonalPeriod=365):
+    def _complexify_data(self, data, extendSeries=False, seasonalPeriod=365):
         """Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -224,8 +224,8 @@ class MCA(object):
         """
 
         if extendSeries:
-            forecast    = self._extendData(data, seasonalPeriod=seasonalPeriod)
-            backcast    = self._extendData(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
+            forecast    = self._extend_data(data, seasonalPeriod=seasonalPeriod)
+            backcast    = self._extend_data(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
 
             data = np.concatenate([backcast, data, forecast])
 
@@ -236,7 +236,7 @@ class MCA(object):
             # cut out the first and last third of Hilbert transform
             # which belong to the forecast/backcast
             data    = data[self._observations:(2*self._observations)]
-            data = self._centerArray(data)
+            data = self._center_array(data)
 
         return data
 
@@ -258,10 +258,10 @@ class MCA(object):
         self._useHilbert = useHilbert
         # complexify input data via Hilbert transform
         if (self._useHilbert):
-            self._noNanDataLeft = self._complexifyData(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            self._noNanDataLeft = self._complexify_data(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             # save computing time if left and right field are the same
-            if self._useMCA:
-                self._noNanDataRight = self._complexifyData(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            if self._use_MCA:
+                self._noNanDataRight = self._complexify_data(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             else:
                 self._noNanDataRight = self._noNanDataLeft
 
@@ -373,7 +373,7 @@ class MCA(object):
         self._power                 = power
 
 
-    def rotationMatrix(self):
+    def rotation_matrix(self):
         """
         Return the rotation matrix.
 
@@ -388,7 +388,7 @@ class MCA(object):
             raise RuntimeError('Rotation matrix does not exist since EOFs were not rotated')
 
 
-    def correlationMatrix(self):
+    def correlation_matrix(self):
         """
         Return the correlation matrix of rotated PCs.
 
@@ -427,7 +427,7 @@ class MCA(object):
         return values, error
 
 
-    def explainedVariance(self, n=None):
+    def explained_variance(self, n=None):
         """Return the described variance of the first `n` PCs.
 
         Parameters
@@ -502,15 +502,15 @@ class MCA(object):
 
         # create data fields with original NaNs
         dtype = self._VLeft.dtype
-        eofsLeft  	= np.zeros([self._variablesLeft, n],dtype=dtype) * np.nan
-        eofsRight  	= np.zeros([self._variablesRight, n],dtype=dtype) * np.nan
+        eofsLeft  	= np.zeros([self._left_variables, n],dtype=dtype) * np.nan
+        eofsRight  	= np.zeros([self._right_variables, n],dtype=dtype) * np.nan
 
         eofsLeft[self._noNanIndexLeft,:] = self._VLeft[:,:n]
         eofsRight[self._noNanIndexRight,:] = self._VRight[:,:n]
 
         # reshape data fields to have original input shape
-        eofsLeft 	= eofsLeft.reshape(self._originalShapeLeft + (n,))
-        eofsRight 	= eofsRight.reshape(self._originalShapeRight + (n,))
+        eofsLeft 	= eofsLeft.reshape(self._left_original_spatial_shape + (n,))
+        eofsRight 	= eofsRight.reshape(self._right_original_spatial_shape + (n,))
 
         if (scaling==1):
             eofsLeft 	= eofsLeft * np.sqrt(self._eigenvalues[:n])
@@ -519,7 +519,7 @@ class MCA(object):
         return eofsLeft, eofsRight
 
 
-    def spatialAmplitude(self, n=None):
+    def spatial_amplitude(self, n=None):
         """Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -544,7 +544,7 @@ class MCA(object):
         return amplitudeLeft.real, amplitudeRight.real
 
 
-    def spatialPhase(self, n=None):
+    def spatial_phase(self, n=None):
         """Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -570,7 +570,7 @@ class MCA(object):
         return phaseLeft.real, phaseRight.real
 
 
-    def temporalAmplitude(self, n=None):
+    def temporal_amplitude(self, n=None):
         """Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
@@ -596,7 +596,7 @@ class MCA(object):
         return amplitudeLeft.real, amplitudeRight.real
 
 
-    def temporalPhase(self, n=None):
+    def temporal_phase(self, n=None):
         """Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -622,7 +622,7 @@ class MCA(object):
         return phaseLeft.real, phaseRight.real
 
 
-    def loadAnalysis(self, eofs=None, pcs=None, eigenvalues=None):
+    def load_analysis(self, eofs=None, pcs=None, eigenvalues=None):
         # standardized fields // EOF fields + PCs
         if all(isinstance(var,list) for var in [eofs,pcs]):
             eofsLeft, eofsRight = [eofs[0], eofs[1]]
@@ -631,19 +631,19 @@ class MCA(object):
             eofsLeft, eofsRight = [eofs, eofs]
             pcsLeft, pcsRight   = [pcs, pcs]
 
-        self._observations          = pcsLeft.shape[0]
-        self._originalShapeLeft     = eofsLeft.shape[:-1]
-        self._originalShapeRight 	= eofsRight.shape[:-1]
-        nModes                      = eofsRight.shape[-1]
+        self._observations                      = pcsLeft.shape[0]
+        self._left_original_spatial_shape       = eofsLeft.shape[:-1]
+        self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
+        number_modes                            = eofsRight.shape[-1]
 
-        self._variablesLeft 		= np.product(self._originalShapeLeft)
-        self._variablesRight 		= np.product(self._originalShapeRight)
+        self._left_variables 		= np.product(self._left_original_spatial_shape)
+        self._right_variables 		= np.product(self._right_original_spatial_shape)
 
-        eofsLeft    = eofsLeft.reshape(self._variablesLeft, nModes)
-        eofsRight   = eofsRight.reshape(self._variablesRight, nModes)
+        eofsLeft    = eofsLeft.reshape(self._left_variables, number_modes)
+        eofsRight   = eofsRight.reshape(self._right_variables, number_modes)
 
-        VLeftT, self._noNanIndexLeft   = self._removeNanColumns(eofsLeft.T)
-        VRightT, self._noNanIndexRight = self._removeNanColumns(eofsRight.T)
+        VLeftT, self._noNanIndexLeft   = self._remove_nan_columns(eofsLeft.T)
+        VRightT, self._noNanIndexRight = self._remove_nan_columns(eofsRight.T)
         self._VLeft     = VLeftT.T
         self._VRight    = VRightT.T
 
