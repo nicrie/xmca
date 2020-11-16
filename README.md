@@ -1,5 +1,5 @@
 # Canonical Correlation Analysis
-Canoncical correlation analysis (CCA) seeks to find the patterns in two data fields with maximum amount of cross-correlation.
+Canonical correlation analysis (CCA) seeks to find the patterns in two data fields with maximum amount of cross-correlation.
 
 If both data fields are equal, CCA basically reduces to Principal Component Analysis (PCA), in climate science often called **EOF analysis**.
 
