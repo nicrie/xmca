@@ -1,7 +1,14 @@
-# Maximum Covariance Analysis in Python
-Maximum covariance analysis (MCA) tries to find the patterns in two data fields with maximum amount of cross-covariance.
+# Canonical Correlation Analysis
+Canonical correlation analysis (CCA) seeks to find the patterns in two data fields with maximum amount of cross-correlation.
 
+If both data fields are equal, CCA basically reduces to Principal Component Analysis (PCA), in climate science often called **EOF analysis**.
 
-In climate science, principal component analysis (PCA) or more commonly empirical orthogonal function (EOF) analysis, is a method which maximises the covariance within a given data field. The theroy behind PCA can be extended in order to examine cross-covariance between two different variables (say SST and SLP) leading to **maximum covariance analysis** (MCA). 
+This packages works with `np.ndarray` and `xarray.DataArray` as input fields.
 
-Additionally, a linear transformation can be applied to lift the orthogonal constrain. 
+## Features
+- maximise covariance instead of correlation ==> Maximum Covariance Analysis (MCA)
+- apply latitute correction to data fields to compensate for stretched areas in higher latitutes
+- apply rotation of singular vectors
+  - Orthogonal Varimax rotation
+  - Oblique Promax rotation
+- complexify data via Hilbert transform to inspect amplitude and phase information
