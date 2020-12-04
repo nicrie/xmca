@@ -35,7 +35,8 @@ class MCA(object):
         the same as left field. In this case, MCA reducdes to normal PCA.
         The default is None.
     normalize : boolean, optional
-        Input data is normalized to unit variance. The default is True.
+        If True, input data is normalized to unit variance which translates to
+        CCA. No normalization performs MCA. The default is True.
 
 
     Examples
