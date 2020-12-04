@@ -34,14 +34,14 @@ class xMCA(MCA):
     Parameters
     ----------
     left : ndarray
-    Left input data. First dimension needs to be time.
+        Left input data. First dimension needs to be time.
     right : ndarray, optional
-    Right input data. First dimension needs to be time.
-    If none is provided, automatically, right field is assumed to be
-    the same as left field. In this case, MCA reducdes to normal PCA.
-    The default is None.
+        Right input data. First dimension needs to be time.
+        If none is provided, automatically, right field is assumed to be
+        the same as left field. In this case, MCA reducdes to normal PCA.
+        The default is None.
     normalize : boolean, optional
-    Input data is normalized to unit variance. The default is True.
+        Input data is normalized to unit variance. The default is True.
 
 
     Examples
