@@ -497,6 +497,81 @@ class xMCA(MCA):
         return left_phase.real, right_phase.real
 
 
+    def _calculate_correlation(self, x, y):
+        assert(self._is_data_array(x))
+        assert(self._is_data_array(y))
+
+        x = x - x.mean('time')
+        y = y - y.mean('time')
+
+        xy = (x*y).mean('time')
+        sigx = x.std('time')
+        sigy = y.std('time')
+
+        return xy/sigx/sigy
+
+
+    def homogeneous_patterns(self, n=None):
+        """
+        Return left and right homogeneous correlation maps.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of patterns (modes) to be returned. If None then all patterns
+            are returned. The default is None.
+
+        Returns
+        -------
+        xr.DataArray
+            Left homogeneous correlation maps.
+        xr.DataArray
+            Right homogeneous correlation maps.
+
+        """
+
+        left_pcs, right_pcs 		= self.pcs(n)
+        left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
+
+        left_field  = self._left
+        right_field = self._right
+
+        left_hom_patterns 	= self._calculate_correlation(left_field,left_pcs)
+        right_hom_patterns 	= self._calculate_correlation(right_field,right_pcs)
+
+        return left_hom_patterns, right_hom_patterns
+
+
+    def heterogeneous_patterns(self, n=None):
+        """
+        Return left and right heterogeneous correlation maps.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of patterns (modes) to be returned. If None then all patterns
+            are returned. The default is None.
+
+        Returns
+        -------
+        xr.DataArray
+            Left heterogeneous correlation maps.
+        xr.DataArray
+            Right heterogeneous correlation maps.
+
+        """
+        left_pcs, right_pcs 		= self.pcs(n)
+        left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
+
+        left_field  = self._left
+        right_field = self._right
+
+        left_het_patterns 	= self._calculate_correlation(left_field,right_pcs)
+        right_het_patterns 	= self._calculate_correlation(right_field,left_pcs)
+
+        return left_het_patterns, right_het_patterns
+
+
     def _get_map_boundaries(self, data_array):
         assert(isinstance(data_array, xr.DataArray))
 
@@ -587,298 +662,188 @@ class xMCA(MCA):
 
         return signs * data
 
-
-    def _calculate_correlation(self, x, y):
-        assert(self._is_data_array(x))
-        assert(self._is_data_array(y))
-
-        x = x - x.mean('time')
-        y = y - y.mean('time')
-
-        xy = (x*y).mean('time')
-        sigx = x.std('time')
-        sigy = y.std('time')
-
-        return xy/sigx/sigy
+    def _boldify(self, string):
+        if plt.rcParams['text.usetex']:
+            return ''.join([r'\textbf{',string,'}'])
+        else:
+            return string
 
 
-    def homogeneous_patterns(self, n=None):
+    def plot(
+        self, mode=1, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
+        resolution='110m'):
         """
-        Return left and right homogeneous correlation maps.
+        Plot mode `n`.
 
         Parameters
         ----------
         n : int, optional
-            Number of patterns (modes) to be returned. If None then all patterns
-            are returned. The default is None.
-
-        Returns
-        -------
-        xr.DataArray
-            Left homogeneous correlation maps.
-        xr.DataArray
-            Right homogeneous correlation maps.
-
-        """
-
-        left_pcs, right_pcs 		= self.pcs(n)
-        left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
-
-        left_field  = self._left
-        right_field = self._right
-
-        left_hom_patterns 	= self._calculate_correlation(left_field,left_pcs)
-        right_hom_patterns 	= self._calculate_correlation(right_field,right_pcs)
-
-        return left_hom_patterns, right_hom_patterns
-
-
-    def heterogeneous_patterns(self, n=None):
-        """
-        Return left and right heterogeneous correlation maps.
-
-        Parameters
-        ----------
-        n : int, optional
-            Number of patterns (modes) to be returned. If None then all patterns
-            are returned. The default is None.
-
-        Returns
-        -------
-        xr.DataArray
-            Left heterogeneous correlation maps.
-        xr.DataArray
-            Right heterogeneous correlation maps.
-
-        """
-        left_pcs, right_pcs 		= self.pcs(n)
-        left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
-
-        left_field  = self._left
-        right_field = self._right
-
-        left_het_patterns 	= self._calculate_correlation(left_field,right_pcs)
-        right_het_patterns 	= self._calculate_correlation(right_field,left_pcs)
-
-        return left_het_patterns, right_het_patterns
-
-
-    def plot_mode(self, n=1, right=False, signs=None, title='', cmap='RdGy_r'):
-        """
-        Plot mode`n` PC and EOF of left (and right) data field.
-
-        Parameters
-        ----------
-        n : int, optional
-            Mode of PC and EOF to plot. The default is 1.
-        right : boolean
-            Plot PC and EOF of right field. The default is False.
-        signs : list of int, optional
-            Either +1 or -1 in order to flip the sign of shown PCs/EOFs.
-            The default is None.
-        title : str, optional
-            Title of figure. The default is ''.
+            Mode to plot. The default is 1.
+        threshold : int, optional
+            Amplitude threshold below which the fields are masked out.
+            The default is 0.
+        cmap_eof : str or Colormap
+            The colormap used to map the spatial patterns.
+            The default is 'Blues'.
+        cmap_phase : str or Colormap
+            The colormap used to map the spatial phase function.
+            The default is 'twilight'.
+        resolution : a named resolution to use from the Natural Earth dataset.
+            Currently can be one of '110m', '50m', and '10m'.
 
         Returns
         -------
         None.
 
         """
-        left_pcs, right_pcs 		= self.pcs(n)
-        left_pcs, right_pcs 		= [left_pcs.sel(mode=n).real, right_pcs.sel(mode=n).real]
 
-        left_eofs, right_eofs 	= self.eofs(n)
-        left_eofs, right_eofs 	= [left_eofs.sel(mode=n).real, right_eofs.sel(mode=n).real]
+        left_pcs, right_pcs 	= self.pcs(mode)
+        left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
 
-        var, error 			= self.explained_variance(n)
-        var, error 			= [var.sel(mode=n).values, error.sel(mode=n).values]
+        if self._useHilbert:
+            left_eofs, right_eofs   = self.spatial_amplitude(mode)
+            cmap_eof_range = [0, 1]
+            eof_title = 'Amplitude'
+        else:
+            left_eofs, right_eofs   = self.eofs(mode)
+            cmap_eof = 'RdBu_r'
+            cmap_eof_range = [-1, 0, 1]
+            eof_title = 'EOF'
+        left_eofs, right_eofs   = [left_eofs.sel(mode=mode), right_eofs.sel(mode=mode)]
 
+        left_phase, right_phase = self.spatial_phase(mode)
+        left_phase, right_phase = [left_phase.sel(mode=mode),right_phase.sel(mode=mode)]
+
+        var, error 		= self.explained_variance(mode)
+        var, error 		= [var.sel(mode=mode).values, error.sel(mode=mode).values]
+
+        titles = {
+        'pc' : 'PC {:d} ({:.1f} \%)'.format(mode,var),
+        'eof': eof_title,
+        'phase':'Phase',
+        'var1' : self._attrs['left_field'],
+        'var2' : self._attrs['right_field']
+        }
+
+        titles.update({k: v.replace('_',' ') for k, v in titles.items()})
+        titles.update({k: self._boldify(v) for k, v in titles.items()})
 
         # normalize all EOFs/PCs such that they range from -1...+1
-        left_eofs 		= self._normalize_EOF_to_1(left_eofs)
-        right_eofs 		= self._normalize_EOF_to_1(right_eofs)
-        left_pcs 		= self._normalize_PC_to_1(left_pcs)
-        right_pcs 		= self._normalize_PC_to_1(right_pcs)
+        left_eofs   = self._normalize_EOF_to_1(left_eofs)
+        right_eofs  = self._normalize_EOF_to_1(right_eofs)
+        left_pcs    = self._normalize_PC_to_1(left_pcs)
+        right_pcs   = self._normalize_PC_to_1(right_pcs)
 
-        # flip signs of PCs and EOFs, if needed
-        left_eofs 	= self._flip_signs(left_eofs, signs)
-        right_eofs 	= self._flip_signs(right_eofs, signs)
-        left_pcs 	= self._flip_signs(left_pcs, signs)
-        right_pcs 	= self._flip_signs(right_pcs, signs)
+        # apply amplitude threshold
+        left_eofs   = left_eofs.where(abs(left_eofs) >= threshold)
+        right_eofs  = right_eofs.where(abs(right_eofs) >= threshold)
+        left_phase  = left_phase.where(abs(left_eofs) >= threshold)
+        right_phase = right_phase.where(abs(right_eofs) >= threshold)
 
         # map boundaries as [east, west, south, north]
         left_map_boundaries  = self._get_map_boundaries(left_eofs)
         right_map_boundaries = self._get_map_boundaries(right_eofs)
+        map_boundaries = [left_map_boundaries, right_map_boundaries]
 
-        # map_projection and center longitude for
-        map_projection = ccrs.PlateCarree()
-        longitude_center  = int((left_map_boundaries[0] + left_map_boundaries[1]) / 2)
-        # take the center longitude of left field  for both, left and right
-        # field as simplification; I don't know a way of specifying
-        # multiple projections at the same time
+        # map projections and center longitude
+        map_projection  = ccrs.PlateCarree()
+        left_c_lon      = int((left_map_boundaries[0] + left_map_boundaries[1]) / 2)
+        right_c_lon     = int((right_map_boundaries[0] + right_map_boundaries[1]) / 2)
 
-        if right:
-            fig, axes_pc, axes_eof = self._create_figure(2,['t','s'],longitude_center)
-        else:
-            fig, axes_pc, axes_eof = self._create_figure(1,['t','s'],longitude_center)
+        left_proj   = ccrs.PlateCarree(central_longitude=left_c_lon)
+        right_proj  = ccrs.PlateCarree(central_longitude=right_c_lon)
+        projs = [left_proj, right_proj]
 
+        # data
+        pcs             = [left_pcs, right_pcs]
+        eofs            = [left_eofs, right_eofs]
+        phases          = [left_phase, right_phase]
+        height_ratios   = [1, 1]
 
+        n_rows = 2
+        n_cols = 3
 
-        # plot PCs/EOFs
-        left_pcs.plot(ax = axes_pc[0,0])
-        left_eofs.plot(
-            ax = axes_eof[0,0], transform = map_projection, cmap = cmap,
-            extend = 'neither',	add_colorbar = True, vmin = -1, vmax = 1,
-            cbar_kwargs = {'label': 'EOF (normalized)'})
-        axes_eof[0,0].set_extent(left_map_boundaries, crs = map_projection)
+        # if PCA then right field not necessary
+        if (self._use_MCA == False):
+            n_rows = n_rows - 1
+            projs.pop()
+            pcs.pop()
+            eofs.pop()
+            phases.pop()
+            height_ratios.pop()
 
-        if right:
-            right_pcs.plot(ax = axes_pc[1,0])
-            right_eofs.plot(
-                ax=axes_eof[1,0], transform = map_projection, cmap = cmap,
-                extend = 'neither', add_colorbar = True, vmin = -1, vmax = 1,
-                cbar_kwargs = {'label': 'EOF (normalized)'})
-            axes_eof[1,0].set_extent(right_map_boundaries, crs = map_projection)
+        if (self._useHilbert == False):
+            n_cols = n_cols - 1
 
-
-        for i,a in enumerate(axes_pc[:,0]):
-            a.set_ylim(-1,1)
-            a.set_xlabel('')
-            a.set_ylabel('PC (normalized)')
-            a.set_title('')
-
-
-        for i,a in enumerate(axes_eof[:,0]):
-            a.coastlines(resolution='50m', lw=0.5)
-            a.add_feature(cfeature.LAND.with_scale('50m'))
-            a.set_title('')
-            a.set_aspect('auto')
-
-
-        fig.subplots_adjust(wspace=0.1,hspace=0.2,left=0.05)
-
-        if title == '':
-            title = "PC {} ({:.1f} $\pm$ {:.1f} \%)".format(n, var,error)
-
-        if right:
-            y_offset = 0.95
-        else:
-            y_offset = 1.00
-        fig.suptitle(title, y=y_offset)
-
-
-    def cplot_mode(self, n=1, right=False, threshold=0, title='', cmap='pink_r'):
-        """
-        Plot mode`n` PC and EOF of left (and right) data field.
-
-        Parameters
-        ----------
-        n : int, optional
-            Mode of PC and EOF to plot. The default is 1.
-        right : boolean
-            Plot PC and EOF of right field. The default is False.
-        threshold : int, optional
-            Amplitude threshold below which the fields are masked out.
-            The default is 0.
-        title : str, optional
-            Title of figure. The default is ''.
-
-        Returns
-        -------
-        None.
-
-        """
-        left_pcs, right_pcs 	= self.pcs(n)
-        left_pcs, right_pcs 	= [left_pcs.sel(mode=n).real, right_pcs.sel(mode=n).real]
-
-        left_amplitude, right_amplitude   = self.spatial_amplitude(n)
-        left_amplitude, right_amplitude   = [left_amplitude.sel(mode=n), right_amplitude.sel(mode=n)]
-
-        left_phase, right_phase           = self.spatial_phase(n)
-        left_phase, right_phase           = [left_phase.sel(mode=n),right_phase.sel(mode=n)]
-
-        var, error 		= self.explained_variance(n)
-        var, error 		= [var.sel(mode=n).values, error.sel(mode=n).values]
-
-
-        # normalize all EOFs/PCs such that they range from -1...+1
-        left_amplitude   = self._normalize_EOF_to_1(left_amplitude)
-        right_amplitude  = self._normalize_EOF_to_1(right_amplitude)
-        left_pcs         = self._normalize_PC_to_1(left_pcs)
-        right_pcs        = self._normalize_PC_to_1(right_pcs)
-
-        # apply amplitude threshold
-        left_amplitude   = left_amplitude.where(left_amplitude > threshold)
-        right_amplitude  = right_amplitude.where(right_amplitude > threshold)
-        left_phase       = left_phase.where(left_amplitude > threshold)
-        right_phase      = right_phase.where(right_amplitude > threshold)
-
-        # map boundaries as [east, west, south, north]
-        left_map_boundaries  = self._get_map_boundaries(left_amplitude)
-        right_map_boundaries = self._get_map_boundaries(right_amplitude)
-
-        # map_projection and center longitude for
-        map_projection = ccrs.PlateCarree()
-        longitude_center  = int((left_map_boundaries[0] + left_map_boundaries[1]) / 2)
-        # take the center longitude of left field  for both, left and right
-        # field as simplification; I don't know a way of specifying
-        # multiple projections at the same time
+        # add additional row for colorbar
+        n_rows = n_rows + 1
+        height_ratios.append(0.05)
 
         # create figure environment
-        if right:
-            fig, axes_pc, axes_eof = self._create_figure(2,['t','s','s'], longitude_center)
-        else:
-            fig, axes_pc, axes_eof = self._create_figure(1,['t','s','s'], longitude_center)
+        fig = plt.figure(figsize=(8.3,5), dpi=150)
+        fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
+        gs = fig.add_gridspec(n_rows, n_cols, height_ratios=height_ratios)
+        axes_pc = [fig.add_subplot(gs[i,0]) for i in range(n_rows-1)]
+        axes_eof = [fig.add_subplot(gs[i,1], projection=projs[i]) for i in range(n_rows-1)]
+        cbax_eof = fig.add_subplot(gs[-1,1])
 
+        axes_space = axes_eof
 
+        var_names = [titles['var1'], titles['var2']]
 
-        # plot PCs/Amplitude/Phase
-        left_pcs.real.plot(ax = axes_pc[0,0])
-        left_amplitude.real.plot(
-            ax = axes_eof[0,0], transform = map_projection,
-            cmap = cmap, extend = 'neither', add_colorbar = True,
-            vmin = 0, vmax = 1, cbar_kwargs = {'label' : 'Amplitude (normalized)'})
-        left_phase.plot(
-            ax = axes_eof[0,1], transform = map_projection,
-            cmap = 'twilight_shifted', cbar_kwargs = {'label' : 'Phase (rad)'},
-            add_colorbar = True, vmin = -np.pi, vmax = np.pi)
+        # plot PCs
+        for i, pc in enumerate(pcs):
+            pc.plot(ax=axes_pc[i])
+            axes_pc[i].set_ylim(-1,1)
+            axes_pc[i].set_xlabel('')
+            axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
+            axes_pc[i].set_title('')
+            axes_pc[i].set_yticks([-1,0,1])
 
-        axes_eof[0,0].set_extent(left_map_boundaries,crs = map_projection)
-        axes_eof[0,1].set_extent(left_map_boundaries,crs = map_projection)
+        axes_pc[0].xaxis.set_visible(False)
+        axes_pc[0].set_title(titles['pc'], fontweight='bold')
 
-        axes_eof[0,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,error))
-        axes_eof[0,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,error))
+        # plot EOFs
+        for i, eof in enumerate(eofs):
+            cb_eof = eof.plot(
+                ax=axes_eof[i], transform=ccrs.PlateCarree(),
+                vmin=cmap_eof_range[0], vmax=cmap_eof_range[-1], cmap=cmap_eof,
+                add_colorbar = False)
+            axes_eof[i].set_extent(map_boundaries[i], crs=ccrs.PlateCarree())
+            axes_eof[i].set_title('')
 
+        plt.colorbar(cb_eof, cbax_eof, orientation='horizontal')
+        cbax_eof.xaxis.set_ticks(cmap_eof_range)
+        axes_eof[0].set_title(titles['eof'], fontweight='bold')
 
-        if right:
-            right_pcs.real.plot(ax = axes_pc[1,0])
-            right_amplitude.real.plot(
-                ax = axes_eof[1,0], transform = map_projection,
-                cmap = cmap, extend = 'neither', add_colorbar = True, vmin = 0,
-                vmax = 1, cbar_kwargs = {'label' : 'Amplitude (normalized)'})
-            right_phase.plot(
-                ax = axes_eof[1,1], transform = map_projection,
-                cmap = 'twilight_shifted', cbar_kwargs = {'label' : 'Phase (rad)'},
-                add_colorbar = True, vmin = -np.pi, vmax = 	np.pi)
+        # plot Phase function (if data is complex)
+        if (self._useHilbert):
+            axes_phase = [fig.add_subplot(gs[i,2], projection=projs[i]) for i in range(n_rows-1)]
+            cbax_phase = fig.add_subplot(gs[-1,2])
 
-            axes_eof[1,0].set_extent(right_map_boundaries,crs = map_projection)
-            axes_eof[1,1].set_extent(right_map_boundaries,crs = map_projection)
+            for i, phase in enumerate(phases):
+                cb_phase = phase.plot(
+                    ax=axes_phase[i], transform=ccrs.PlateCarree(),
+                    vmin=-np.pi, vmax=np.pi, cmap=cmap_phase,
+                    add_colorbar = False)
+                axes_phase[i].set_extent(map_boundaries[i], crs=ccrs.PlateCarree())
+                axes_phase[i].set_title('')
 
-            axes_eof[1,0].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,error))
-            axes_eof[1,1].set_title(r'Mode: {:d}: {:.1f} $\pm$ {:.1f} \%'.format(n,var,error))
+            plt.colorbar(cb_phase, cbax_phase, orientation='horizontal')
+            cbax_phase.xaxis.set_ticks([-3.14,0,3.14])
+            cbax_phase.set_xticklabels([r'-$\pi$','0',r'$\pi$'])
 
-        for a in axes_pc.flatten():
-            a.set_ylabel('Real PC (normalized)')
-            a.set_xlabel('')
-            a.set_title('')
+            for a in axes_phase:
+                axes_space.append(a)
 
+            axes_phase[0].set_title(titles['phase'], fontweight='bold')
 
-        for a in axes_eof.flatten():
-            a.coastlines(lw = 0.5, resolution = '50m')
+        # add map features
+        for a in axes_space:
+            a.coastlines(lw = .5, resolution = resolution)
             a.set_aspect('auto')
+            a.add_feature(cfeature.LAND, color='gray', zorder=0)
 
-        fig.subplots_adjust(wspace = 0.1, hspace = 0.17, left = 0.05)
-        fig.suptitle(title)
 
 
     def plot_overview(self, n=3, right=False, signs=None, title='', cmap='RdGy_r'):
@@ -1137,9 +1102,11 @@ class xMCA(MCA):
 
     def save_analysis(self, path=None):
         analysis_name   = self._attrs['analysis']
-        folder_pca      = self._attrs['left_field']
-        folder_mca      = '_'.join([folder_pca, self._attrs['right_field']])
-        folder_name     = folder_mca if self._use_MCA else folder_pca
+        folder_name     = self._attrs['left_field']
+        if self._use_MCA:
+            folder_name = '_'.join([folder_name, self._attrs['right_field']])
+
+        folder_name.lower().replace(' ', '_')
 
         if path is None:
             path = os.getcwd()
@@ -1169,10 +1136,11 @@ class xMCA(MCA):
             except KeyError:
                 raise KeyError('xr.Dataset needs two variables called \'real\' and \'imag\'.')
             except TypeError:
-                raise TypeError("The input type seems incorrect. Take xr.DataArray or xr.Dataset")
+                raise TypeError("The input type seems incorrect. Use xr.DataArray or xr.Dataset")
 
             data_array.attrs = dataset.attrs
             return data_array
+
 
 
     def load_analysis(self, eofs=None, pcs=None, eigenvalues=None):
@@ -1181,6 +1149,7 @@ class xMCA(MCA):
             left_eofs, right_eofs   = [eofs[0], eofs[1]]
             left_pcs, right_pcs     = [pcs[0], pcs[1]]
             self._use_MCA           = True
+
         else:
             left_eofs, right_eofs   = [eofs, eofs]
             left_pcs, right_pcs     = [pcs, pcs]
