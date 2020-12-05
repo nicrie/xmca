@@ -628,14 +628,18 @@ class MCA(object):
         if all(isinstance(var,list) for var in [eofs,pcs]):
             eofsLeft, eofsRight = [eofs[0], eofs[1]]
             pcsLeft, pcsRight   = [pcs[0], pcs[1]]
+            self._use_MCA           = True
         else:
             eofsLeft, eofsRight = [eofs, eofs]
             pcsLeft, pcsRight   = [pcs, pcs]
+            self._use_MCA           = False
 
         self._observations                      = pcsLeft.shape[0]
         self._left_original_spatial_shape       = eofsLeft.shape[:-1]
         self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
         number_modes                            = eofsRight.shape[-1]
+
+        self._useHilbert = True if pcsLeft.dtype == complex else False
 
         self._left_variables 		= np.product(self._left_original_spatial_shape)
         self._right_variables 		= np.product(self._right_original_spatial_shape)
