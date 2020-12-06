@@ -256,9 +256,9 @@ class MCA(object):
             Only used for complex time series (useHilbert=True).
             Default is False.
         """
-        self._useHilbert = useHilbert
+        self._use_hilbert = useHilbert
         # complexify input data via Hilbert transform
-        if (self._useHilbert):
+        if (self._use_hilbert):
             self._noNanDataLeft = self._complexify_data(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
             # save computing time if left and right field are the same
             if self._use_MCA:
@@ -639,7 +639,7 @@ class MCA(object):
         self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
         number_modes                            = eofsRight.shape[-1]
 
-        self._useHilbert = True if pcsLeft.dtype == complex else False
+        self._use_hilbert = True if pcsLeft.dtype == complex else False
 
         self._left_variables 		= np.product(self._left_original_spatial_shape)
         self._right_variables 		= np.product(self._right_original_spatial_shape)

@@ -700,7 +700,7 @@ class xMCA(MCA):
         left_pcs, right_pcs 	= self.pcs(mode)
         left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
 
-        if self._useHilbert:
+        if self._use_hilbert:
             left_eofs, right_eofs   = self.spatial_amplitude(mode)
             cmap_eof_range = [0, 1]
             eof_title = 'Amplitude'
@@ -772,7 +772,7 @@ class xMCA(MCA):
             phases.pop()
             height_ratios.pop()
 
-        if (self._useHilbert == False):
+        if (self._use_hilbert == False):
             n_cols = n_cols - 1
 
         # add additional row for colorbar
@@ -817,7 +817,7 @@ class xMCA(MCA):
         axes_eof[0].set_title(titles['eof'], fontweight='bold')
 
         # plot Phase function (if data is complex)
-        if (self._useHilbert):
+        if (self._use_hilbert):
             axes_phase = [fig.add_subplot(gs[i,2], projection=projs[i]) for i in range(n_rows-1)]
             cbax_phase = fig.add_subplot(gs[-1,2])
 
@@ -1084,7 +1084,7 @@ class xMCA(MCA):
 
     def to_netcdf(self, data_array, path, *args, **kwargs):
         method_idx  = self._attrs['analysis']
-        complex_idx = 'c{:}'.format(int(self._useHilbert))
+        complex_idx = 'c{:}'.format(int(self._use_hilbert))
         rot_idx     = 'r{:02}'.format(self._nRotations)
         power_idx   = 'p{:02}'.format(self._power)
         file_name   = '.'.join([data_array.attrs['name'],'nc'])
@@ -1106,7 +1106,7 @@ class xMCA(MCA):
         if self._use_MCA:
             folder_name = '_'.join([folder_name, self._attrs['right_field']])
 
-        folder_name.lower().replace(' ', '_')
+        folder_name = folder_name.lower().replace(' ', '_')
 
         if path is None:
             path = os.getcwd()
