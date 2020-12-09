@@ -6,15 +6,19 @@ Complex rotated maximum covariance analysis of two numpy arrays.
 # =============================================================================
 # Imports
 # =============================================================================
+import os
+
 import numpy as np
 import xarray as xr
-import textwrap
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
 from tqdm import tqdm
+from datetime import datetime
 
 from tools.rotation import promax
-
+from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
+from tools.array import is_not_empty, check_time_dims, check_nan_rows
+from tools.text import secure_str, boldify_str, wrap_str
 # =============================================================================
 # MCA
 # =============================================================================
@@ -34,9 +38,6 @@ class MCA(object):
         If none is provided, automatically, right field is assumed to be
         the same as left field. In this case, MCA reducdes to normal PCA.
         The default is None.
-    normalize : boolean, optional
-        If True, input data is normalized to unit variance which translates to
-        CCA. No normalization performs MCA. The default is True.
 
 
     Examples
@@ -55,7 +56,7 @@ class MCA(object):
     >>> pcsData1, pcsData2 = mca.pcs()
     """
 
-    def __init__(self, left, right=None, normalize=True):
+    def __init__(self, left = None, right = None):
         """Load data fields and store information about data size/shape.
 
         Parameters
@@ -67,136 +68,126 @@ class MCA(object):
             If none is provided, automatically, right field is assumed to be
             the same as left field. In this case, MCA reducdes to normal PCA.
             The default is None.
-        normalize : boolean, optional
-            Input data is normalized to unit variance. The default is True.
-
 
         """
-        self._left      = left.copy()
+        self._left      = np.array([]) if left is None else left.copy()
         self._right     = self._left if right is None else right.copy()
-        self._use_MCA    = not self._arrays_are_equal(self._left, self._right)
 
-        assert(self._is_array(self._left))
-        assert(self._is_array(self._right))
-        assert(self._time_dimensions_are_equal(self._left, self._right))
-
-
-        self._observations          = self._left.shape[0]
-        self._left_original_spatial_shape     = self._left.shape[1:]
-        self._right_original_spatial_shape 	= self._right.shape[1:]
-
-        self._left_variables 		= np.product(self._left_original_spatial_shape)
-        self._right_variables 		= np.product(self._right_original_spatial_shape)
-
-        # create 2D matrix in order to perform PCA
-        self._left 	    = self._left.reshape(self._observations,self._left_variables)
-        self._right 	= self._right.reshape(self._observations,self._right_variables)
-
-        # check for NaN time steps
-        assert(self._has_no_nan_timesteps(self._left))
-        assert(self._has_no_nan_timesteps(self._right))
+        is_arr(self._left)
+        is_arr(self._right)
+        check_time_dims(self._left, self._right)
 
         # center input data to zero mean (remove mean)
-        self._left 	    = self._center_array(self._left)
-        self._right 	= self._center_array(self._right)
+        self._left 	    = remove_mean(self._left)
+        self._right 	= remove_mean(self._right)
 
-        # normalize input data to unit variance
-        if (normalize):
-            self._left  = self._normalize_array(self._left)
-            self._right = self._normalize_array(self._right)
+        # store meta information
+        self._analysis = {
+            # data input
+            'left_name'             : 'left',
+            'right_name'            : 'right',
+            'is_bivariate'          : False,
+            # pre-processing
+            'is_normalized'         : False,
+            'is_coslat_corrected'   : False,
+            'method'                : 'pca',
+            # Complex solution
+            'is_complex'            : False,
+            'theta'                 : False,
+            'theta_period'          : 365,
+            #Rotated solution
+            'is_rotated'            : False,
+            'rotations'             : 0,
+            'power'                 : 0,
+            # Truncated solution
+            'is_truncated'          : False,
+            'is_truncated_at'       : 0,
+            'eigen_dimension'    : 0,
+            'eigensum'          : 0.0
+            }
 
-        # remove NaNs columns in data fields
-        self._noNanDataLeft, self._noNanIndexLeft   = self._remove_nan_columns(self._left)
-        self._noNanDataRight, self._noNanIndexRight = self._remove_nan_columns(self._right)
-
-        assert(self._is_not_empty(self._noNanDataLeft))
-        assert(self._is_not_empty(self._noNanDataRight))
-
-        # meta information on rotation
-        self._rotatedSolution   = False
-        self._nRotations        = 0
-        self._power             = 0
-
-
-    def _remove_nan_columns(self, array):
-        noNanIndex = np.where(~(np.isnan(array[0])))[0]
-        noNanData  = array[:,noNanIndex]
-        return noNanData, noNanIndex
-
-
-    def _arrays_are_equal(self, arr1 ,arr2):
-        if arr1.shape == arr2.shape:
-            return ((np.isnan(arr1) & np.isnan(arr2)) | (arr1 == arr2)).all()
-        else:
-            return False
+        self._analysis['is_bivariate']  = not arrs_are_equal(self._left, self._right)
+        self._analysis['method']        = self._get_method_id()
 
 
-    def _is_array(self,data):
-        if (isinstance(data,np.ndarray)):
-            return True
-        else:
-            raise TypeError('Data needs to be np.ndarray.')
 
 
-    def _time_dimensions_are_equal(self, left, right):
-        if (left.shape[0] == right.shape[0]):
-            return True
-        else:
-            raise ValueError('Both input fields need to have same time dimensions.')
+    def _get_method_id(self):
+        id = 'pca'
+        if self._analysis['is_bivariate']:
+            id = 'mca'
+            if self._analysis['is_normalized']:
+                id = 'cca'
+        return id
 
 
-    def _center_array(self, array):
-        """Remove the mean of an array along the first dimension."""
-        return array - array.mean(axis=0)
+    def _get_complex_id(self):
+        id = int(self._analysis['is_complex'])
+        return 'c{:}'.format(id)
 
 
-    def _normalize_array(self, array):
-        """Normalize the array along the first dimension (divide by std)."""
-        return array / array.std(axis=0)
+    def _get_rotation_id(self):
+        id = self._analysis['rotations']
+        return 'r{:02}'.format(id)
 
 
-    def _has_no_nan_timesteps(self, data):
-        """Check if data contains a nan time step.
-
-        A nan time step is a time step for which the values of every station
-        (column) in	the data is np.NaN. Nan time steps are problematic
-        since centering of the data transforms all values of a station (column)
-        to np.NaN if only one np.NaN is present.
-        """
-        if (np.isnan(data).all(axis=1).any()):
-            raise ValueError(textwrap.fill(textwrap.dedent("""
-            Gaps (np.NaN) in time series detected. Either remove or interpolate
-            all NaN time steps in your data.""")))
-        else:
-            return True
+    def _get_power_id(self):
+        id = self._analysis['power']
+        return 'p{:02}'.format(id)
 
 
-    def _is_not_empty(self, index):
-        if (index.size > 0):
-            return True
-        else:
-            raise ValueError('Input field is empty or contains NaN only.')
+    def _get_analysis_id(self):
+        method      = self._get_method_id()
+        hilbert     = self._get_complex_id()
+        rotation    = self._get_rotation_id()
+        power       = self._get_power_id()
+
+        analysis    = '_'.join([method,hilbert,rotation,power])
+        return analysis
 
 
-    def _theta_forecast(self, series, steps=None, seasonalPeriod=365):
+    def _get_analysis_path(self, path=None):
+        base_path   = path
+        if base_path is None:
+            base_path = os.getcwd()
+
+        base_folder = 'pycca'
+
+        left_var    = self._analysis['left_name']
+        right_var   = self._analysis['right_name']
+
+        analysis_folder     = left_var
+        if self._analysis['is_bivariate']:
+            analysis_folder = '_'.join([analysis_folder, right_var])
+        analysis_folder = secure_str(analysis_folder)
+
+        analysis_path   = os.path.join(base_path, base_folder, analysis_folder)
+
+        if not os.path.exists(analysis_path):
+            os.makedirs(analysis_path)
+
+        return analysis_path
+
+
+    def _theta_forecast(self, series, steps=None, period=365):
         if steps is None:
             steps = len(series)
 
-        model = ThetaModel(series, period=seasonalPeriod, deseasonalize=True, use_test=False).fit()
+        model = ThetaModel(series, period=period, deseasonalize=True, use_test=False).fit()
         forecast = model.forecast(steps=steps, theta=20)
 
         return forecast
 
 
-    def _extend_data(self, data, seasonalPeriod=365):
+    def _extend_data(self, data, period=365):
 
-        extendedData = [self._theta_forecast(col, seasonalPeriod=seasonalPeriod) for col in tqdm(data.T)]
+        extendedData = [self._theta_forecast(col, period=period) for col in tqdm(data.T)]
         extendedData = np.array(extendedData).T
 
         return extendedData
 
 
-    def _complexify_data(self, data, extendSeries=False, seasonalPeriod=365):
+    def _complexify_data(self, data, theta=False, period=365):
         """Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -213,9 +204,12 @@ class MCA(object):
         ----------
         data : ndarray
             Real input data which is to be transformed via Hilbert transform.
-        extendSeries : boolean, optional
+        theta : boolean, optional
             If True, input time series are extended via forecast/backcast to
             3 * original length. This helps avoiding boundary effects of FFT.
+        period : int, optional
+            Period used to extend time series via Theta model. Using daily
+            data a period of 365 represents seasonal cycle. The default is 365.
 
         Returns
         -------
@@ -224,60 +218,136 @@ class MCA(object):
 
         """
 
-        if extendSeries:
-            forecast    = self._extend_data(data, seasonalPeriod=seasonalPeriod)
-            backcast    = self._extend_data(data[::-1], seasonalPeriod=seasonalPeriod)[::-1]
+        if theta:
+            forecast    = self._extend_data(data, period=period)
+            backcast    = self._extend_data(data[::-1], period=period)[::-1]
 
             data = np.concatenate([backcast, data, forecast])
+            self._analysis['theta_period'] = period
 
         # perform actual Hilbert transform of (extended) time series
         data = hilbert(data,axis=0)
 
-        if extendSeries:
+        if theta:
             # cut out the first and last third of Hilbert transform
             # which belong to the forecast/backcast
-            data    = data[self._observations:(2*self._observations)]
-            data = self._center_array(data)
+            data = data[self._observations:(2*self._observations)]
+            data = remove_mean(data)
 
         return data
 
 
-    def solve(self, useHilbert=False, extendSeries=False, seasonalPeriod=365):
+    def apply_weights(self,left=None, right=None):
+        """Apply weights to data sets.
+
+        Supplied weights are applied via broadcasting.
+
+        Parameters
+        ----------
+        left : ndarray
+            Weights for left data set.
+        right : ndarray
+            Weights for right data set.
+
+
+        """
+
+        if left is None:
+            left = 1
+
+        if right is None:
+            right = 1
+
+        self._left  = self._left * left
+        self._right = self._right * right
+
+
+    def normalize(self):
+        """Normalize the input data to unit variance."""
+
+        if (self._analysis['is_normalized']):
+            print('Data already normalized. Nothing was done.')
+            return None
+
+        else:
+            self._left  = self._left / self._left.std(axis=0)
+            self._right = self._right / self._right.std(axis=0)
+
+            self._analysis['is_normalized'] = True
+            self._analysis['is_coslat_corrected'] = False
+            self._analysis['method'] = self._get_method_id()
+            return None
+
+
+    def solve(self, complexify=False, theta=False, period=365):
         """Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
         ----------
-        useHilbert : boolean, optional
+        complexify : boolean, optional
             Use Hilbert transform to complexify the input data fields
             in order to perform complex PCA/MCA. Default is false.
-        extendSeries : boolean, optional
+        theta : boolean, optional
             If True, extend time series by fore/backcasting based on
             Theta model. New time series will have 3 * original length.
-            Only used for complex time series (useHilbert=True).
+            Only used for complex time series (complexify=True).
             Default is False.
+        period : int, optional
+            Seasonal period used for Theta model. Default is 365, representing
+            a yearly cycle for daily data.
         """
-        self._use_hilbert = useHilbert
+
+        self._observations                  = self._left.shape[0]
+        self._left_original_spatial_shape   = self._left.shape[1:]
+        self._right_original_spatial_shape 	= self._right.shape[1:]
+
+        self._left_variables 		= np.product(self._left_original_spatial_shape)
+        self._right_variables 		= np.product(self._right_original_spatial_shape)
+
+        # create 2D matrix in order to perform PCA
+        self._left 	    = self._left.reshape(self._observations,self._left_variables)
+        self._right 	= self._right.reshape(self._observations,self._right_variables)
+
+        # check for NaN time steps
+        check_nan_rows(self._left)
+        check_nan_rows(self._right)
+
+        # remove NaNs columns in data fields
+        self._left, self._left_no_nan_index   = remove_nan_cols(self._left)
+        self._right, self._right_no_nan_index = remove_nan_cols(self._right)
+
+        is_not_empty(self._left)
+        is_not_empty(self._right)
+
         # complexify input data via Hilbert transform
-        if (self._use_hilbert):
-            self._noNanDataLeft = self._complexify_data(self._noNanDataLeft, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+        if (complexify == True):
+            self._left = self._complexify_data(self._left, theta=theta, period=period)
             # save computing time if left and right field are the same
-            if self._use_MCA:
-                self._noNanDataRight = self._complexify_data(self._noNanDataRight, extendSeries=extendSeries, seasonalPeriod=seasonalPeriod)
+            if self._analysis['is_bivariate']:
+                self._right = self._complexify_data(self._right, theta=theta, period=period)
             else:
-                self._noNanDataRight = self._noNanDataLeft
+                self._right = self._left
+
+            self._analysis['is_complex'] = True
 
         # create covariance matrix
-        kernel = self._noNanDataLeft.conjugate().T @ self._noNanDataRight / self._observations
+        kernel = self._left.conjugate().T @ self._right / self._observations
 
         # solve eigenvalue problem
-        VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
+        try:
+            VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
+        except LinAlgError:
+            raise LinAlgError("SVD failed. NaN entries may be the problem.")
+
         VRight = VTRight.conjugate().T
 
         S = np.sqrt(np.diag(eigenvalues) * self._observations)
         Si = np.diag(1./np.diag(S))
 
         self._eigenvalues = eigenvalues
-        self._eigensum = eigenvalues.sum()
+        self._analysis['eigensum'] = eigenvalues.sum()
+        self._analysis['eigen_dimension'] = eigenvalues.size
+        self._analysis['is_truncated_at'] = eigenvalues.size
 
         # standardized EOF fields
         self._VLeft 	= VLeft
@@ -288,11 +358,11 @@ class MCA(object):
         self._LRight 	= VRight @ S
 
         # get PC scores by projecting data fields on loadings
-        self._ULeft 	= self._noNanDataLeft @ VLeft @ Si
-        self._URight 	= self._noNanDataRight @ VRight @ Si
+        self._ULeft 	= self._left @ VLeft @ Si
+        self._URight 	= self._right @ VRight @ Si
 
 
-    def rotate(self, nRotations, power=1, tol=1e-5):
+    def rotate(self, n_rot, power=1, tol=1e-5):
         """Perform Promax rotation on the first `n` EOFs.
 
         Promax rotation (Hendrickson & White 1964) is an oblique rotation which
@@ -304,7 +374,7 @@ class MCA(object):
 
         Parameters
         ----------
-        nRotations : int
+        n_rot : int
             Number of EOFs to rotate.
         power : int, optional
             Power of Promax rotation. The default is 1.
@@ -321,13 +391,13 @@ class MCA(object):
         None.
 
         """
-        if(nRotations < 2):
-            raise ValueError('nRotations must be >=2')
+        if(n_rot < 2):
+            raise ValueError('`n_rot` must be >=2')
         if(power<1):
-            raise ValueError('Power must be >=1')
+            raise ValueError('`power` must be >=1')
 
         # rotate loadings (Cheng and Dunkerton 1995)
-        L = np.concatenate((self._LLeft[:,:nRotations], self._LRight[:,:nRotations]))
+        L = np.concatenate((self._LLeft[:,:n_rot], self._LRight[:,:n_rot]))
         Lr, R, Phi = promax(L, power, maxIter=1000, tol=tol)
         LLeft 	= Lr[:self._VLeft.shape[0],:]
         LRight 	= Lr[self._VLeft.shape[0]:,:]
@@ -346,11 +416,11 @@ class MCA(object):
         # If rotation is orthogonal: R.T = R
         # If rotation is oblique (p>1): R^(-1).T = R
         if(power==1):
-            ULeft 	= self._ULeft[:,:nRotations] @ R
-            URight 	= self._URight[:,:nRotations] @ R
+            ULeft 	= self._ULeft[:,:n_rot] @ R
+            URight 	= self._URight[:,:n_rot] @ R
         else:
-            ULeft 	= self._ULeft[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
-            URight 	= self._URight[:,:nRotations] @ np.linalg.pinv(R).conjugate().T
+            ULeft 	= self._ULeft[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
+            URight 	= self._URight[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
 
 
         # store rotated pcs, eofs and "eigenvalues"
@@ -367,11 +437,11 @@ class MCA(object):
         self._URight 		= URight[:,varIdx]
 
         # store rotation and correlation matrix of PCs + meta information
-        self._rotationMatrix 		= R
-        self._correlationMatrix 	= Phi[varIdx,varIdx]
-        self._rotatedSolution 		= True
-        self._nRotations            = nRotations
-        self._power                 = power
+        self._rotation_matrix 		= R
+        self._correlation_matrix 	= Phi[varIdx,varIdx]
+        self._analysis['is_rotated']            = True
+        self._analysis['rotations']             = n_rot
+        self._analysis['power']                 = power
 
 
     def rotation_matrix(self):
@@ -383,10 +453,10 @@ class MCA(object):
         ndarray
             Rotation matrix.
         """
-        if (self._rotatedSolution):
-            return self._rotationMatrix
+        if (self._analysis['is_rotated']):
+            return self._rotation_matrix
         else:
-            raise RuntimeError('Rotation matrix does not exist since EOFs were not rotated')
+            print('Apply `.rotate()` first to retrieve the correlation matrix.')
 
 
     def correlation_matrix(self):
@@ -399,10 +469,10 @@ class MCA(object):
             Correlation matrix.
 
         """
-        if (self._rotatedSolution):
-            return self._correlationMatrix
+        if (self._analysis['is_rotated']):
+            return self._correlation_matrix
         else:
-            raise RuntimeError('Correlation matrix does not exist since EOFs were not rotated.')
+            print('Apply `.rotate()` first to retrieve the correlation matrix.')
 
 
     def eigenvalues(self,n=None):
@@ -445,8 +515,8 @@ class MCA(object):
 
         """
         values, error = self.eigenvalues(n)
-        desVar 		= values / self._eigensum * 100
-        desVarErr 	= error / self._eigensum * 100
+        desVar 		= values / self._analysis['eigensum'] * 100
+        desVarErr 	= error / self._analysis['eigensum'] * 100
         return desVar, desVarErr
 
 
@@ -506,8 +576,8 @@ class MCA(object):
         eofsLeft  	= np.zeros([self._left_variables, n],dtype=dtype) * np.nan
         eofsRight  	= np.zeros([self._right_variables, n],dtype=dtype) * np.nan
 
-        eofsLeft[self._noNanIndexLeft,:] = self._VLeft[:,:n]
-        eofsRight[self._noNanIndexRight,:] = self._VRight[:,:n]
+        eofsLeft[self._left_no_nan_index,:] = self._VLeft[:,:n]
+        eofsRight[self._right_no_nan_index,:] = self._VRight[:,:n]
 
         # reshape data fields to have original input shape
         eofsLeft 	= eofsLeft.reshape(self._left_original_spatial_shape + (n,))
@@ -623,23 +693,164 @@ class MCA(object):
         return phaseLeft.real, phaseRight.real
 
 
-    def load_analysis(self, eofs=None, pcs=None, eigenvalues=None):
+    def truncate(self, n):
+        """Truncate solution.
+
+        Parameters
+        ----------
+        n : int
+            Cut off after mode `n`.
+
+
+        """
+        if (n < self._eigenvalues.size):
+            self._eigenvalues = self._eigenvalues[:n]
+
+            self._ULeft = self._ULeft[:,:n]
+            self._VLeft = self._VLeft[:,:n]
+
+            self._VRight = self._VRight[:,:n]
+            self._URight = self._URight[:,:n]
+
+            self._analysis['is_truncated'] = True
+            self._analysis['is_truncated_at'] = n
+
+
+    def _create_info_file(self, path):
+        sep_line = '\n#' + '-' * 79
+        now  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        file_header = (
+            'This file contains information neccessary to load stored analysis '
+            'data from pyCCA module.')
+
+        path_output   = os.path.join(path, self._get_analysis_id())
+
+        file = open(path_output,"w+")
+        file.write(wrap_str(file_header))
+        file.write('\n# To load this analysis use:')
+        file.write('\n# from mca.xarray import xMCA')
+        file.write('\n# cca = xMCA()')
+        file.write('\n# cca.load_analysis(PATH_TO_THIS_FILE)')
+        file.write('\n')
+        file.write(sep_line)
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('created',now))
+        file.close()
+
+
+    def _save_info_to_file(self, path):
+        sep_line = '\n#' + '-' * 79
+
+        path_output   = os.path.join(path,self._get_analysis_id())
+
+        file = open(path_output,"a")
+        file.write(sep_line)
+        for key, value in self._analysis.items():
+            if key in ['is_bivariate','is_complex', 'is_rotated','is_truncated']:
+                file.write(sep_line)
+            file.write('\n{:<20} : {:<57}'.format(key, str(value)))
+        file.close()
+
+
+    def _save_paths_to_file(self, path, format):
+        sep_line = '\n#' + '-' * 79
+
+        var1 = secure_str(self._analysis['left_name'])
+        var2 = secure_str(self._analysis['right_name'])
+        eofs = '.'.join(['eofs',format])
+        pcs = '.'.join(['pcs',format])
+        eigenvalues = '.'.join(['eigenvalues',format])
+
+        path_output   = os.path.join(path,self._get_analysis_id())
+        path_eof1   = '_'.join([path_output, var1, eofs])
+        path_eof2   = '_'.join([path_output, var2, eofs])
+        path_pc1    = '_'.join([path_output, var1, pcs])
+        path_pc2    = '_'.join([path_output, var2, pcs])
+        path_eigen  = '_'.join([path_output, eigenvalues])
+
+        file = open(path_output,"a")
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('this file', path_output))
+        file.write('\n{:<20} : {:<57}'.format('eigenvalues', path_eigen))
+        file.write('\n{:<20} : {:<57}'.format('field1_eofs', path_eof1))
+        file.write('\n{:<20} : {:<57}'.format('field1_pcs', path_pc1))
+        file.write('\n{:<20} : {:<57}'.format('field2_eofs', path_eof2))
+        file.write('\n{:<20} : {:<57}'.format('field2_pcs', path_pc2))
+        file.write('\n')
+        file.close()
+
+
+    def _save_data(self, data_array, path, *args, **kwargs):
+        raise NotImplementedError('only works for `xarray`')
+
+
+    def _set_key(self, key, value):
+        try:
+            key_type = type(self._analysis[key])
+        except KeyError:
+            raise KeyError("Key `{}` not found in info file.".format(key))
+        if key_type == bool:
+            self._analysis[key] = (value == 'True')
+        else:
+            self._analysis[key] = key_type(value)
+
+
+    def _set_info_from_file(self, path):
+
+        info_file = open(path, 'r')
+        lines = info_file.readlines()
+        for line in lines:
+            if (line[0] != '#'):
+                key = line.split(':')[0]
+                key = key.rstrip()
+                if key in self._analysis.keys():
+                    value = line.split(':')[1].strip()
+                    self._set_key(key, value)
+        info_file.close()
+
+
+    def _get_locs_from_file(self, path):
+        # locations for data files
+        file_locations = {
+            'field1_eofs'       : None,
+            'field1_pcs'        : None,
+            'field2_eofs'       : None,
+            'field2_pcs'        : None,
+            'eigenvalues'       : None
+        }
+
+        info_file = open(path, 'r')
+        lines = info_file.readlines()
+        for line in lines:
+            if (line[0] != '#'):
+                key = line.split(':')[0]
+                key = key.rstrip()
+                if key in file_locations.keys():
+                    path = line.split(':')[1].strip()
+                    file_locations[key] = path
+        info_file.close()
+
+        return file_locations
+
+
+
+    def load_analysis(self, info_file, eofs=None, pcs=None, eigenvalues=None):
+        self._set_info_from_file(info_file)
+
         # standardized fields // EOF fields + PCs
-        if all(isinstance(var,list) for var in [eofs,pcs]):
+        if self._analysis['is_bivariate']:
             eofsLeft, eofsRight = [eofs[0], eofs[1]]
             pcsLeft, pcsRight   = [pcs[0], pcs[1]]
-            self._use_MCA           = True
         else:
-            eofsLeft, eofsRight = [eofs, eofs]
-            pcsLeft, pcsRight   = [pcs, pcs]
-            self._use_MCA           = False
+            eofsLeft, eofsRight = [eofs[0], eofs[0]]
+            pcsLeft, pcsRight   = [pcs[0], pcs[0]]
 
         self._observations                      = pcsLeft.shape[0]
         self._left_original_spatial_shape       = eofsLeft.shape[:-1]
         self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
-        number_modes                            = eofsRight.shape[-1]
+        number_modes                            = eofsLeft.shape[-1]
 
-        self._use_hilbert = True if pcsLeft.dtype == complex else False
 
         self._left_variables 		= np.product(self._left_original_spatial_shape)
         self._right_variables 		= np.product(self._right_original_spatial_shape)
@@ -647,8 +858,8 @@ class MCA(object):
         eofsLeft    = eofsLeft.reshape(self._left_variables, number_modes)
         eofsRight   = eofsRight.reshape(self._right_variables, number_modes)
 
-        VLeftT, self._noNanIndexLeft   = self._remove_nan_columns(eofsLeft.T)
-        VRightT, self._noNanIndexRight = self._remove_nan_columns(eofsRight.T)
+        VLeftT, self._left_no_nan_index   = remove_nan_cols(eofsLeft.T)
+        VRightT, self._right_no_nan_index = remove_nan_cols(eofsRight.T)
         self._VLeft     = VLeftT.T
         self._VRight    = VRightT.T
 
@@ -656,7 +867,6 @@ class MCA(object):
         Si  = np.diag(1./np.diag(S))
 
         self._eigenvalues   = eigenvalues
-        self._eigensum      = eigenvalues.sum()
 
         self._ULeft, self._URight = [pcsLeft, pcsRight]
 
