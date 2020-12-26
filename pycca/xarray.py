@@ -17,23 +17,24 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from datetime import datetime
 
-
-from mca.array import MCA
+from pycca.array import CCA
 from tools.text import secure_str, boldify_str, wrap_str
 from tools.xarray import is_DataArray, check_dims, get_attr, calc_temporal_corr
 from tools.xarray import get_lonlat_limits, norm_time_to_1, norm_space_to_1
 from tools.xarray import split_complex, set_to_array, array_to_set, create_coords
 # =============================================================================
-# xMCA
+# xCCA
 # =============================================================================
 
-class xMCA(MCA):
-    """Perform Canonical Correlation Analysis with `xarray.DataArray`.
+class xCCA(CCA):
+    """Perform Canonical Correlation Analysis (CCA) for two `xarray.DataArray`.
 
-    MCA is principal component analysis (PCA) generalized
+    CCA is a generalized form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
-    it is equivalent to PCA.
+    it is equivalent to PCA. Non-normalized CCA is called Maximum Covariance
+    Analysis (MCA).
 
     Parameters
     ----------
@@ -90,7 +91,7 @@ class xMCA(MCA):
         check_dims(left, right)
 
         # constructor of base class for numpy.ndarray
-        MCA.__init__(self, left.data, right.data)
+        CCA.__init__(self, left.data, right.data)
 
         # store meta information of DataArrays
         # TODO: add left and right timesteps; change also in plot functions
@@ -101,7 +102,6 @@ class xMCA(MCA):
         # store store meta information about analysis
         self._analysis['left_name'] = 'left' if left.name is None else left.name
         self._analysis['right_name']= 'right' if right.name is None else right.name
-
 
 
     def _get_fields(self):
@@ -1040,7 +1040,7 @@ class xMCA(MCA):
             right_eofs.coords['lat']
             )
 
-        MCA.load_analysis(
+        CCA.load_analysis(
             self,
             info_file=info_file,
             eofs = [left_eofs.data, right_eofs.data],

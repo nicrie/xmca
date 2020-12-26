@@ -1,3 +1,3 @@
-from mca.array import MCA
-from mca.xarray import xMCA
+from pycca.array import CCA
+from pycca.xarray import xCCA
 

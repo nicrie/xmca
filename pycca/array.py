@@ -22,12 +22,13 @@ from tools.text import secure_str, boldify_str, wrap_str
 # =============================================================================
 # MCA
 # =============================================================================
-class MCA(object):
-    """Perform maximum covariance analysis (MCA) for two `np.ndarray` data fields.
+class CCA(object):
+    """Perform Canonical Correlation Analysis (CCA) for two `numpy.ndarray`.
 
-    MCA is principal component analysis (PCA) generalized
+    CCA is a generalized form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
-    it is equivalent to PCA.
+    it is equivalent to PCA. Non-normalized CCA is called Maximum Covariance
+    Analysis (MCA).
 
     Parameters
     ----------
@@ -45,15 +46,23 @@ class MCA(object):
     Let `data1` and `data2` be some geophysical fields (e.g. SST and pressure).
     To perform PCA use:
 
-    >>> pca = MCA(data1)
+    >>> pca = CCA(data1)
     >>> pca.solve()
     >>> pcs,_ = pca.pcs()
 
     To perform MCA use:
 
-    >>> mca = MCA(data1, data2)
+    >>> mca = CCA(data1, data2)
     >>> mca.solve()
-    >>> pcsData1, pcsData2 = mca.pcs()
+    >>> pcs_data1, pcs_data2 = mca.pcs()
+
+    To perform CCA use:
+
+    >>> cca = CCA(data1, data2)
+    >>> cca.normalize()
+    >>> cca.solve()
+    >>> pcs_data1, pcs_data2 = cca.pcs()
+
     """
 
     def __init__(self, left = None, right = None):
@@ -851,7 +860,6 @@ class MCA(object):
         self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
         number_modes                            = eofsLeft.shape[-1]
 
-
         self._left_variables 		= np.product(self._left_original_spatial_shape)
         self._right_variables 		= np.product(self._right_original_spatial_shape)
 
@@ -867,7 +875,6 @@ class MCA(object):
         Si  = np.diag(1./np.diag(S))
 
         self._eigenvalues   = eigenvalues
-
         self._ULeft, self._URight = [pcsLeft, pcsRight]
 
         # loadings // EOF fields
