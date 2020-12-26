@@ -80,9 +80,12 @@ def check_nan_rows(arr):
         all NaN time steps in your data.""")))
     else:
         pass
+<<<<<<< HEAD
 
 def is_not_empty(arr):
     if (arr.size > 0):
         pass
     else:
         raise ValueError('Input field is empty or contains NaN only.')
+=======
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932

@@ -17,8 +17,13 @@ from datetime import datetime
 
 from tools.rotation import promax
 from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
+<<<<<<< HEAD:pycca/array.py
 from tools.array import is_not_empty, check_time_dims, check_nan_rows
 from tools.text import secure_str, boldify_str, wrap_str
+=======
+from tools.array import check_time_dims, check_nan_rows
+
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 # =============================================================================
 # MCA
 # =============================================================================
@@ -72,6 +77,7 @@ class MCA(object):
         """
         self._left      = np.array([]) if left is None else left.copy()
         self._right     = self._left if right is None else right.copy()
+<<<<<<< HEAD:pycca/array.py
 
         is_arr(self._left)
         is_arr(self._right)
@@ -141,10 +147,74 @@ class MCA(object):
         hilbert     = self._get_complex_id()
         rotation    = self._get_rotation_id()
         power       = self._get_power_id()
+=======
+
+        is_arr(self._left)
+        is_arr(self._right)
+        check_time_dims(self._left, self._right)
+
+        # center input data to zero mean (remove mean)
+        self._left 	    = remove_mean(self._left)
+        self._right 	= remove_mean(self._right)
+
+        # store meta information
+        self._analysis = {
+            # data input
+            'left_name'             : 'left',
+            'right_name'            : 'right',
+            'is_bivariate'          : False,
+            # pre-processing
+            'is_normalized'         : False,
+            'is_coslat_corrected'   : False,
+            'method'                : 'pca',
+            # Complex solution
+            'is_complex'            : False,
+            'theta'                 : False,
+            'theta_period'          : 365,
+            #Rotated solution
+            'is_rotated'            : False,
+            'rotations'             : 0,
+            'power'                 : 0,
+            # Truncated solution
+            'is_truncated'          : False,
+            'singular_sum'          : 0,
+            'singular_dimension'    : 0
+            }
+
+        self._analysis['is_bivariate']  = not arrs_are_equal(self._left, self._right)
+        self._analysis['method']        = self._get_method_id()
+
+
+
+
+    def _get_method_id(self):
+        id = 'pca'
+        if self._analysis['is_bivariate']:
+            id = 'mca'
+            if self._analysis['is_normalized']:
+                id = 'cca'
+        return id
+
+
+    def _get_complex_id(self):
+        id = int(self._analysis['is_complex'])
+        return 'c{:}'.format(id)
+
+
+    def _get_rotation_id(self):
+        id = self._analysis['rotations']
+        return 'r{:02}'.format(id)
+
+
+    def _get_power_id(self):
+        id = self._analysis['power']
+        return 'p{:02}'.format(id)
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         analysis    = '_'.join([method,hilbert,rotation,power])
         return analysis
 
+<<<<<<< HEAD:pycca/array.py
 
     def _get_analysis_path(self, path=None):
         base_path   = path
@@ -162,6 +232,16 @@ class MCA(object):
         analysis_folder = secure_str(analysis_folder)
 
         analysis_path   = os.path.join(base_path, base_folder, analysis_folder)
+=======
+    def _get_analysis_id(self):
+        method      = self._get_method_id()
+        hilbert     = self._get_complex_id()
+        rotation    = self._get_rotation_id()
+        power       = self._get_power_id()
+
+        analysis    = '_'.join([method,hilbert,rotation,power])
+        return analysis
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         if not os.path.exists(analysis_path):
             os.makedirs(analysis_path)
@@ -274,7 +354,10 @@ class MCA(object):
             self._right = self._right / self._right.std(axis=0)
 
             self._analysis['is_normalized'] = True
+<<<<<<< HEAD:pycca/array.py
             self._analysis['is_coslat_corrected'] = False
+=======
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
             self._analysis['method'] = self._get_method_id()
             return None
 
@@ -316,8 +399,13 @@ class MCA(object):
         self._left, self._left_no_nan_index   = remove_nan_cols(self._left)
         self._right, self._right_no_nan_index = remove_nan_cols(self._right)
 
+<<<<<<< HEAD:pycca/array.py
         is_not_empty(self._left)
         is_not_empty(self._right)
+=======
+        assert(self._is_not_empty(self._left))
+        assert(self._is_not_empty(self._right))
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         # complexify input data via Hilbert transform
         if (complexify == True):
@@ -345,9 +433,14 @@ class MCA(object):
         Si = np.diag(1./np.diag(S))
 
         self._eigenvalues = eigenvalues
+<<<<<<< HEAD:pycca/array.py
         self._analysis['eigensum'] = eigenvalues.sum()
         self._analysis['eigen_dimension'] = eigenvalues.size
         self._analysis['is_truncated_at'] = eigenvalues.size
+=======
+        self._analysis['singular_sum'] = eigenvalues.sum()
+        self._analysis['singular_dimension'] = eigenvalues.size
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         # standardized EOF fields
         self._VLeft 	= VLeft
@@ -515,8 +608,13 @@ class MCA(object):
 
         """
         values, error = self.eigenvalues(n)
+<<<<<<< HEAD:pycca/array.py
         desVar 		= values / self._analysis['eigensum'] * 100
         desVarErr 	= error / self._analysis['eigensum'] * 100
+=======
+        desVar 		= values / self._analysis['singular_sum'] * 100
+        desVarErr 	= error / self._analysis['singular_sum'] * 100
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
         return desVar, desVarErr
 
 
@@ -703,6 +801,7 @@ class MCA(object):
 
 
         """
+<<<<<<< HEAD:pycca/array.py
         if (n < self._eigenvalues.size):
             self._eigenvalues = self._eigenvalues[:n]
 
@@ -838,19 +937,45 @@ class MCA(object):
     def load_analysis(self, info_file, eofs=None, pcs=None, eigenvalues=None):
         self._set_info_from_file(info_file)
 
+=======
+        self._eigenvalues = self._eigenvalues[:n]
+
+        self._ULeft = self._ULeft[:,:n]
+        self._VLeft = self._VLeft[:,:n]
+
+        self._VRight = self._VRight[:,:n]
+        self._URight = self._URight[:,:n]
+
+        self._analysis['is_truncated'] = True
+
+
+    def load_analysis(self, eofs=None, pcs=None, eigenvalues=None):
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
         # standardized fields // EOF fields + PCs
         if self._analysis['is_bivariate']:
             eofsLeft, eofsRight = [eofs[0], eofs[1]]
             pcsLeft, pcsRight   = [pcs[0], pcs[1]]
+<<<<<<< HEAD:pycca/array.py
         else:
             eofsLeft, eofsRight = [eofs[0], eofs[0]]
             pcsLeft, pcsRight   = [pcs[0], pcs[0]]
+=======
+            self._analysis['is_bivariate']           = True
+        else:
+            eofsLeft, eofsRight = [eofs, eofs]
+            pcsLeft, pcsRight   = [pcs, pcs]
+            self._analysis['is_bivariate']           = False
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         self._observations                      = pcsLeft.shape[0]
         self._left_original_spatial_shape       = eofsLeft.shape[:-1]
         self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
         number_modes                            = eofsLeft.shape[-1]
 
+<<<<<<< HEAD:pycca/array.py
+=======
+        self._analysis['is_complex'] = True if pcsLeft.dtype == complex else False
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         self._left_variables 		= np.product(self._left_original_spatial_shape)
         self._right_variables 		= np.product(self._right_original_spatial_shape)
@@ -867,6 +992,10 @@ class MCA(object):
         Si  = np.diag(1./np.diag(S))
 
         self._eigenvalues   = eigenvalues
+<<<<<<< HEAD:pycca/array.py
+=======
+        self._analysis['singular_sum']      = eigenvalues.sum()
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/array.py
 
         self._ULeft, self._URight = [pcsLeft, pcsRight]
 

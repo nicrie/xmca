@@ -17,13 +17,21 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from datetime import datetime
 
+<<<<<<< HEAD:pycca/xarray.py
 
+=======
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 from mca.array import MCA
 from tools.text import secure_str, boldify_str, wrap_str
 from tools.xarray import is_DataArray, check_dims, get_attr, calc_temporal_corr
 from tools.xarray import get_lonlat_limits, norm_time_to_1, norm_space_to_1
+<<<<<<< HEAD:pycca/xarray.py
 from tools.xarray import split_complex, set_to_array, array_to_set, create_coords
+=======
+from tools.xarray import split_complex, Dataset_to_DataArray
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 # =============================================================================
 # xMCA
 # =============================================================================
@@ -86,9 +94,15 @@ class xMCA(MCA):
 
         is_DataArray(left)
         is_DataArray(right)
+<<<<<<< HEAD:pycca/xarray.py
 
         check_dims(left, right)
 
+=======
+
+        check_dims(left, right)
+
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
         # constructor of base class for numpy.ndarray
         MCA.__init__(self, left.data, right.data)
 
@@ -97,13 +111,27 @@ class xMCA(MCA):
         self._dims          = left.dims
         self._left_coords   = left.coords
         self._right_coords  = right.coords
+<<<<<<< HEAD:pycca/xarray.py
+=======
+
+        # store store meta information about analysis
+        self._analysis['left_name'] = 'left' if left.name is None else left.name
+        self._analysis['right_name']= 'right' if right.name is None else right.name
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 
         # store store meta information about analysis
         self._analysis['left_name'] = 'left' if left.name is None else left.name
         self._analysis['right_name']= 'right' if right.name is None else right.name
 
 
+<<<<<<< HEAD:pycca/xarray.py
 
+    def _get_fields(self):
+        left = xr.DataArray(self._left, dims=self._dims, coords=self._left_coords)
+        right = xr.DataArray(self._right, dims=self._dims, coords=self._right_coords)
+        return left, right
+
+=======
     def _get_fields(self):
         left = xr.DataArray(self._left, dims=self._dims, coords=self._left_coords)
         right = xr.DataArray(self._right, dims=self._dims, coords=self._right_coords)
@@ -115,8 +143,22 @@ class xMCA(MCA):
             self._analysis['left_name']     = left
         if right is not None:
             self._analysis['right_name']    = right
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 
+    def set_field_names(self, left = None, right = None):
+        if left is not None:
+            self._analysis['left_name']     = left
+        if right is not None:
+            self._analysis['right_name']    = right
 
+<<<<<<< HEAD:pycca/xarray.py
+
+    def apply_weights(self,left_weights=None, right_weights=None):
+        left, right = self._get_fields()
+
+        if left_weights is not None:
+            self._left  = (left * left_weights).data
+=======
     def apply_weights(self,left_weights=None, right_weights=None):
         left, right = self._get_fields()
 
@@ -125,8 +167,15 @@ class xMCA(MCA):
 
         if right_weights is not None:
             self._right = (right * right_weights).data
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 
+        if right_weights is not None:
+            self._right = (right * right_weights).data
 
+<<<<<<< HEAD:pycca/xarray.py
+
+=======
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
     def apply_coslat(self):
         """Apply area correction to higher latitudes.
 
@@ -172,13 +221,21 @@ class xMCA(MCA):
         values = xr.DataArray(values,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
+<<<<<<< HEAD:pycca/xarray.py
             name 	= 'eigenvalues',
+=======
+            name 	= 'singular values',
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
             attrs   = attrs)
 
         error = xr.DataArray(error,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
+<<<<<<< HEAD:pycca/xarray.py
             name 	= 'error eigenvalues',
+=======
+            name 	= 'error singular values',
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
             attrs   = attrs)
 
         return values, error
@@ -531,6 +588,7 @@ class xMCA(MCA):
 
         left_het_patterns 	= cal_temporal_corr(left_field,right_pcs)
         right_het_patterns 	= cal_temporal_corr(right_field,left_pcs)
+<<<<<<< HEAD:pycca/xarray.py
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
@@ -542,6 +600,19 @@ class xMCA(MCA):
         right_het_patterns.name = right_name
         right_het_patterns.attrs = attrs
 
+=======
+
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+
+        left_name = ' '.join([attrs['left_name'],'heterogeneous patterns'])
+        left_het_patterns.name = left_name
+        left_het_patterns.attrs = attrs
+
+        right_name = ' '.join([attrs['right_name'],'heterogeneous patterns'])
+        right_het_patterns.name = right_name
+        right_het_patterns.attrs = attrs
+
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
         return left_het_patterns, right_het_patterns
 
 
@@ -974,6 +1045,7 @@ class xMCA(MCA):
         fig.suptitle(title)
 
 
+<<<<<<< HEAD:pycca/xarray.py
     def _save_data(self, data_array, path, *args, **kwargs):
         analysis_path   = path
         analysis_name   = self._get_analysis_id()
@@ -1005,12 +1077,125 @@ class xMCA(MCA):
             self._save_data(right_eofs, analysis_path)
             self._save_data(right_pcs, analysis_path)
 
+=======
+    def to_netcdf(self, da, path, *args, **kwargs):
+        file_base_name   = self._get_analysis_id()
+        file_var_name   = '.'.join([da.name,'nc'])
+        file_var_name   = secure_str(file_var_name)
+
+        file_name   = '_'.join([file_base_name, file_var_name])
+        output_dir   = os.path.join(path,file_name)
+
+        if da.dtype == np.complex:
+            dataset = split_complex(da)
+        else:
+            dataset = da.to_dataset(promote_attrs=True)
+
+        dataset.to_netcdf(path=output_dir, *args, **kwargs)
+
+
+    def _create_info_file(self, path=None):
+
+        if path is None:
+            path = os.getcwd()
+
+        file_name = self._get_analysis_id()
+        output_dir   = os.path.join(path,file_name)
+
+        sep_line = '\n#' + '-' * 79
+
+        file_header = (
+            'This file contains information neccessary to load stored analysis '
+            'data from pyCCA module.')
+        now  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        saved_sin_vals = self._eigenvalues.size
+
+
+        var1 = secure_str(self._analysis['left_name'])
+        var2 = secure_str(self._analysis['right_name'])
+        f_info = output_dir
+        f_eof1 = '_'.join([output_dir, var1, 'eofs.nc'])
+        f_eof2 = '_'.join([output_dir, var2, 'eofs.nc'])
+        f_pc1 = '_'.join([output_dir, var1, 'pcs.nc'])
+        f_pc2 = '_'.join([output_dir, var2, 'pcs.nc'])
+        f_sin = '_'.join([output_dir, 'singular.nc'])
+
+
+        file = open(output_dir,"w+")
+        file.write(wrap_str(file_header))
+        file.write('\n# To load this analysis use:')
+        file.write('\n# cca.xMCA()')
+        file.write('\n# cca.load_analysis(THIS_FILE)')
+        file.write('\n')
+        file.write(sep_line)
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Created',now))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Method',self._get_method_id()))
+        file.write('\n{:<20} : {:<57}'.format('Field1',self._analysis['left_name']))
+        file.write('\n{:<20} : {:<57}'.format('Field2',self._analysis['right_name']))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Normalized',str(self._analysis['is_normalized'])))
+        file.write('\n{:<20} : {:<57}'.format('CosLat corrected',str(self._analysis['is_coslat_corrected'])))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Complex',str(self._analysis['is_complex'])))
+        file.write('\n{:<20} : {:<57}'.format('Theta model',str(self._analysis['theta'])))
+        file.write('\n{:<20} : {:<57}'.format('Theta period',self._analysis['theta_period']))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Rotation',str(self._analysis['is_rotated'])))
+        file.write('\n{:<20} : {:<57}'.format('Rotated PCs',self._analysis['rotations']))
+        file.write('\n{:<20} : {:<57}'.format('Power',self._analysis['power']))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Truncated',str(self._analysis['is_truncated'])))
+        file.write('\n{:<20} : {:<57}'.format('Singular sum',self._analysis['singular_sum']))
+        file.write('\n{:<20} : {:<57}'.format('Total singular values',self._analysis['singular_dimension']))
+        file.write('\n{:<20} : {:<57}'.format('Saved', saved_sin_vals))
+        file.write(sep_line)
+        file.write('\n{:<20} : {:<57}'.format('Info', f_info))
+        file.write('\n{:<20} : {:<57}'.format('Singular values', f_sin))
+        file.write('\n{:<20} : {:<57}'.format('Field1 EOFs', f_eof1))
+        file.write('\n{:<20} : {:<57}'.format('Field1 PCs', f_pc1))
+        file.write('\n{:<20} : {:<57}'.format('Field2 EOFs', f_eof2))
+        file.write('\n{:<20} : {:<57}'.format('Field2 PCs', f_pc2))
+        file.write('\n')
+        file.close()
+
+
+
+    def save_analysis(self, path=None):
+        base_path   = path
+        if base_path is None:
+            base_path = os.getcwd()
+
+        base_folder = 'pycca'
+
+        analysis_folder     = self._analysis['left_name']
+        if self._analysis['is_bivariate']:
+            analysis_folder = '_'.join([analysis_folder, self._analysis['right_name']])
+        analysis_folder = secure_str(analysis_folder)
+        output_dir   = os.path.join(base_path, base_folder, analysis_folder)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        self.to_netcdf(self.eofs()[0],output_dir)
+        self.to_netcdf(self.pcs()[0],output_dir)
+        self.to_netcdf(self.eigenvalues()[0],output_dir)
+
+        if self._analysis['is_bivariate']:
+            self.to_netcdf(self.eofs()[1],output_dir)
+            self.to_netcdf(self.pcs()[1],output_dir)
+
+        self._create_info_file(path=output_dir)
+
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 
 
     def load_analysis(self, info_file):
         paths = self._get_locs_from_file(info_file)
         self._set_info_from_file(info_file)
 
+<<<<<<< HEAD:pycca/xarray.py
         eigenvalues = xr.open_dataset(paths['eigenvalues'])
         left_eofs   = xr.open_dataset(paths['field1_eofs'])
         left_pcs    = xr.open_dataset(paths['field1_pcs'])
@@ -1020,6 +1205,67 @@ class xMCA(MCA):
         else:
             right_eofs = left_eofs
             right_pcs = left_pcs
+=======
+    def _set_key(self, key, value):
+        if key == 'field1':
+            self._analysis['left_field'] = str(value)
+        if key == 'field2':
+            self._analysis['right_field'] = str(value)
+        if key == 'normalized':
+            self._analysis['is_normalized'] =  bool(value)
+        if key == 'normalized':
+            self._analysis['is_normalized'] =  bool(value)
+        else:
+            raise ValueError("Key not found. Analysis could not be loaded.")
+
+
+    def load_info_file(self, path):
+        keys = {
+            'field1', 'field2', 'normalized', 'coslat_corrected',
+            'complex', 'theta_model', 'theta_period',
+            'rotation', 'rotated_pcs', 'power',
+            'truncated', 'total_singular_values', 'saved', 'singular_sum',
+            'field1_eofs', 'field1_pcs', 'field2_eofs', 'field2_pcs',
+            'singular_values'}
+
+        file = open(path, 'r')
+        lines = file.readlines()
+        for line in lines:
+            if (line[0] != '#'):
+                key = line.split(':')[0]
+                key = key.rstrip().lower().replace(' ', '_')
+                print(key)
+                if key in keys:
+                    value = line.split(':')[1].strip()
+                    #self._set_key(key,value)
+
+        file.close()
+
+    def load_analysis(self, eofs=None, pcs=None, eigenvalues=None, info_file=None):
+        # standardized fields // EOF fields + PCs
+        if all(isinstance(var,list) for var in [eofs,pcs]):
+            left_eofs, right_eofs   = [eofs[0], eofs[1]]
+            left_pcs, right_pcs     = [pcs[0], pcs[1]]
+            self._analysis['is_bivariate']           = True
+
+        else:
+            left_eofs, right_eofs   = [eofs, eofs]
+            left_pcs, right_pcs     = [pcs, pcs]
+            self._analysis['is_bivariate']           = False
+
+        left_eofs   = Dataset_to_DataArray(left_eofs)
+        right_eofs  = Dataset_to_DataArray(right_eofs)
+        left_pcs    = Dataset_to_DataArray(left_pcs)
+        right_pcs   = Dataset_to_DataArray(right_pcs)
+        eigenvalues = Dataset_to_DataArray(eigenvalues)
+
+
+        # store meta information about analysis
+        self._analysis = {
+            'left_field'  : self._get_field_attr(left_eofs,'left_field','left_field'),
+            'right_field' : self._get_field_attr(right_eofs,'right_field','right_field')
+        }
+>>>>>>> 466519ec754607173ed05b32435b83e3b38b5932:mca/xarray.py
 
         left_eofs   = set_to_array(left_eofs)
         right_eofs  = set_to_array(right_eofs)
