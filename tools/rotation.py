@@ -44,7 +44,8 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
     # normalize the matrix
     # using sqrt of the sum of squares (Kaiser)
 	h = np.sqrt(np.sum(A * A.conjugate(),axis=1))
-	A = np.diag(1./h) @ A
+	# A = np.diag(1./h) @ A
+    A = (1./h)[:,np.newaxis] * A
 
     # seek for rotation matrix based on varimax criteria
 	converged = False
@@ -67,8 +68,8 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
 		A = np.empty(A.shape)
 		A[:] = np.nan
 
-    # de-normalize
-	A = np.diag(h) @ A
+    # de-normalize using broadcasting
+	A = h[:,np.newaxis] * A
 
     # perform rotation
 	B = A @ R
@@ -110,7 +111,9 @@ def promax(A, power=1, maxIter=1000, tol=1e-8):
 
     # pre-normalization by communalities (sum of squared rows)
 	h = np.sqrt(np.sum(X*X.conjugate(),axis=1))
-	X = np.diag(1./h) @ X
+    # use broadcasting
+    X = (1./h)[:,np.newaxis] * X
+    #X = np.diag(1./h) @ X
 
     # "Procustes" equation
 	P = X * np.abs(X)**(power - 1)
@@ -130,7 +133,7 @@ def promax(A, power=1, maxIter=1000, tol=1e-8):
 	B = X @ L
 
     # post-normalization based on Kaiser
-	B =  np.diag(h) @ B
+	B =  h[:,np.newaxis] * B
 
 	R = R @ L
 
