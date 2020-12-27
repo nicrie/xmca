@@ -19,6 +19,7 @@ from tools.rotation import promax
 from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
 from tools.array import is_not_empty, check_time_dims, check_nan_rows
 from tools.text import secure_str, boldify_str, wrap_str
+
 # =============================================================================
 # MCA
 # =============================================================================
@@ -111,8 +112,8 @@ class CCA(object):
             # Truncated solution
             'is_truncated'          : False,
             'is_truncated_at'       : 0,
-            'eigen_dimension'    : 0,
-            'eigensum'          : 0.0
+            'eigen_dimension'       : 0,
+            'eigensum'              : 0.0
             }
 
         self._analysis['is_bivariate']  = not arrs_are_equal(self._left, self._right)

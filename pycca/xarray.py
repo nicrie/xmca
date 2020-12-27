@@ -160,7 +160,7 @@ class xCCA(CCA):
 
         """
         # for n=Nonr, all eigenvalues are returned
-        values, error = MCA.eigenvalues(self, n)
+        values, error = CCA.eigenvalues(self, n)
 
         # if n is not provided, take all eigenvalues
         if n is None:
@@ -200,7 +200,7 @@ class xCCA(CCA):
             Associated uncertainty according to North's `rule of thumb`.
 
         """
-        variance, error 	= MCA.explained_variance(self, n)
+        variance, error 	= CCA.explained_variance(self, n)
 
         # if n is not provided, take all eigenvalues
         if n is None:
@@ -241,7 +241,7 @@ class xCCA(CCA):
             PCs of right input field.
 
         """
-        left_pcs, right_pcs = MCA.pcs(self, n, scaling=scaling)
+        left_pcs, right_pcs = CCA.pcs(self, n, scaling=scaling)
 
         if n is None:
             n = left_pcs.shape[1]
@@ -285,7 +285,7 @@ class xCCA(CCA):
             EOFs of right input field.
 
         """
-        left_eofs, right_eofs = MCA.eofs(self, n, scaling=scaling)
+        left_eofs, right_eofs = CCA.eofs(self, n, scaling=scaling)
 
         if n is None:
             n = left_eofs.shape[-1]
