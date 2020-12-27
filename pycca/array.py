@@ -763,32 +763,32 @@ class CCA(object):
         file.close()
 
 
-    def _save_paths_to_file(self, path, format):
-        sep_line = '\n#' + '-' * 79
+    def _get_file_names(self, format):
+        var1        = secure_str(self._analysis['left_name'])
+        var2        = secure_str(self._analysis['right_name'])
 
-        var1 = secure_str(self._analysis['left_name'])
-        var2 = secure_str(self._analysis['right_name'])
-        eofs = '.'.join(['eofs',format])
-        pcs = '.'.join(['pcs',format])
-        eigenvalues = '.'.join(['eigenvalues',format])
+        left_eofs   = '_'.join([var1, 'eofs'])
+        right_eofs  = '_'.join([var2, 'eofs'])
+        left_pcs    = '_'.join([var1, 'pcs'])
+        right_pcs   = '_'.join([var2, 'pcs'])
+        eigen       = '_'.join(['eigenvalues'])
 
-        path_output   = os.path.join(path,self._get_analysis_id())
-        path_eof1   = '_'.join([path_output, var1, eofs])
-        path_eof2   = '_'.join([path_output, var2, eofs])
-        path_pc1    = '_'.join([path_output, var1, pcs])
-        path_pc2    = '_'.join([path_output, var2, pcs])
-        path_eigen  = '_'.join([path_output, eigenvalues])
+        base_name = self._get_analysis_id()
 
-        file = open(path_output,"a")
-        file.write(sep_line)
-        file.write('\n{:<20} : {:<57}'.format('this file', path_output))
-        file.write('\n{:<20} : {:<57}'.format('eigenvalues', path_eigen))
-        file.write('\n{:<20} : {:<57}'.format('field1_eofs', path_eof1))
-        file.write('\n{:<20} : {:<57}'.format('field1_pcs', path_pc1))
-        file.write('\n{:<20} : {:<57}'.format('field2_eofs', path_eof2))
-        file.write('\n{:<20} : {:<57}'.format('field2_pcs', path_pc2))
-        file.write('\n')
-        file.close()
+        file_names = {
+            'left_eofs'     : left_eofs,
+            'right_eofs'    : right_eofs,
+            'left_pcs'      : left_pcs,
+            'right_pcs'     : right_pcs,
+            'eigenvalues'   : eigen
+        }
+
+        for keys, file in file_names.items():
+            name = '_'.join([base_name, file])
+            file_names[keys] = '.'.join([name, format])
+
+        return file_names
+
 
 
     def _save_data(self, data_array, path, *args, **kwargs):
@@ -820,33 +820,11 @@ class CCA(object):
         info_file.close()
 
 
-    def _get_locs_from_file(self, path):
-        # locations for data files
-        file_locations = {
-            'field1_eofs'       : None,
-            'field1_pcs'        : None,
-            'field2_eofs'       : None,
-            'field2_pcs'        : None,
-            'eigenvalues'       : None
-        }
-
-        info_file = open(path, 'r')
-        lines = info_file.readlines()
-        for line in lines:
-            if (line[0] != '#'):
-                key = line.split(':')[0]
-                key = key.rstrip()
-                if key in file_locations.keys():
-                    path = line.split(':')[1].strip()
-                    file_locations[key] = path
-        info_file.close()
-
-        return file_locations
 
 
 
-    def load_analysis(self, info_file, eofs=None, pcs=None, eigenvalues=None):
-        self._set_info_from_file(info_file)
+    def load_analysis(self, path, eofs=None, pcs=None, eigenvalues=None):
+        self._set_info_from_file(path)
 
         # standardized fields // EOF fields + PCs
         if self._analysis['is_bivariate']:

@@ -991,7 +991,6 @@ class xCCA(CCA):
 
         self._create_info_file(analysis_path)
         self._save_info_to_file(analysis_path)
-        self._save_paths_to_file(analysis_path, 'nc')
 
         left_eofs, right_eofs = self.eofs()
         left_pcs, right_pcs = self.pcs()
@@ -1007,16 +1006,20 @@ class xCCA(CCA):
 
 
 
-    def load_analysis(self, info_file):
-        paths = self._get_locs_from_file(info_file)
-        self._set_info_from_file(info_file)
+    def load_analysis(self, path):
+        self._set_info_from_file(path)
 
-        eigenvalues = xr.open_dataset(paths['eigenvalues'])
-        left_eofs   = xr.open_dataset(paths['field1_eofs'])
-        left_pcs    = xr.open_dataset(paths['field1_pcs'])
+        path_folder,_ = os.path.split(path)
+        file_names = self._get_file_names(format='nc')
+        for key,file in file_names.items():
+            file_names[key] = os.path.join(path_folder,file)
+
+        eigenvalues = xr.open_dataset(file_names['eigenvalues'])
+        left_eofs   = xr.open_dataset(file_names['left_eofs'])
+        left_pcs    = xr.open_dataset(file_names['left_pcs'])
         if self._analysis['is_bivariate']:
-            right_eofs  = xr.open_dataset(paths['field2_eofs'])
-            right_pcs   = xr.open_dataset(paths['field2_pcs'])
+            right_eofs  = xr.open_dataset(file_names['right_eofs'])
+            right_pcs   = xr.open_dataset(file_names['right_pcs'])
         else:
             right_eofs = left_eofs
             right_pcs = left_pcs
@@ -1042,7 +1045,7 @@ class xCCA(CCA):
 
         CCA.load_analysis(
             self,
-            info_file=info_file,
+            path=path,
             eofs = [left_eofs.data, right_eofs.data],
             pcs =  [left_pcs.data, right_pcs.data],
             eigenvalues = eigenvalues.data)
