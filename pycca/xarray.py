@@ -486,11 +486,10 @@ class xCCA(CCA):
         left_pcs, right_pcs 		= self.pcs(n)
         left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
 
-        left_field  = self._left
-        right_field = self._right
+        left_field, right_field  = self._get_fields()
 
-        left_hom_patterns 	= cal_temporal_corr(left_field,left_pcs)
-        right_hom_patterns 	= cal_temporal_corr(right_field,right_pcs)
+        left_hom_patterns 	= calc_temporal_corr(left_field,left_pcs)
+        right_hom_patterns 	= calc_temporal_corr(right_field,right_pcs)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
@@ -526,11 +525,10 @@ class xCCA(CCA):
         left_pcs, right_pcs 		= self.pcs(n)
         left_pcs, right_pcs 		= [left_pcs.real, right_pcs.real]
 
-        left_field  = self._left
-        right_field = self._right
+        left_field, right_field  = self._get_fields()
 
-        left_het_patterns 	= cal_temporal_corr(left_field,right_pcs)
-        right_het_patterns 	= cal_temporal_corr(right_field,left_pcs)
+        left_het_patterns 	= calc_temporal_corr(left_field,right_pcs)
+        right_het_patterns 	= calc_temporal_corr(right_field,left_pcs)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
@@ -577,7 +575,7 @@ class xCCA(CCA):
 
 
     def plot(
-        self, mode=1, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
+        self, mode, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
         resolution='110m'):
         """
         Plot mode `n`.
@@ -752,6 +750,19 @@ class xCCA(CCA):
             a.coastlines(lw = .5, resolution = resolution)
             a.set_aspect('auto')
             a.add_feature(cfeature.LAND, color='gray', zorder=0)
+
+
+    def save_plot(self, mode, path=None, dpi=96, **kwargs):
+        if path is None:
+            path = self._get_analysis_path()
+
+        mode_id = ''.join(['mode',str(mode)])
+        format = '.png'
+        file_name = '_'.join([self._get_analysis_id(),mode_id])
+        file_path = os.path.join(path, file_name)
+        self.plot(mode=mode, **kwargs)
+        plt.savefig(file_path + format, dpi=dpi)
+
 
 
     def plot_overview(self, n=3, right=False, title='', cmap='RdGy_r'):
