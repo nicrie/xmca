@@ -24,7 +24,7 @@ from pycca.array import CCA
 from tools.text import secure_str, boldify_str, wrap_str
 from tools.xarray import is_DataArray, check_dims, get_attr, calc_temporal_corr
 from tools.xarray import get_lonlat_limits, norm_time_to_1, norm_space_to_1
-from tools.xarray import split_complex, set_to_array, array_to_set, create_coords
+from tools.xarray import split_complex, create_coords
 # =============================================================================
 # xCCA
 # =============================================================================
@@ -995,8 +995,10 @@ class xCCA(CCA):
         file_name   = '_'.join([analysis_name, var_name])
         output_path = os.path.join(analysis_path,file_name)
 
-        dataset = array_to_set(data_array)
-        dataset.to_netcdf(path=output_path, *args, **kwargs)
+        data_array.to_netcdf(
+            path=output_path,
+            engine="h5netcdf", invalid_netcdf=True, *args, **kwargs
+            )
 
 
     def save_analysis(self, path=None):
@@ -1027,22 +1029,15 @@ class xCCA(CCA):
         for key,file in file_names.items():
             file_names[key] = os.path.join(path_folder,file)
 
-        eigenvalues = xr.open_dataset(file_names['eigenvalues'])
-        left_eofs   = xr.open_dataset(file_names['left_eofs'])
-        left_pcs    = xr.open_dataset(file_names['left_pcs'])
+        eigenvalues = xr.open_dataarray(file_names['eigenvalues'])
+        left_eofs   = xr.open_dataarray(file_names['left_eofs'])
+        left_pcs    = xr.open_dataarray(file_names['left_pcs'])
         if self._analysis['is_bivariate']:
-            right_eofs  = xr.open_dataset(file_names['right_eofs'])
-            right_pcs   = xr.open_dataset(file_names['right_pcs'])
+            right_eofs  = xr.open_dataarray(file_names['right_eofs'])
+            right_pcs   = xr.open_dataarray(file_names['right_pcs'])
         else:
             right_eofs = left_eofs
             right_pcs = left_pcs
-
-        left_eofs   = set_to_array(left_eofs)
-        right_eofs  = set_to_array(right_eofs)
-        left_pcs    = set_to_array(left_pcs)
-        right_pcs   = set_to_array(right_pcs)
-        # TODO: remove ugly .eigen... (only use dataarrays to store data, no datasets)
-        eigenvalues = set_to_array(eigenvalues.eigenvalues)
 
         # store meta information of DataArrays
         self._left_coords = create_coords(

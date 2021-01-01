@@ -97,29 +97,6 @@ def split_complex(data_array):
     return dataset
 
 
-def array_to_set(data_array):
-    if data_array.dtype == np.complex:
-        dataset = split_complex(data_array)
-    else:
-        dataset = data_array.to_dataset(promote_attrs=True)
-    return dataset
-
-
-def set_to_array(dataset):
-    if isinstance(dataset,xr.DataArray):
-        data_array = dataset
-    else:
-        try:
-            data_array =  dataset['real'] + 1j * dataset['imag']
-            data_array.attrs = dataset.attrs
-        except KeyError:
-            raise KeyError('xr.Dataset needs two variables called `real` and `imag`.')
-        except TypeError:
-            raise TypeError("Input type needs to be `xr.DataArray` or `xr.Dataset`")
-
-    return data_array
-
-
 def create_coords(*coords):
     dims = [c.name for c in coords]
     sizes = [c.size for c in coords]
