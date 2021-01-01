@@ -14,6 +14,7 @@ from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
 from tqdm import tqdm
 from datetime import datetime
+import cmath
 
 from tools.rotation import promax
 from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
@@ -118,8 +119,6 @@ class CCA(object):
 
         self._analysis['is_bivariate']  = not arrs_are_equal(self._left, self._right)
         self._analysis['method']        = self._get_method_id()
-
-
 
 
     def _get_method_id(self):
@@ -530,7 +529,7 @@ class CCA(object):
         return desVar, desVarErr
 
 
-    def pcs(self, n=None, scaling=0):
+    def pcs(self, n=None, scaling=0, phase_shift=0):
         """Return the first `n` PCs.
 
         Parameters
@@ -556,10 +555,14 @@ class CCA(object):
             pcsLeft 	= pcsLeft * np.sqrt(self._eigenvalues[:n])
             pcsRight 	= pcsRight * np.sqrt(self._eigenvalues[:n])
 
+        if self._analysis['is_complex']:
+            pcsLeft     = pcsLeft * cmath.rect(1,phase_shift)
+            pcsRight    = pcsRight * cmath.rect(1,phase_shift)
+
         return pcsLeft, pcsRight
 
 
-    def eofs(self, n=None, scaling=0):
+    def eofs(self, n=None, scaling=0, phase_shift=0):
         """Return the first `n` EOFs.
 
         Parameters
@@ -597,6 +600,10 @@ class CCA(object):
             eofsLeft 	= eofsLeft * np.sqrt(self._eigenvalues[:n])
             eofsRight 	= eofsRight * np.sqrt(self._eigenvalues[:n])
 
+        if self._analysis['is_complex']:
+            eofsLeft     = eofsLeft * cmath.rect(1,phase_shift)
+            eofsRight    = eofsRight * cmath.rect(1,phase_shift)
+
         return eofsLeft, eofsRight
 
 
@@ -625,7 +632,7 @@ class CCA(object):
         return amplitudeLeft.real, amplitudeRight.real
 
 
-    def spatial_phase(self, n=None):
+    def spatial_phase(self, n=None, phase_shift=0):
         """Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -642,7 +649,7 @@ class CCA(object):
             Fields of right input field.
 
         """
-        eofsLeft, eofsRight = self.eofs(n)
+        eofsLeft, eofsRight = self.eofs(n, phase_shift=phase_shift)
 
         phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
         phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
@@ -677,7 +684,7 @@ class CCA(object):
         return amplitudeLeft.real, amplitudeRight.real
 
 
-    def temporal_phase(self, n=None):
+    def temporal_phase(self, n=None, phase_shift=0):
         """Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -694,7 +701,7 @@ class CCA(object):
             Phase function of right input field.
 
         """
-        pcsLeft, pcsRight = self.pcs(n)
+        pcsLeft, pcsRight = self.pcs(n, phase_shift=phase_shift)
 
         phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
         phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)

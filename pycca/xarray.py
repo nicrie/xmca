@@ -18,6 +18,7 @@ from matplotlib.gridspec import GridSpec
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from datetime import datetime
+import cmath
 
 from pycca.array import CCA
 from tools.text import secure_str, boldify_str, wrap_str
@@ -224,7 +225,7 @@ class xCCA(CCA):
         return variance, error
 
 
-    def pcs(self, n=None, scaling=0):
+    def pcs(self, n=None, scaling=0, phase_shift=0):
         """Return first `n` PCs.
 
         Parameters
@@ -241,7 +242,7 @@ class xCCA(CCA):
             PCs of right input field.
 
         """
-        left_pcs, right_pcs = CCA.pcs(self, n, scaling=scaling)
+        left_pcs, right_pcs = CCA.pcs(self, n, scaling, phase_shift)
 
         if n is None:
             n = left_pcs.shape[1]
@@ -268,7 +269,7 @@ class xCCA(CCA):
         return left_pcs, right_pcs
 
 
-    def eofs(self, n=None, scaling=0):
+    def eofs(self, n=None, scaling=0, phase_shift=0):
         """Return the first `n` EOFs.
 
         Parameters
@@ -285,7 +286,7 @@ class xCCA(CCA):
             EOFs of right input field.
 
         """
-        left_eofs, right_eofs = CCA.eofs(self, n, scaling=scaling)
+        left_eofs, right_eofs = CCA.eofs(self, n, scaling, phase_shift)
 
         if n is None:
             n = left_eofs.shape[-1]
@@ -356,7 +357,7 @@ class xCCA(CCA):
         return left_amplitude.real, right_amplitude.real
 
 
-    def spatial_phase(self, n=None):
+    def spatial_phase(self, n=None, phase_shift=0):
         """Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -373,7 +374,7 @@ class xCCA(CCA):
             Fields of right input field.
 
         """
-        left_eofs, right_eofs = self.eofs(n)
+        left_eofs, right_eofs = self.eofs(n, phase_shift=phase_shift)
 
         left_phase = np.arctan2(left_eofs.imag,left_eofs.real)
         right_phase = np.arctan2(right_eofs.imag,right_eofs.real)
@@ -428,7 +429,7 @@ class xCCA(CCA):
         return left_amplitude.real, right_amplitude.real
 
 
-    def temporal_phase(self, n=None):
+    def temporal_phase(self, n=None, phase_shift=0):
         """Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -445,7 +446,7 @@ class xCCA(CCA):
             Temporal phase function of right input field.
 
         """
-        left_pcs, right_pcs = self.pcs(n)
+        left_pcs, right_pcs = self.pcs(n, phase_shift=phase_shift)
 
         left_phase = np.arctan2(left_pcs.imag,left_pcs.real)
         right_phase = np.arctan2(right_pcs.imag,right_pcs.real)
@@ -576,7 +577,7 @@ class xCCA(CCA):
 
     def plot(
         self, mode, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
-        resolution='110m'):
+        resolution='110m', phase_shift=0):
         """
         Plot mode `n`.
 
@@ -602,21 +603,22 @@ class xCCA(CCA):
 
         """
 
-        left_pcs, right_pcs 	= self.pcs(mode)
-        left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
+        left_pcs, right_pcs 	= self.pcs(mode, phase_shift=phase_shift)
 
         if self._analysis['is_complex']:
             left_eofs, right_eofs   = self.spatial_amplitude(mode)
-            cmap_eof_range = [0, 1]
             eof_title = 'Amplitude'
         else:
             left_eofs, right_eofs   = self.eofs(mode)
             cmap_eof = 'RdBu_r'
             cmap_eof_range = [-1, 0, 1]
             eof_title = 'EOF'
-        left_eofs, right_eofs   = [left_eofs.sel(mode=mode), right_eofs.sel(mode=mode)]
 
-        left_phase, right_phase = self.spatial_phase(mode)
+        left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
+        cmap_eof_range = [0, 1]
+
+        left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
+        left_eofs, right_eofs   = [left_eofs.sel(mode=mode), right_eofs.sel(mode=mode)]
         left_phase, right_phase = [left_phase.sel(mode=mode),right_phase.sel(mode=mode)]
 
         var, error 		= self.explained_variance(mode)
