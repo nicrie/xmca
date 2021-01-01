@@ -579,11 +579,11 @@ class xCCA(CCA):
         self, mode, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
         resolution='110m', phase_shift=0):
         """
-        Plot mode `n`.
+        Plot results for `mode`.
 
         Parameters
         ----------
-        n : int, optional
+        mode : int, optional
             Mode to plot. The default is 1.
         threshold : int, optional
             Amplitude threshold below which the fields are masked out.
@@ -607,15 +607,17 @@ class xCCA(CCA):
 
         if self._analysis['is_complex']:
             left_eofs, right_eofs   = self.spatial_amplitude(mode)
-            eof_title = 'Amplitude'
+            left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
+            cmap_eof_range  = [0, 1]
+            cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
+            cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
+            eof_title       = 'Amplitude'
         else:
             left_eofs, right_eofs   = self.eofs(mode)
-            cmap_eof = 'RdBu_r'
-            cmap_eof_range = [-1, 0, 1]
-            eof_title = 'EOF'
+            cmap_eof        = 'RdBu_r' is cmap_eof is None else cmap_eof
+            cmap_eof_range  = [-1, 0, 1]
+            eof_title       = 'EOF'
 
-        left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
-        cmap_eof_range = [0, 1]
 
         left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
         left_eofs, right_eofs   = [left_eofs.sel(mode=mode), right_eofs.sel(mode=mode)]
@@ -709,7 +711,7 @@ class xCCA(CCA):
             axes_pc[i].set_yticks([-1,0,1])
 
 
-        #axes_pc[0].xaxis.set_visible(False)
+        axes_pc[0].xaxis.set_visible(False)
         axes_pc[0].set_title(titles['pc'], fontweight='bold')
 
         # plot EOFs
