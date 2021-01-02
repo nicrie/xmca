@@ -576,7 +576,7 @@ class xCCA(CCA):
 
 
     def plot(
-        self, mode, threshold=0, cmap_eof='Blues', cmap_phase='twilight',
+        self, mode, threshold=0, cmap_eof=None, cmap_phase=None,
         resolution='110m', phase_shift=0):
         """
         Plot results for `mode`.
@@ -607,17 +607,17 @@ class xCCA(CCA):
 
         if self._analysis['is_complex']:
             left_eofs, right_eofs   = self.spatial_amplitude(mode)
-            left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
             cmap_eof_range  = [0, 1]
             cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
             cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
             eof_title       = 'Amplitude'
         else:
             left_eofs, right_eofs   = self.eofs(mode)
-            cmap_eof        = 'RdBu_r' is cmap_eof is None else cmap_eof
+            cmap_eof        = 'RdBu_r' if cmap_eof is None else cmap_eof
             cmap_eof_range  = [-1, 0, 1]
             eof_title       = 'EOF'
 
+        left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
 
         left_pcs, right_pcs 	= [left_pcs.sel(mode=mode).real, right_pcs.sel(mode=mode).real]
         left_eofs, right_eofs   = [left_eofs.sel(mode=mode), right_eofs.sel(mode=mode)]
