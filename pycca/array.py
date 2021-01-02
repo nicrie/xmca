@@ -873,6 +873,18 @@ class CCA(object):
             a.yaxis.set_visible(False)
 
 
+    def save_plot(self, mode, path=None, dpi=96, **kwargs):
+        if path is None:
+            path = self._get_analysis_path()
+
+        mode_id = ''.join(['mode',str(mode)])
+        format = '.png'
+        file_name = '_'.join([self._get_analysis_id(),mode_id])
+        file_path = os.path.join(path, file_name)
+        self.plot(mode=mode, **kwargs)
+        plt.savefig(file_path + format, dpi=dpi)
+
+
     def truncate(self, n):
         """Truncate solution.
 
