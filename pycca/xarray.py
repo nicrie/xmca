@@ -111,13 +111,6 @@ class xCCA(CCA):
         return left, right
 
 
-    def set_field_names(self, left = None, right = None):
-        if left is not None:
-            self._analysis['left_name']     = left
-        if right is not None:
-            self._analysis['right_name']    = right
-
-
     def apply_weights(self,left_weights=None, right_weights=None):
         left, right = self._get_fields()
 

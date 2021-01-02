@@ -121,6 +121,13 @@ class CCA(object):
         self._analysis['method']        = self._get_method_id()
 
 
+    def set_field_names(self, left = None, right = None):
+        if left is not None:
+            self._analysis['left_name']     = left
+        if right is not None:
+            self._analysis['right_name']    = right
+
+
     def _get_method_id(self):
         id = 'pca'
         if self._analysis['is_bivariate']:
