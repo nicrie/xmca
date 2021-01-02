@@ -569,8 +569,9 @@ class xCCA(CCA):
 
 
     def plot(
-        self, mode, threshold=0, cmap_eof=None, cmap_phase=None,
-        resolution='110m', phase_shift=0):
+        self, mode, threshold=0, phase_shift=0,
+        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0),
+        resolution='110m', ):
         """
         Plot results for `mode`.
 
@@ -681,7 +682,6 @@ class xCCA(CCA):
         n_rows = n_rows + 1
         height_ratios.append(0.05)
 
-        figsize = (8.3,5) if self._analysis['is_bivariate'] else (8.3,2.5)
         # create figure environment
         fig = plt.figure(figsize=figsize, dpi=150)
         fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
@@ -747,18 +747,6 @@ class xCCA(CCA):
             a.coastlines(lw = .5, resolution = resolution)
             a.set_aspect('auto')
             a.add_feature(cfeature.LAND, color='gray', zorder=0)
-
-
-    def save_plot(self, mode, path=None, dpi=96, **kwargs):
-        if path is None:
-            path = self._get_analysis_path()
-
-        mode_id = ''.join(['mode',str(mode)])
-        format = '.png'
-        file_name = '_'.join([self._get_analysis_id(),mode_id])
-        file_path = os.path.join(path, file_name)
-        self.plot(mode=mode, **kwargs)
-        plt.savefig(file_path + format, dpi=dpi)
 
 
 
@@ -1024,12 +1012,12 @@ class xCCA(CCA):
         for key,file in file_names.items():
             file_names[key] = os.path.join(path_folder,file)
 
-        eigenvalues = xr.open_dataarray(file_names['eigenvalues'])
-        left_eofs   = xr.open_dataarray(file_names['left_eofs'])
-        left_pcs    = xr.open_dataarray(file_names['left_pcs'])
+        eigenvalues = xr.open_dataarray(file_names['eigenvalues'], engine = 'h5netcdf')
+        left_eofs   = xr.open_dataarray(file_names['left_eofs'], engine = 'h5netcdf')
+        left_pcs    = xr.open_dataarray(file_names['left_pcs'], engine = 'h5netcdf')
         if self._analysis['is_bivariate']:
-            right_eofs  = xr.open_dataarray(file_names['right_eofs'])
-            right_pcs   = xr.open_dataarray(file_names['right_pcs'])
+            right_eofs  = xr.open_dataarray(file_names['right_eofs'], engine = 'h5netcdf')
+            right_pcs   = xr.open_dataarray(file_names['right_pcs'], engine = 'h5netcdf')
         else:
             right_eofs = left_eofs
             right_pcs = left_pcs
