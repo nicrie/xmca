@@ -718,7 +718,8 @@ class CCA(object):
 
 
     def plot(
-        self, mode, threshold=0, cmap_eof=None, cmap_phase=None, phase_shift=0):
+        self, mode, threshold=0, phase_shift=0,
+        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0)):
         """
         Plot results for `mode`.
 
@@ -812,7 +813,6 @@ class CCA(object):
         n_rows = n_rows + 1
         height_ratios.append(0.05)
 
-        figsize = (8.3,5) if self._analysis['is_bivariate'] else (8.3,2.5)
         # create figure environment
         fig = plt.figure(figsize=figsize, dpi=150)
         fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
