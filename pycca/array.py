@@ -9,7 +9,7 @@ Complex rotated maximum covariance analysis of two numpy arrays.
 import os
 
 import numpy as np
-import xarray as xr
+import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
 from tqdm import tqdm
@@ -18,7 +18,7 @@ import cmath
 
 from tools.rotation import promax
 from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
-from tools.array import is_not_empty, check_time_dims, check_nan_rows
+from tools.array import is_not_empty, check_time_dims, check_nan_rows, norm_to_1
 from tools.text import secure_str, boldify_str, wrap_str
 
 # =============================================================================
@@ -708,6 +708,162 @@ class CCA(object):
 
         # use the real part to force a real output
         return phaseLeft.real, phaseRight.real
+
+
+    def plot(
+        self, mode, threshold=0, cmap_eof=None, cmap_phase=None, phase_shift=0):
+        """
+        Plot results for `mode`.
+
+        Parameters
+        ----------
+        mode : int, optional
+            Mode to plot. The default is 1.
+        threshold : int, optional
+            Amplitude threshold below which the fields are masked out.
+            The default is 0.
+        cmap_eof : str or Colormap
+            The colormap used to map the spatial patterns.
+            The default is 'Blues'.
+        cmap_phase : str or Colormap
+            The colormap used to map the spatial phase function.
+            The default is 'twilight'.
+
+        Returns
+        -------
+        None.
+
+        """
+
+        left_pcs, right_pcs 	= self.pcs(mode, phase_shift=phase_shift)
+
+        if self._analysis['is_complex']:
+            left_eofs, right_eofs   = self.spatial_amplitude(mode)
+            cmap_eof_range  = [0, 1]
+            cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
+            cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
+            eof_title       = 'Amplitude'
+        else:
+            left_eofs, right_eofs   = self.eofs(mode)
+            cmap_eof        = 'RdBu_r' if cmap_eof is None else cmap_eof
+            cmap_eof_range  = [-1, 0, 1]
+            eof_title       = 'EOF'
+
+        left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
+
+        left_pcs, right_pcs 	= [left_pcs[:,mode-1].real, right_pcs[:,mode-1].real]
+        left_eofs, right_eofs   = [left_eofs[:,:,mode-1], right_eofs[:,:,mode-1]]
+        left_phase, right_phase = [left_phase[:,:,mode-1],right_phase[:,:,mode-1]]
+
+        var, error 		= self.explained_variance(mode)
+        var, error 		= [var[mode-1], error[mode-1]]
+
+        titles = {
+        'pc' : 'PC {:d} ({:.1f} \%)'.format(mode,var),
+        'eof': eof_title,
+        'phase':'Phase',
+        'var1' : self._analysis['left_name'],
+        'var2' : self._analysis['right_name']
+        }
+
+        titles.update({k: v.replace('_',' ') for k, v in titles.items()})
+        titles.update({k: boldify_str(v) for k, v in titles.items()})
+
+        # normalize all EOFs/PCs such that they range from -1...+1
+        left_eofs   = norm_to_1(left_eofs, axis=(0,1))
+        right_eofs  = norm_to_1(right_eofs, axis=(0,1))
+        left_pcs    = norm_to_1(left_pcs, axis=(0))
+        right_pcs   = norm_to_1(right_pcs, axis=(0))
+
+        # apply amplitude threshold
+        left_eofs   = np.where(abs(left_eofs) >= threshold, left_eofs, np.nan)
+        right_eofs  = np.where(abs(right_eofs) >= threshold, right_eofs, np.nan)
+        left_phase  = np.where(abs(left_eofs) >= threshold, left_phase, np.nan)
+        right_phase = np.where(abs(right_eofs) >= threshold, right_phase, np.nan)
+
+        # data
+        pcs             = [left_pcs, right_pcs]
+        eofs            = [left_eofs, right_eofs]
+        phases          = [left_phase, right_phase]
+        height_ratios   = [1, 1]
+
+        n_rows = 2
+        n_cols = 3
+
+        # if PCA then right field not necessary
+        if (self._analysis['is_bivariate'] == False):
+            n_rows = n_rows - 1
+            pcs.pop()
+            eofs.pop()
+            phases.pop()
+            height_ratios.pop()
+
+        if (self._analysis['is_complex'] == False):
+            n_cols = n_cols - 1
+
+        # add additional row for colorbar
+        n_rows = n_rows + 1
+        height_ratios.append(0.05)
+
+        figsize = (8.3,5) if self._analysis['is_bivariate'] else (8.3,2.5)
+        # create figure environment
+        fig = plt.figure(figsize=figsize, dpi=150)
+        fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
+        gs = fig.add_gridspec(n_rows, n_cols, height_ratios=height_ratios)
+        axes_pc = [fig.add_subplot(gs[i,0]) for i in range(n_rows-1)]
+        axes_eof = [fig.add_subplot(gs[i,1]) for i in range(n_rows-1)]
+        cbax_eof = fig.add_subplot(gs[-1,1])
+
+        axes_space = axes_eof
+
+        var_names = [titles['var1'], titles['var2']]
+
+        # plot PCs
+        for i, pc in enumerate(pcs):
+            axes_pc[i].plot(pc)
+            axes_pc[i].set_ylim(-1,1)
+            axes_pc[i].set_xlabel('')
+            axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
+            axes_pc[i].set_title('')
+            axes_pc[i].set_yticks([-1,0,1])
+
+        axes_pc[0].xaxis.set_visible(False)
+        axes_pc[0].set_title(titles['pc'], fontweight='bold')
+
+        # plot EOFs
+        for i, eof in enumerate(eofs):
+            cb_eof = axes_eof[i].imshow(eofs[i],
+                vmin=cmap_eof_range[0], vmax=cmap_eof_range[-1], cmap=cmap_eof)
+            axes_eof[i].set_title('')
+
+        plt.colorbar(cb_eof, cbax_eof, orientation='horizontal')
+        cbax_eof.xaxis.set_ticks(cmap_eof_range)
+        axes_eof[0].set_title(titles['eof'], fontweight='bold')
+
+        # plot Phase function (if data is complex)
+        if (self._analysis['is_complex']):
+            axes_phase = [fig.add_subplot(gs[i,2]) for i in range(n_rows-1)]
+            cbax_phase = fig.add_subplot(gs[-1,2])
+
+            for i, phase in enumerate(phases):
+                cb_phase = axes_phase[i].imshow(phases[i],
+                    vmin=-np.pi, vmax=np.pi, cmap=cmap_phase)
+                axes_phase[i].set_title('')
+
+            plt.colorbar(cb_phase, cbax_phase, orientation='horizontal')
+            cbax_phase.xaxis.set_ticks([-3.14,0,3.14])
+            cbax_phase.set_xticklabels([r'-$\pi$','0',r'$\pi$'])
+
+            for a in axes_phase:
+                axes_space.append(a)
+
+            axes_phase[0].set_title(titles['phase'], fontweight='bold')
+
+        # add map features
+        for a in axes_space:
+            a.set_aspect('auto')
+            a.xaxis.set_visible(False)
+            a.yaxis.set_visible(False)
 
 
     def truncate(self, n):

@@ -20,11 +20,13 @@ def arrs_are_equal(arr1 ,arr2):
     else:
         return False
 
+
 def is_arr(data):
     if (isinstance(data,np.ndarray)):
         return True
     else:
         raise TypeError('Data needs to be np.ndarray.')
+
 
 def check_time_dims(arr1, arr2):
     if (arr1.shape[0] == arr2.shape[0]):
@@ -81,8 +83,13 @@ def check_nan_rows(arr):
     else:
         pass
 
+
 def is_not_empty(arr):
     if (arr.size > 0):
         pass
     else:
         raise ValueError('Input field is empty or contains NaN only.')
+
+
+def norm_to_1(arr, axis):
+    return arr / abs(arr).max(axis=axis)
