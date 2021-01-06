@@ -697,7 +697,7 @@ class xCCA(CCA):
         # plot PCs
         for i, pc in enumerate(pcs):
             pc.plot(ax=axes_pc[i])
-            axes_pc[i].set_ylim(-1,1)
+            axes_pc[i].set_ylim(-1.2,1.2)
             axes_pc[i].set_xlabel('')
             axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
             axes_pc[i].set_title('')

@@ -408,7 +408,8 @@ class CCA(object):
 
         """
         if(n_rot < 2):
-            raise ValueError('`n_rot` must be >=2')
+            print('`n_rot` must be >=2. Solution not rotated.')
+            return None
         if(power<1):
             raise ValueError('`power` must be >=1')
 
@@ -828,7 +829,7 @@ class CCA(object):
         # plot PCs
         for i, pc in enumerate(pcs):
             axes_pc[i].plot(pc)
-            axes_pc[i].set_ylim(-1,1)
+            axes_pc[i].set_ylim(-1.2,1.2)
             axes_pc[i].set_xlabel('')
             axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
             axes_pc[i].set_title('')
@@ -972,7 +973,6 @@ class CCA(object):
         return file_names
 
 
-
     def _save_data(self, data_array, path, *args, **kwargs):
         raise NotImplementedError('only works for `xarray`')
 
@@ -1000,9 +1000,6 @@ class CCA(object):
                     value = line.split(':')[1].strip()
                     self._set_key(key, value)
         info_file.close()
-
-
-
 
 
     def load_analysis(self, path, eofs=None, pcs=None, eigenvalues=None):
