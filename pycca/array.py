@@ -883,6 +883,7 @@ class CCA(object):
         file_name = '_'.join([self._get_analysis_id(),mode_id])
         file_path = os.path.join(path, file_name)
         self.plot(mode=mode, **kwargs)
+        plt.tight_layout()
         plt.savefig(file_path + format, dpi=dpi)
 
 
