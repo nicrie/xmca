@@ -60,10 +60,35 @@ def calc_temporal_corr(x, y):
     return xy/sigx/sigy
 
 
-def get_lonlat_limits(data_array):
+def wrap_lon_to_180(da, lon='lon'):
+    """
+    Wrap longitude coordinates of DatArray to -180..179
+
+    Parameters
+    ----------
+    da : DatArray
+        object with longitude coordinates
+    lon : string
+        name of the longitude ('lon', 'longitude', ...)
+
+    Returns
+    -------
+    wrapped : Dataset
+        Another dataset array wrapped around.
+    """
+
+    # wrap 0..359 to -180..179
+    da = da.assign_coords(lon=(((da[lon] + 180) % 360) - 180))
+
+    # sort the data
+    return da.sortby(lon)
+
+
+def get_extent(data_array, central_longitude=0):
     try:
-        east 	= data_array.coords['lon'].min()
-        west 	= data_array.coords['lon'].max()
+        data_array = wrap_lon_to_180(data_array)
+        east 	= data_array.coords['lon'].min() + central_longitude + 0.001
+        west 	= data_array.coords['lon'].max() + central_longitude - 0.001
         south 	= data_array.coords['lat'].min()
         north 	= data_array.coords['lat'].max()
 

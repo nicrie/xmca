@@ -23,7 +23,7 @@ import cmath
 from pycca.array import CCA
 from tools.text import secure_str, boldify_str, wrap_str
 from tools.xarray import is_DataArray, check_dims, get_attr, calc_temporal_corr
-from tools.xarray import get_lonlat_limits, norm_time_to_1, norm_space_to_1
+from tools.xarray import get_extent, norm_time_to_1, norm_space_to_1
 from tools.xarray import split_complex, create_coords
 # =============================================================================
 # xCCA
@@ -571,7 +571,7 @@ class xCCA(CCA):
     def plot(
         self, mode, threshold=0, phase_shift=0,
         cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0),
-        resolution='110m', ):
+        resolution='110m', projection=None, c_lon=None):
         """
         Plot results for `mode`.
 
@@ -643,19 +643,26 @@ class xCCA(CCA):
         left_phase  = left_phase.where(abs(left_eofs) >= threshold)
         right_phase = right_phase.where(abs(right_eofs) >= threshold)
 
-        # map boundaries as [east, west, south, north]
-        left_map_boundaries  = get_lonlat_limits(left_eofs)
-        right_map_boundaries = get_lonlat_limits(right_eofs)
-        map_boundaries = [left_map_boundaries, right_map_boundaries]
-
         # map projections and center longitude
-        map_projection  = ccrs.PlateCarree()
-        left_c_lon      = int((left_map_boundaries[0] + left_map_boundaries[1]) / 2)
-        right_c_lon     = int((right_map_boundaries[0] + right_map_boundaries[1]) / 2)
+        data_projection  = ccrs.PlateCarree()
+        if c_lon is None:
+            left_c_lon      = left_eofs.lon[[0,-1]].mean()
+            right_c_lon     = right_eofs.lon[[0,-1]].mean()
+        else:
+            left_c_lon  = c_lon
+            right_c_lon = c_lon
 
-        left_proj   = ccrs.PlateCarree(central_longitude=left_c_lon)
-        right_proj  = ccrs.PlateCarree(central_longitude=right_c_lon)
+        if projection is None:
+            projection = ccrs.PlateCarree
+        left_proj   = projection(central_longitude=left_c_lon)
+        right_proj  = projection(central_longitude=right_c_lon)
         projs = [left_proj, right_proj]
+
+        # map boundaries as [east, west, south, north]
+        map_boundaries = [
+            get_extent(left_eofs, central_longitude = left_c_lon),
+            get_extent(right_eofs, central_longitude = right_c_lon)
+            ]
 
         # data
         pcs             = [left_pcs, right_pcs]
@@ -698,22 +705,25 @@ class xCCA(CCA):
         for i, pc in enumerate(pcs):
             pc.plot(ax=axes_pc[i])
             axes_pc[i].set_ylim(-1.2,1.2)
-            axes_pc[i].set_xlabel('')
-            axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
-            axes_pc[i].set_title('')
             axes_pc[i].set_yticks([-1,0,1])
+            axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
+            axes_pc[i].set_xlabel('')
+            axes_pc[i].set_title('')
+            axes_pc[i].spines['right'].set_visible(False)
+            axes_pc[i].spines['top'].set_visible(False)
 
 
         axes_pc[0].xaxis.set_visible(False)
+        axes_pc[0].spines['bottom'].set_visible(False)
         axes_pc[0].set_title(titles['pc'], fontweight='bold')
 
         # plot EOFs
         for i, eof in enumerate(eofs):
             cb_eof = eof.plot(
-                ax=axes_eof[i], transform=ccrs.PlateCarree(),
+                ax=axes_eof[i], transform=data_projection,
                 vmin=cmap_eof_range[0], vmax=cmap_eof_range[-1], cmap=cmap_eof,
                 add_colorbar = False)
-            axes_eof[i].set_extent(map_boundaries[i], crs=ccrs.PlateCarree())
+            axes_eof[i].set_extent(map_boundaries[i], crs=data_projection)
             axes_eof[i].set_title('')
 
         plt.colorbar(cb_eof, cbax_eof, orientation='horizontal')
@@ -727,10 +737,10 @@ class xCCA(CCA):
 
             for i, phase in enumerate(phases):
                 cb_phase = phase.plot(
-                    ax=axes_phase[i], transform=ccrs.PlateCarree(),
+                    ax=axes_phase[i], transform=data_projection,
                     vmin=-np.pi, vmax=np.pi, cmap=cmap_phase,
                     add_colorbar = False)
-                axes_phase[i].set_extent(map_boundaries[i], crs=ccrs.PlateCarree())
+                axes_phase[i].set_extent(map_boundaries[i], crs=data_projection)
                 axes_phase[i].set_title('')
 
             plt.colorbar(cb_phase, cbax_phase, orientation='horizontal')
@@ -786,8 +796,8 @@ class xCCA(CCA):
         right_pcs 		= norm_time_to_1(right_pcs)
 
         # map boundaries as [east, west, south, north]
-        left_map_boundaries     = get_lonlat_limits(left_eofs)
-        right_map_boundaries    = get_lonlat_limits(right_eofs)
+        left_map_boundaries     = get_extent(left_eofs)
+        right_map_boundaries    = get_extent(right_eofs)
 
         # map_projection and center longitude for
         map_projection = ccrs.PlateCarree()
@@ -888,8 +898,8 @@ class xCCA(CCA):
 
 
         # map boundaries as [east, west, south, north]
-        left_map_boundaries     = get_lonlat_limits(left_amplitude)
-        right_map_boundaries    = get_lonlat_limits(right_amplitude)
+        left_map_boundaries     = get_extent(left_amplitude)
+        right_map_boundaries    = get_extent(right_amplitude)
 
         # map_projection and center longitude for
         map_projection = ccrs.PlateCarree()
