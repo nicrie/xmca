@@ -537,6 +537,33 @@ class xCCA(CCA):
         return left_het_patterns, right_het_patterns
 
 
+    def reconstructed_fields(self, mode):
+        left_eofs, right_eofs   = self.eofs(scaling=0)
+        left_pcs, right_pcs     = self.pcs(scaling=1)
+
+        left_eofs   = left_eofs.sel(mode=mode)
+        right_eofs  = right_eofs.sel(mode=mode)
+
+        left_pcs    = left_pcs.sel(mode=mode)
+        right_pcs   = right_pcs.sel(mode=mode)
+
+        left_reconstructed  = xr.dot(left_pcs,left_eofs.conjugate(),dims=['mode'])
+        right_reconstructed = xr.dot(right_pcs,right_eofs.conjugate(),dims=['mode'])
+
+        if self._analysis['is_coslat_corrected']:
+            left_reconstructed   /= np.cos(np.deg2rad(self._left_coords['lat']))
+            right_reconstructed  /= np.cos(np.deg2rad(self._right_coords['lat']))
+
+        if self._analysis['is_normalized']:
+            left_reconstructed  *= self._left_std
+            right_reconstructed *= self._right_std
+
+        left_reconstructed  += self._left_mean
+        right_reconstructed += self._right_mean
+
+        return left_reconstructed.real, right_reconstructed.real
+
+
     def _create_figure(self, nrows=3, coltypes=['t','s'], longitude_center=0):
         n_rows, n_cols = [nrows, len(coltypes)]
 

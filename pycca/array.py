@@ -89,6 +89,10 @@ class CCA(object):
         check_time_dims(self._left, self._right)
 
         # center input data to zero mean (remove mean)
+        self._left_mean     = self._left.mean(axis=0)
+        self._right_mean    = self._right.mean(axis=0)
+        self._left_std      = self._left.std(axis=0)
+        self._right_std      = self._right.std(axis=0)
         self._left 	    = remove_mean(self._left)
         self._right 	= remove_mean(self._right)
 
