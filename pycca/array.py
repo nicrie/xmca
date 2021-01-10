@@ -185,6 +185,48 @@ class CCA(object):
         return analysis_path
 
 
+    def apply_weights(self,left=None, right=None):
+        """Apply weights to data sets.
+
+        Supplied weights are applied via broadcasting.
+
+        Parameters
+        ----------
+        left : ndarray
+            Weights for left data set.
+        right : ndarray
+            Weights for right data set.
+
+
+        """
+
+        if left is None:
+            left = 1
+
+        if right is None:
+            right = 1
+
+        self._left  = self._left * left
+        self._right = self._right * right
+
+
+    def normalize(self):
+        """Normalize the input data to unit variance."""
+
+        if (self._analysis['is_normalized']):
+            print('Data already normalized. Nothing was done.')
+            return None
+
+        else:
+            self._left  = self._left / self._left.std(axis=0)
+            self._right = self._right / self._right.std(axis=0)
+
+            self._analysis['is_normalized'] = True
+            self._analysis['is_coslat_corrected'] = False
+            self._analysis['method'] = self._get_method_id()
+            return None
+
+
     def _theta_forecast(self, series, steps=None, period=365):
         if steps is None:
             steps = len(series)
@@ -251,48 +293,6 @@ class CCA(object):
             data = remove_mean(data)
 
         return data
-
-
-    def apply_weights(self,left=None, right=None):
-        """Apply weights to data sets.
-
-        Supplied weights are applied via broadcasting.
-
-        Parameters
-        ----------
-        left : ndarray
-            Weights for left data set.
-        right : ndarray
-            Weights for right data set.
-
-
-        """
-
-        if left is None:
-            left = 1
-
-        if right is None:
-            right = 1
-
-        self._left  = self._left * left
-        self._right = self._right * right
-
-
-    def normalize(self):
-        """Normalize the input data to unit variance."""
-
-        if (self._analysis['is_normalized']):
-            print('Data already normalized. Nothing was done.')
-            return None
-
-        else:
-            self._left  = self._left / self._left.std(axis=0)
-            self._right = self._right / self._right.std(axis=0)
-
-            self._analysis['is_normalized'] = True
-            self._analysis['is_coslat_corrected'] = False
-            self._analysis['method'] = self._get_method_id()
-            return None
 
 
     def solve(self, complexify=False, theta=False, period=365):
@@ -544,9 +544,9 @@ class CCA(object):
         ----------
         n : int, optional
             Number of PCs to be returned. The default is None.
-        scaling : [0,1], optional
-            If 1, scale PCs by square root of eigenvalues. If 0, return
-            unscaled PCs. The default is 0.
+        scaling : {0,1}, optional
+            If 1, scale PCs by square root of
+            eigenvalues. If 0, return unscaled PCs. The default is 0.
 
         Returns
         -------
@@ -559,9 +559,13 @@ class CCA(object):
         pcsLeft 	= self._ULeft[:,:n]
         pcsRight 	= self._URight[:,:n]
 
-        if (scaling==1):
-            pcsLeft 	= pcsLeft * np.sqrt(self._eigenvalues[:n])
-            pcsRight 	= pcsRight * np.sqrt(self._eigenvalues[:n])
+        eigenvalues = self._eigenvalues[:n]
+        n_obs       = self._observations
+
+        # scale PCs with their eigenvalues
+        if ((0 <= scaling) & (scaling <= 1)):
+            pcsLeft 	= pcsLeft * np.sqrt(n_obs * eigenvalues)**scaling
+            pcsRight 	= pcsRight * np.sqrt(n_obs * eigenvalues)**scaling
 
         if self._analysis['is_complex']:
             pcsLeft     = pcsLeft * cmath.rect(1,phase_shift)
@@ -577,9 +581,9 @@ class CCA(object):
         ----------
         n : int, optional
             Number of EOFs to be returned. The default is None.
-        scaling : [0,1], optional
-            If 1, scale PCs by square root of eigenvalues. If 0, return
-            unscaled PCs. The default is 0.
+        scaling : {0,1}, optional
+            If 1, scale EOFs by square root of
+            eigenvalues. If 0, return unscaled EOFs. The default is 0.
 
         Returns
         -------
@@ -591,6 +595,9 @@ class CCA(object):
         """
         if n is None:
             n = self._eigenvalues.size
+
+        eigenvalues = self._eigenvalues[:n]
+        n_obs       = self._observations
 
         # create data fields with original NaNs
         dtype = self._VLeft.dtype
@@ -604,9 +611,10 @@ class CCA(object):
         eofsLeft 	= eofsLeft.reshape(self._left_original_spatial_shape + (n,))
         eofsRight 	= eofsRight.reshape(self._right_original_spatial_shape + (n,))
 
-        if (scaling==1):
-            eofsLeft 	= eofsLeft * np.sqrt(self._eigenvalues[:n])
-            eofsRight 	= eofsRight * np.sqrt(self._eigenvalues[:n])
+        # scale EOFs with their eigenvalues
+        if ((0 <= scaling) & (scaling <= 1)):
+            eofsLeft 	= eofsLeft * np.sqrt(n_obs * eigenvalues)**scaling
+            eofsRight 	= eofsRight * np.sqrt(n_obs * eigenvalues)**scaling
 
         if self._analysis['is_complex']:
             eofsLeft     = eofsLeft * cmath.rect(1,phase_shift)
