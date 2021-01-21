@@ -92,4 +92,4 @@ def is_not_empty(arr):
 
 
 def norm_to_1(arr, axis):
-    return arr / abs(arr).max(axis=axis)
+    return arr / np.nanmax(abs(arr), axis=axis)
