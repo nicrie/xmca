@@ -67,7 +67,7 @@ class CCA(object):
 
     """
 
-    def __init__(self, left = None, right = None):
+    def __init__(self, *data):
         """Load data fields and store information about data size/shape.
 
         Parameters
@@ -81,27 +81,42 @@ class CCA(object):
             The default is None.
 
         """
-        self._left      = np.array([]) if left is None else left.copy()
-        self._right     = self._left if right is None else right.copy()
+        if len(data) > 2:
+            raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
-        is_arr(self._left)
-        is_arr(self._right)
-        check_time_dims(self._left, self._right)
+        self._fields                = {} # input fields
+        self._field_names           = {} # names of input fields
+        self._field_means           = {} # mean of fields
+        self._field_stds            = {} # standard deviation of fields
+        self._fields_spatial_shape  = {} # spatial shapes of fields
+        self._n_variables           = {} # number of variables of fields
+        self._no_nan_index          = {} # index of variables containing data
+        self._n_observations        = {} # number of observations/samples
 
-        # center input data to zero mean (remove mean)
-        self._left_mean     = self._left.mean(axis=0)
-        self._right_mean    = self._right.mean(axis=0)
-        self._left_std      = self._left.std(axis=0)
-        self._right_std      = self._right.std(axis=0)
-        self._left 	    = remove_mean(self._left)
-        self._right 	= remove_mean(self._right)
+        # set fields
+        self._keys    = ['left', 'right']
+        self._fields  = {key : field for key,field in zip(self._keys,data)}
+        # set fields
+        #self._fields = {'left'  : np.array([]) if left is None else left.copy()}
+        #if right is not None:
+        #    self._fields['right'] = right.copy()
 
-        # store meta information
+        # set class variables
+        for key, field in self._fields.items():
+            is_arr(field)
+            self._field_names[key]          = key
+            self._field_means[key]          = field.mean(axis=0)
+            self._field_stds[key]           = field.std(axis=0)
+            self._fields_spatial_shape[key] = field.shape[1:]
+            self._n_variables[key]          = np.product(field.shape[1:])
+            self._n_observations[key]       = field.shape[0]
+
+            # center input data to zero mean (remove mean)
+            self._fields[key]       = remove_mean(field)
+
+        # set meta information
         self._analysis = {
-            # data input
-            'left_name'             : 'left',
-            'right_name'            : 'right',
-            'is_bivariate'          : False,
+            'is_bivariate'          : True if len(self._fields) > 1 else False,
             # pre-processing
             'is_normalized'         : False,
             'is_coslat_corrected'   : False,
@@ -121,15 +136,14 @@ class CCA(object):
             'eigensum'              : 0.0
             }
 
-        self._analysis['is_bivariate']  = not arrs_are_equal(self._left, self._right)
         self._analysis['method']        = self._get_method_id()
 
 
     def set_field_names(self, left = None, right = None):
         if left is not None:
-            self._analysis['left_name']     = left
+            self._field_names['left']   = left
         if right is not None:
-            self._analysis['right_name']    = right
+            self._field_names['right']   = right
 
 
     def _get_method_id(self):
@@ -173,12 +187,7 @@ class CCA(object):
 
         base_folder = 'pycca'
 
-        left_var    = self._analysis['left_name']
-        right_var   = self._analysis['right_name']
-
-        analysis_folder     = left_var
-        if self._analysis['is_bivariate']:
-            analysis_folder = '_'.join([analysis_folder, right_var])
+        analysis_folder = '_'.join(self._field_names.values())
         analysis_folder = secure_str(analysis_folder)
 
         analysis_path   = os.path.join(base_path, base_folder, analysis_folder)
@@ -187,6 +196,22 @@ class CCA(object):
             os.makedirs(analysis_path)
 
         return analysis_path
+
+
+    def _get_fields(self, original_scale=False):
+        std     = self._field_stds
+        mean    = self._field_means
+        fields  = self._fields
+
+        new_fields = {}
+        for key, field in fields.items():
+            new_fields[key] = field
+            if original_scale:
+                if self._analysis['is_normalized']:
+                    new_fields[key] *= std[key]
+                new_fields[key] += mean[key]
+
+        return new_fields
 
 
     def apply_weights(self,left=None, right=None):
@@ -203,15 +228,11 @@ class CCA(object):
 
 
         """
+        field_items = self._fields.items()
 
-        if left is None:
-            left = 1
-
-        if right is None:
-            right = 1
-
-        self._left  = self._left * left
-        self._right = self._right * right
+        weights = {'left' : left, 'right' : right}
+        weights.update({k : 1 if w is None else w for k,w in weights.items()})
+        self._fields.update({k : field * weight for k,field in field_items})
 
 
     def normalize(self):
@@ -222,8 +243,12 @@ class CCA(object):
             return None
 
         else:
-            self._left  = self._left / self._left.std(axis=0)
-            self._right = self._right / self._right.std(axis=0)
+            keys        = self._fields.keys()
+            fields      = self._fields.values()
+            fields_std  = self._field_stds.values()
+
+            for key,field,std in zip(keys,fields,fields_std):
+                self._fields[key] = field / std
 
             self._analysis['is_normalized'] = True
             self._analysis['is_coslat_corrected'] = False
@@ -231,9 +256,9 @@ class CCA(object):
             return None
 
 
-    def _theta_forecast(self, series, steps=None, period=365):
-        if steps is None:
-            steps = len(series)
+    def _theta_forecast(self, series):
+        period = self._analysis['theta_period']
+        steps = len(series)
 
         model = ThetaModel(series, period=period, deseasonalize=True, use_test=False).fit()
         forecast = model.forecast(steps=steps, theta=20)
@@ -241,15 +266,14 @@ class CCA(object):
         return forecast
 
 
-    def _extend_data(self, data, period=365):
-
-        extendedData = [self._theta_forecast(col, period=period) for col in tqdm(data.T)]
+    def _extend_data(self, data):
+        extendedData = [self._theta_forecast(col) for col in tqdm(data.T)]
         extendedData = np.array(extendedData).T
 
         return extendedData
 
 
-    def _complexify_data(self, data, theta=False, period=365):
+    def _complexify_data(self, data):
         """Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -279,27 +303,27 @@ class CCA(object):
             Analytical signal of input data.
 
         """
+        n_observations = self._n_observations['left']
 
-        if theta:
-            forecast    = self._extend_data(data, period=period)
-            backcast    = self._extend_data(data[::-1], period=period)[::-1]
+        if self._analysis['theta']:
+            forecast    = self._extend_data(data)
+            backcast    = self._extend_data(data[::-1])[::-1]
 
             data = np.concatenate([backcast, data, forecast])
-            self._analysis['theta_period'] = period
 
         # perform actual Hilbert transform of (extended) time series
         data = hilbert(data,axis=0)
 
-        if theta:
+        if self._analysis['theta']:
             # cut out the first and last third of Hilbert transform
             # which belong to the forecast/backcast
-            data = data[self._observations:(2*self._observations)]
+            data = data[n_observations:(2*n_observations)]
             data = remove_mean(data)
 
         return data
 
 
-    def solve(self, complexify=False, theta=False, period=365):
+    def solve(self, complexify=False, theta=False, period=365, save_memory=False):
         """Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
@@ -316,70 +340,74 @@ class CCA(object):
             Seasonal period used for Theta model. Default is 365, representing
             a yearly cycle for daily data.
         """
+        self._analysis['is_complex']    = complexify
+        self._analysis['theta']         = theta
+        self._analysis['theta_period']  = period
 
-        self._observations                  = self._left.shape[0]
-        self._left_original_spatial_shape   = self._left.shape[1:]
-        self._right_original_spatial_shape 	= self._right.shape[1:]
+        n_observations  = self._n_observations
+        n_variables     = self._n_variables
 
-        self._left_variables 		= np.product(self._left_original_spatial_shape)
-        self._right_variables 		= np.product(self._right_original_spatial_shape)
+        field_2d = {}
 
-        # create 2D matrix in order to perform PCA
-        self._left 	    = self._left.reshape(self._observations,self._left_variables)
-        self._right 	= self._right.reshape(self._observations,self._right_variables)
+        for key,field in self._fields.items():
+            # create 2D matrix in order to perform PCA
+            field = field.reshape(n_observations[key], n_variables[key])
+            # check for NaN time steps
+            check_nan_rows(field)
+            # remove NaNs columns in data fields
+            field, no_nan_index   = remove_nan_cols(field)
+            is_not_empty(field)
 
-        # check for NaN time steps
-        check_nan_rows(self._left)
-        check_nan_rows(self._right)
+            # complexify input data via Hilbert transform
+            if self._analysis['is_complex']:
+                field = self._complexify_data(field)
 
-        # remove NaNs columns in data fields
-        self._left, self._left_no_nan_index   = remove_nan_cols(self._left)
-        self._right, self._right_no_nan_index = remove_nan_cols(self._right)
+            field_2d[key]           = field
+            # save index of real variables for recontruction of original field
+            self._no_nan_index[key] = no_nan_index
 
-        is_not_empty(self._left)
-        is_not_empty(self._right)
-
-        # complexify input data via Hilbert transform
-        if (complexify == True):
-            self._left = self._complexify_data(self._left, theta=theta, period=period)
-            # save computing time if left and right field are the same
-            if self._analysis['is_bivariate']:
-                self._right = self._complexify_data(self._right, theta=theta, period=period)
-            else:
-                self._right = self._left
-
-            self._analysis['is_complex'] = True
 
         # create covariance matrix
-        kernel = self._left.conjugate().T @ self._right / self._observations
+        if self._analysis['is_bivariate']:
+            kernel = field_2d['left'].conjugate().T @ field_2d['right']
+        else:
+            kernel = field_2d['left'].conjugate().T @ field_2d['left']
+        kernel = kernel / n_observations['left']
 
-        # solve eigenvalue problem
+        self._V = {} # singular vectors (EOFs)
+        self._L = {} # "loaded" singular vectors
+        self._U = {} # projections // (PCs)
+
+        # perform singular value decomposition
         try:
+            if save_memory:
+                import scipy as sp
+                VLeft, eigenvalues, VTRight = sp.sparse.linalg.svd(kernel, full_matrices=False)
             VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
         except LinAlgError:
             raise LinAlgError("SVD failed. NaN entries may be the problem.")
 
-        VRight = VTRight.conjugate().T
+        self._V['left'] = VLeft
+        if self._analysis['is_bivariate']:
+            self._V['right'] = VTRight.conjugate().T
+        # free up some space
+        del(VLeft)
+        del(VTRight)
 
-        S = np.sqrt(np.diag(eigenvalues) * self._observations)
+        S = np.sqrt(np.diag(eigenvalues) * n_observations['left'])
         Si = np.diag(1./np.diag(S))
 
         self._eigenvalues = eigenvalues
+
+        for key, V in self._V.items():
+            # "loaded" EOFs
+            self._L[key] = V @ S
+            # get PC scores by projecting fields on loaded EOFs
+            self._U[key] = field_2d[key] @ V @ Si
+
         self._analysis['eigensum'] = eigenvalues.sum()
         self._analysis['eigen_dimension'] = eigenvalues.size
         self._analysis['is_truncated_at'] = eigenvalues.size
-
-        # standardized EOF fields
-        self._VLeft 	= VLeft
-        self._VRight 	= VRight
-
-        # loadings // EOF fields
-        self._LLeft 	= VLeft @ S
-        self._LRight 	= VRight @ S
-
-        # get PC scores by projecting data fields on loadings
-        self._ULeft 	= self._left @ VLeft @ Si
-        self._URight 	= self._right @ VRight @ Si
 
 
     def rotate(self, n_rot, power=1, tol=1e-5):
@@ -417,52 +445,61 @@ class CCA(object):
         if(power<1):
             raise ValueError('`power` must be >=1')
 
+        n_observations = self._n_observations['left']
+
+        truncated_L = {}
+        for key, L in self._L.items():
+            truncated_L[key] = L[:,:n_rot]
+
         # rotate loadings (Cheng and Dunkerton 1995)
-        L = np.concatenate((self._LLeft[:,:n_rot], self._LRight[:,:n_rot]))
-        Lr, R, Phi = promax(L, power, maxIter=1000, tol=tol)
-        LLeft 	= Lr[:self._VLeft.shape[0],:]
-        LRight 	= Lr[self._VLeft.shape[0]:,:]
+        combined_L = np.concatenate(list(truncated_L.values()))
+        combined_L, R, Phi = promax(combined_L, power, maxIter=1000, tol=tol)
 
-        # calculate variance/reconstruct "eigenvalues"
-        wLeft = np.linalg.norm(LLeft,axis=0)
-        wRight = np.linalg.norm(LRight,axis=0)
-        variance = wLeft * wRight / self._observations
-        varIdx = np.argsort(variance)[::-1]
+        rot_V   = {} # rotated singular vectors (EOFs)
+        rot_L   = {} # rotated "loading"
+        rot_U   = {} # rotated projections (PCs)
+        weights = {} # weights associated to "loadings"
 
-        # pull loadings from EOFs
-        VLeft 	= LLeft / wLeft
-        VRight 	= LRight / wRight
+        rot_L['left']   = combined_L[:truncated_L['left'].shape[0],:]
+        if self._analysis['is_bivariate']:
+            rot_L['right']  = combined_L[truncated_L['left'].shape[0]:,:]
+
+        for key, L in rot_L.items():
+            # calculate variance/reconstruct "eigenvalues"
+            w = np.linalg.norm(L, axis=0)
+            # pull loadings from EOFs
+            rot_V[key] 	=  L / w
+            weights[key] = w
+
+        if self._analysis['is_bivariate']:
+            variance = weights['left'] * weights['right'] / n_observations
+        else:
+            variance = weights['left'] * weights['left'] / n_observations
+        var_idx = np.argsort(variance)[::-1]
 
         # rotate PC scores
         # If rotation is orthogonal: R.T = R
         # If rotation is oblique (p>1): R^(-1).T = R
-        if(power==1):
-            ULeft 	= self._ULeft[:,:n_rot] @ R
-            URight 	= self._URight[:,:n_rot] @ R
-        else:
-            ULeft 	= self._ULeft[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
-            URight 	= self._URight[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
-
+        for key, pcs in self._U.items():
+            if(power==1):
+                rot_U[key] = pcs[:,:n_rot] @ R
+            else:
+                rot_U[key] = pcs[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
 
         # store rotated pcs, eofs and "eigenvalues"
         # and sort according to described variance
-        self._eigenvalues 	= variance[varIdx]
-        # Standardized EOFs
-        self._VLeft 		= VLeft[:,varIdx]
-        self._VRight 		= VRight[:,varIdx]
-        # EOF loadings
-        self._LLeft 		= LLeft[:,varIdx]
-        self._LRight 		= LRight[:,varIdx]
-        # Standardized PC scores
-        self._ULeft 		= ULeft[:,varIdx]
-        self._URight 		= URight[:,varIdx]
+        self._eigenvalues 	= variance[var_idx]
+        for key in rot_L.keys():
+            self._V[key] = rot_V[key][:,var_idx] # Standardized EOFs
+            self._L[key] = rot_L[key][:,var_idx] # Loaded EOFs
+            self._U[key] = rot_U[key][:,var_idx] # Standardized PC scores
 
         # store rotation and correlation matrix of PCs + meta information
-        self._rotation_matrix 		= R
-        self._correlation_matrix 	= Phi[varIdx,varIdx]
-        self._analysis['is_rotated']            = True
-        self._analysis['rotations']             = n_rot
-        self._analysis['power']                 = power
+        self._rotation_matrix           = R
+        self._correlation_matrix        = Phi[var_idx,var_idx]
+        self._analysis['is_rotated']    = True
+        self._analysis['rotations']     = n_rot
+        self._analysis['power']         = power
 
 
     def rotation_matrix(self):
@@ -513,10 +550,11 @@ class CCA(object):
 
         """
         values = self._eigenvalues[:n]
+        n_observations = self._n_observations['left']
         # error according to North's Rule of Thumb
-        error = np.sqrt(2/self._observations) * values
+        error = np.sqrt(2 / n_observations) * values
 
-        return values, error
+        return values
 
 
     def explained_variance(self, n=None):
@@ -535,96 +573,90 @@ class CCA(object):
             Associated uncertainty according to North's `rule of thumb`.
 
         """
-        values, error = self.eigenvalues(n)
-        desVar 		= values / self._analysis['eigensum'] * 100
-        desVarErr 	= error / self._analysis['eigensum'] * 100
-        return desVar, desVarErr
+        values      = self.eigenvalues(n)
+        exp_var 	= values / self._analysis['eigensum'] * 100
+        #desVarErr 	= error / self._analysis['eigensum'] * 100
+        return exp_var
 
 
-    def pcs(self, n=None, scaling=0, phase_shift=0):
+    def pcs(self, n=None, scaling=False, phase_shift=0):
         """Return the first `n` PCs.
 
         Parameters
         ----------
         n : int, optional
             Number of PCs to be returned. The default is None.
-        scaling : {0,1}, optional
-            If 1, scale PCs by square root of
-            eigenvalues. If 0, return unscaled PCs. The default is 0.
+        scaling : boolean, optional
+            If True, scale PCs by square root of
+            eigenvalues. If False, return unscaled PCs. The default is False.
 
         Returns
         -------
-        pcsLeft : ndarray
-            PCs associated with left input field.
-        pcsRight : ndarray
-            PCs associated with right input field.
+        pcs : dict[ndarray, ndarray]
+            PCs associated to left and right input field.
 
         """
-        pcsLeft 	= self._ULeft[:,:n]
-        pcsRight 	= self._URight[:,:n]
+        n_obs       = self._n_observations['left']
+        eigenvalues = self._eigenvalues
+        scaling     = int(scaling)
 
-        eigenvalues = self._eigenvalues[:n]
-        n_obs       = self._observations
+        if n is None:
+            n = eigenvalues.size
 
-        # scale PCs with their eigenvalues
-        if ((0 <= scaling) & (scaling <= 1)):
-            pcsLeft 	= pcsLeft * np.sqrt(n_obs * eigenvalues)**scaling
-            pcsRight 	= pcsRight * np.sqrt(n_obs * eigenvalues)**scaling
+        pcs = {}
+        for key, U in self._U.items():
+            # scale PCs with their eigenvalues
+            pcs[key] = U[:,:n] * np.sqrt(n_obs * eigenvalues[:n])**scaling
 
-        if self._analysis['is_complex']:
-            pcsLeft     = pcsLeft * cmath.rect(1,phase_shift)
-            pcsRight    = pcsRight * cmath.rect(1,phase_shift)
+            # apply phase shift
+            if self._analysis['is_complex']:
+                pcs[key]    = pcs[key] * cmath.rect(1,phase_shift)
 
-        return pcsLeft, pcsRight
+        return pcs
 
 
-    def eofs(self, n=None, scaling=0, phase_shift=0):
+    def eofs(self, n=None, scaling=False, phase_shift=0):
         """Return the first `n` EOFs.
 
         Parameters
         ----------
         n : int, optional
             Number of EOFs to be returned. The default is None.
-        scaling : {0,1}, optional
-            If 1, scale EOFs by square root of
-            eigenvalues. If 0, return unscaled EOFs. The default is 0.
+        scaling : boolean, optional
+            If True, scale EOFs by square root of
+            eigenvalues. If False, return unscaled EOFs. The default is False.
 
         Returns
         -------
-        eofsLeft : ndarray
-            EOFs associated with left input field.
-        eofsRight : ndarray
-            EOFs associated with right input field.
+        eofs : dict[ndarray, ndarray]
+            EOFs associated to left and right input field.
 
         """
+        n_obs       = self._n_observations['left']
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
+        eigenvalues = self._eigenvalues
+        scaling     = int(scaling)
+
         if n is None:
             n = self._eigenvalues.size
 
-        eigenvalues = self._eigenvalues[:n]
-        n_obs       = self._observations
+        eofs = {}
+        for key, V in self._V.items():
+            # create data fields with original NaNs
+            dtype       = V.dtype
+            eofs[key]   = np.zeros([n_var[key], n], dtype = dtype) * np.nan
+            eofs[key][no_nan_idx[key],:] = V[:,:n]
+            # reshape data fields to have original input shape
+            eofs[key] 	= eofs[key].reshape(field_shape[key] + (n,))
+            # scale EOFs with their eigenvalues
+            eofs[key] 	= eofs[key] * np.sqrt(n_obs * eigenvalues[:n])**scaling
+            # apply phase shift
+            if self._analysis['is_complex']:
+                eofs[key]   = eofs[key] * cmath.rect(1,phase_shift)
 
-        # create data fields with original NaNs
-        dtype = self._VLeft.dtype
-        eofsLeft  	= np.zeros([self._left_variables, n],dtype=dtype) * np.nan
-        eofsRight  	= np.zeros([self._right_variables, n],dtype=dtype) * np.nan
-
-        eofsLeft[self._left_no_nan_index,:] = self._VLeft[:,:n]
-        eofsRight[self._right_no_nan_index,:] = self._VRight[:,:n]
-
-        # reshape data fields to have original input shape
-        eofsLeft 	= eofsLeft.reshape(self._left_original_spatial_shape + (n,))
-        eofsRight 	= eofsRight.reshape(self._right_original_spatial_shape + (n,))
-
-        # scale EOFs with their eigenvalues
-        if ((0 <= scaling) & (scaling <= 1)):
-            eofsLeft 	= eofsLeft * np.sqrt(n_obs * eigenvalues)**scaling
-            eofsRight 	= eofsRight * np.sqrt(n_obs * eigenvalues)**scaling
-
-        if self._analysis['is_complex']:
-            eofsLeft     = eofsLeft * cmath.rect(1,phase_shift)
-            eofsRight    = eofsRight * cmath.rect(1,phase_shift)
-
-        return eofsLeft, eofsRight
+        return eofs
 
 
     def spatial_amplitude(self, n=None):
@@ -633,23 +665,22 @@ class CCA(object):
         Parameters
         ----------
         n : int, optional
-            Number of amplitude fields to be returned. If None, return all fields. The default is None.
+            Number of amplitude fields to be returned. If None, return all
+            fields. The default is None.
 
         Returns
         -------
-        ndarray
-            Amplitude fields of left input field.
-        ndarray
-            Amplitude fields of right input field.
+        amplitudes : dict[ndarray, ndarray]
+            Spatial amplitude fields associated to left and right field.
 
         """
-        eofsLeft, eofsRight = self.eofs(n)
+        eofs = self.eofs(n)
 
-        amplitudeLeft   = np.sqrt(eofsLeft * eofsLeft.conjugate())
-        amplitudeRight  = np.sqrt(eofsRight * eofsRight.conjugate())
+        amplitudes = {}
+        for key, eof in eofs.items():
+            amplitudes[key] = np.sqrt(eof * eof.conjugate()).real
 
-        # use the real part to force a real output
-        return amplitudeLeft.real, amplitudeRight.real
+        return amplitudes
 
 
     def spatial_phase(self, n=None, phase_shift=0):
@@ -663,19 +694,17 @@ class CCA(object):
 
         Returns
         -------
-        ndarray
-            Fields of left input field.
-        ndarray
-            Fields of right input field.
+        amplitudes : dict[ndarray, ndarray]
+            Spatial phase fields associated to left and right field.
 
         """
-        eofsLeft, eofsRight = self.eofs(n, phase_shift=phase_shift)
+        eofs = self.eofs(n, phase_shift=phase_shift)
 
-        phaseLeft = np.arctan2(eofsLeft.imag,eofsLeft.real)
-        phaseRight = np.arctan2(eofsRight.imag,eofsRight.real)
+        phases = {}
+        for key, eof in eofs.items():
+            phases[key] = np.arctan2(eof.imag, eof.real).real
 
-        # use the real part to force a real output
-        return phaseLeft.real, phaseRight.real
+        return phases
 
 
     def temporal_amplitude(self, n=None):
@@ -689,19 +718,17 @@ class CCA(object):
 
         Returns
         -------
-        ndarray
-            Amplitude time series of left input field.
-        ndarray
-            Amplitude time series of right input field.
+        amplitudes : dict[ndarray, ndarray]
+            Temporal ampliude series associated to left and right field.
 
         """
-        pcsLeft, pcsRight = self.pcs(n)
+        pcs = self.pcs(n)
 
-        amplitudeLeft   = np.sqrt(pcsLeft * pcsLeft.conjugate())
-        amplitudeRight  = np.sqrt(pcsRight * pcsRight.conjugate())
+        amplitudes = {}
+        for key, pc in pcs.items():
+            amplitudes[key] = np.sqrt(pc * pc.conjugate()).real
 
-        # use the real part to force a real output
-        return amplitudeLeft.real, amplitudeRight.real
+        return amplitudes
 
 
     def temporal_phase(self, n=None, phase_shift=0):
@@ -715,19 +742,17 @@ class CCA(object):
 
         Returns
         -------
-        ndarray
-            Phase function of left input field.
-        ndarray
-            Phase function of right input field.
+        amplitudes : dict[ndarray, ndarray]
+            Temporal phase function associated to left and right field.
 
         """
-        pcsLeft, pcsRight = self.pcs(n, phase_shift=phase_shift)
+        pcs = self.pcs(n, phase_shift=phase_shift)
 
-        phaseLeft = np.arctan2(pcsLeft.imag,pcsLeft.real)
-        phaseRight = np.arctan2(pcsRight.imag,pcsRight.real)
+        phases = {}
+        for key, pc in pcs.items():
+            phases[key] = np.arctan2(pc.imag, pc.real).real
 
-        # use the real part to force a real output
-        return phaseLeft.real, phaseRight.real
+        return phases
 
 
     def plot(
@@ -755,76 +780,58 @@ class CCA(object):
         None.
 
         """
+        pcs     = self.pcs(mode, phase_shift=phase_shift)
+        eofs    = self.eofs(mode)
+        phases  = self.spatial_phase(mode, phase_shift=phase_shift)
+        var 	= self.explained_variance(mode)[mode-1]
 
-        left_pcs, right_pcs 	= self.pcs(mode, phase_shift=phase_shift)
+        n_cols          = 2
+        n_rows          = len(pcs)
+        height_ratios   = [1] * n_rows
+
+        # add additional row for colorbar
+        n_rows += 1
+        height_ratios.append(0.05)
+
+        eof_title       = 'EOF'
+        cmap_eof_range  = [-1, 0, 1]
 
         if self._analysis['is_complex']:
-            left_eofs, right_eofs   = self.spatial_amplitude(mode)
+            n_cols          += 1
+            eofs            = self.spatial_amplitude(mode)
+            eof_title       = 'Amplitude'
             cmap_eof_range  = [0, 1]
             cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
             cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
-            eof_title       = 'Amplitude'
         else:
-            left_eofs, right_eofs   = self.eofs(mode)
             cmap_eof        = 'RdBu_r' if cmap_eof is None else cmap_eof
-            cmap_eof_range  = [-1, 0, 1]
-            eof_title       = 'EOF'
 
-        left_phase, right_phase = self.spatial_phase(mode, phase_shift=phase_shift)
+        for key in pcs.keys():
+            pcs[key]    = pcs[key][:,mode-1].real
+            eofs[key]   = eofs[key][:,:,mode-1]
+            phases[key]  = phases[key][:,:,mode-1]
 
-        left_pcs, right_pcs 	= [left_pcs[:,mode-1].real, right_pcs[:,mode-1].real]
-        left_eofs, right_eofs   = [left_eofs[:,:,mode-1], right_eofs[:,:,mode-1]]
-        left_phase, right_phase = [left_phase[:,:,mode-1],right_phase[:,:,mode-1]]
+            # normalize all EOFs/PCs to -1...+1
+            pcs[
+            key]    = norm_to_1(pcs[key], axis=(0))
+            eofs[key]   = norm_to_1(eofs[key], axis=(0,1))
 
-        var, error 		= self.explained_variance(mode)
-        var, error 		= [var[mode-1], error[mode-1]]
+            # apply amplitude threshold
+            eofs[key]  = np.where(abs(eofs[key]) >= threshold, eofs[key], np.nan)
+            phases[key] = np.where(abs(eofs[key]) >= threshold, phases[key], np.nan)
+
 
         titles = {
         'pc' : 'PC {:d} ({:.1f} \%)'.format(mode,var),
         'eof': eof_title,
         'phase':'Phase',
-        'var1' : self._analysis['left_name'],
-        'var2' : self._analysis['right_name']
+        'var1' : self._field_names['left'],
+        'var2' : self._field_names['right']
         }
 
         titles.update({k: v.replace('_',' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
 
-        # normalize all EOFs/PCs such that they range from -1...+1
-        left_eofs   = norm_to_1(left_eofs, axis=(0,1))
-        right_eofs  = norm_to_1(right_eofs, axis=(0,1))
-        left_pcs    = norm_to_1(left_pcs, axis=(0))
-        right_pcs   = norm_to_1(right_pcs, axis=(0))
-
-        # apply amplitude threshold
-        left_eofs   = np.where(abs(left_eofs) >= threshold, left_eofs, np.nan)
-        right_eofs  = np.where(abs(right_eofs) >= threshold, right_eofs, np.nan)
-        left_phase  = np.where(abs(left_eofs) >= threshold, left_phase, np.nan)
-        right_phase = np.where(abs(right_eofs) >= threshold, right_phase, np.nan)
-
-        # data
-        pcs             = [left_pcs, right_pcs]
-        eofs            = [left_eofs, right_eofs]
-        phases          = [left_phase, right_phase]
-        height_ratios   = [1, 1]
-
-        n_rows = 2
-        n_cols = 3
-
-        # if PCA then right field not necessary
-        if (self._analysis['is_bivariate'] == False):
-            n_rows = n_rows - 1
-            pcs.pop()
-            eofs.pop()
-            phases.pop()
-            height_ratios.pop()
-
-        if (self._analysis['is_complex'] == False):
-            n_cols = n_cols - 1
-
-        # add additional row for colorbar
-        n_rows = n_rows + 1
-        height_ratios.append(0.05)
 
         # create figure environment
         fig = plt.figure(figsize=figsize, dpi=150)
@@ -839,20 +846,23 @@ class CCA(object):
         var_names = [titles['var1'], titles['var2']]
 
         # plot PCs
-        for i, pc in enumerate(pcs):
+        for i, pc in enumerate(pcs.values()):
             axes_pc[i].plot(pc)
             axes_pc[i].set_ylim(-1.2,1.2)
             axes_pc[i].set_xlabel('')
             axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
             axes_pc[i].set_title('')
             axes_pc[i].set_yticks([-1,0,1])
+            axes_pc[i].spines['right'].set_visible(False)
+            axes_pc[i].spines['top'].set_visible(False)
 
         axes_pc[0].xaxis.set_visible(False)
         axes_pc[0].set_title(titles['pc'], fontweight='bold')
 
         # plot EOFs
-        for i, eof in enumerate(eofs):
-            cb_eof = axes_eof[i].imshow(eofs[i],
+        for i, eof in enumerate(eofs.values()):
+            cb_eof = axes_eof[i].imshow(
+                eof, origin='lower',
                 vmin=cmap_eof_range[0], vmax=cmap_eof_range[-1], cmap=cmap_eof)
             axes_eof[i].set_title('')
 
@@ -865,8 +875,9 @@ class CCA(object):
             axes_phase = [fig.add_subplot(gs[i,2]) for i in range(n_rows-1)]
             cbax_phase = fig.add_subplot(gs[-1,2])
 
-            for i, phase in enumerate(phases):
-                cb_phase = axes_phase[i].imshow(phases[i],
+            for i, phase in enumerate(phases.values()):
+                cb_phase = axes_phase[i].imshow(
+                    phase, origin='lower',
                     vmin=-np.pi, vmax=np.pi, cmap=cmap_phase)
                 axes_phase[i].set_title('')
 
@@ -884,6 +895,11 @@ class CCA(object):
             a.set_aspect('auto')
             a.xaxis.set_visible(False)
             a.yaxis.set_visible(False)
+
+        # if more than 1 row, remove xaxis
+        if (len(pcs) == 2):
+            axes_pc[0].xaxis.set_visible(False)
+            axes_pc[0].spines['bottom'].set_visible(False)
 
 
     def save_plot(self, mode, path=None, dpi=96, **kwargs):
@@ -912,11 +928,9 @@ class CCA(object):
         if (n < self._eigenvalues.size):
             self._eigenvalues = self._eigenvalues[:n]
 
-            self._ULeft = self._ULeft[:,:n]
-            self._VLeft = self._VLeft[:,:n]
-
-            self._VRight = self._VRight[:,:n]
-            self._URight = self._URight[:,:n]
+            for key in self._U.keys():
+                self._U[key] = self._U[key][:,:n]
+                self._V[key] = self._V[key][:,:n]
 
             self._analysis['is_truncated'] = True
             self._analysis['is_truncated_at'] = n
@@ -931,6 +945,7 @@ class CCA(object):
             'data from pyCCA module.')
 
         path_output   = os.path.join(path, self._get_analysis_id())
+        path_output = '.'.join([path_output,'info'])
 
         file = open(path_output,"w+")
         file.write(wrap_str(file_header))
@@ -942,47 +957,42 @@ class CCA(object):
         file.write(sep_line)
         file.write(sep_line)
         file.write('\n{:<20} : {:<57}'.format('created',now))
-        file.close()
-
-
-    def _save_info_to_file(self, path):
-        sep_line = '\n#' + '-' * 79
-
-        path_output   = os.path.join(path,self._get_analysis_id())
-
-        file = open(path_output,"a")
         file.write(sep_line)
-        for key, value in self._analysis.items():
+        for key, name in self._field_names.items():
+            file.write('\n{:<20} : {:<57}'.format(key, str(name)))
+        file.write(sep_line)
+        for key, info in self._analysis.items():
             if key in ['is_bivariate','is_complex', 'is_rotated','is_truncated']:
                 file.write(sep_line)
-            file.write('\n{:<20} : {:<57}'.format(key, str(value)))
+            file.write('\n{:<20} : {:<57}'.format(key, str(info)))
         file.close()
 
 
     def _get_file_names(self, format):
-        var1        = secure_str(self._analysis['left_name'])
-        var2        = secure_str(self._analysis['right_name'])
-
-        left_eofs   = '_'.join([var1, 'eofs'])
-        right_eofs  = '_'.join([var2, 'eofs'])
-        left_pcs    = '_'.join([var1, 'pcs'])
-        right_pcs   = '_'.join([var2, 'pcs'])
-        eigen       = '_'.join(['eigenvalues'])
-
         base_name = self._get_analysis_id()
 
+        fields  = {}
+        eofs    = {}
+        pcs     = {}
+        for key, variable in self._field_names.items():
+            variable    = secure_str(variable)
+            field_name  = '_'.join([base_name, variable])
+            eof_name    = '_'.join([base_name, variable, 'eofs'])
+            pc_name     = '_'.join([base_name, variable, 'pcs'])
+
+            fields[key] = '.'.join([field_name, format])
+            eofs[key]   = '.'.join([eof_name, format])
+            pcs[key]    = '.'.join([pc_name, format])
+
+        eigenvalues = '_'.join([base_name, 'eigenvalues'])
+        eigenvalues = '.'.join([eigenvalues, format])
+
         file_names = {
-            'left_eofs'     : left_eofs,
-            'right_eofs'    : right_eofs,
-            'left_pcs'      : left_pcs,
-            'right_pcs'     : right_pcs,
-            'eigenvalues'   : eigen
+            'fields'    : fields,
+            'eofs'      : eofs,
+            'pcs'       : pcs,
+            'eigenvalues':eigenvalues
         }
-
-        for keys, file in file_names.items():
-            name = '_'.join([base_name, file])
-            file_names[keys] = '.'.join([name, format])
-
         return file_names
 
 
@@ -990,7 +1000,7 @@ class CCA(object):
         raise NotImplementedError('only works for `xarray`')
 
 
-    def _set_key(self, key, value):
+    def _set_analysis(self, key, value):
         try:
             key_type = type(self._analysis[key])
         except KeyError:
@@ -1009,45 +1019,40 @@ class CCA(object):
             if (line[0] != '#'):
                 key = line.split(':')[0]
                 key = key.rstrip()
+                if key in ['left', 'right']:
+                    name = line.split(':')[1].strip()
+                    self._field_names[key] = name
                 if key in self._analysis.keys():
                     value = line.split(':')[1].strip()
-                    self._set_key(key, value)
+                    self._set_analysis(key, value)
         info_file.close()
 
 
-    def load_analysis(self, path, eofs=None, pcs=None, eigenvalues=None):
+    def load_analysis(self, path, fields, eofs, pcs, eigenvalues):
         self._set_info_from_file(path)
 
-        # standardized fields // EOF fields + PCs
-        if self._analysis['is_bivariate']:
-            eofsLeft, eofsRight = [eofs[0], eofs[1]]
-            pcsLeft, pcsRight   = [pcs[0], pcs[1]]
-        else:
-            eofsLeft, eofsRight = [eofs[0], eofs[0]]
-            pcsLeft, pcsRight   = [pcs[0], pcs[0]]
+        self._n_observations        = {}
+        self._fields_spatial_shape  = {}
+        self._n_variables           = {}
+        self._no_nan_index          = {}
 
-        self._observations                      = pcsLeft.shape[0]
-        self._left_original_spatial_shape       = eofsLeft.shape[:-1]
-        self._right_original_spatial_shape 	    = eofsRight.shape[:-1]
-        number_modes                            = eofsLeft.shape[-1]
+        self._V                     = {}
+        self._L                     = {}
+        self._U                     = {}
+        self._eigenvalues           = eigenvalues
+        for key in eofs.keys():
+            self._n_observations[key]       = pcs[key].shape[0]
+            self._fields_spatial_shape[key] = eofs[key].shape[:-1]
+            self._n_variables[key]          = np.product(eofs[key].shape[:-1])
+            n_modes                         = eofs[key].shape[-1]
+            S   = np.sqrt(np.diag(eigenvalues) * self._n_observations[key])
+            Si  = np.diag(1./np.diag(S))
 
-        self._left_variables 		= np.product(self._left_original_spatial_shape)
-        self._right_variables 		= np.product(self._right_original_spatial_shape)
+            eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
+            VT, self._no_nan_index[key]   = remove_nan_cols(eofs[key].T)
 
-        eofsLeft    = eofsLeft.reshape(self._left_variables, number_modes)
-        eofsRight   = eofsRight.reshape(self._right_variables, number_modes)
+            self._V[key]    = VT.T
+            self._L[key] 	= self._V[key] @ S
+            self._U[key]    = pcs[key]
 
-        VLeftT, self._left_no_nan_index   = remove_nan_cols(eofsLeft.T)
-        VRightT, self._right_no_nan_index = remove_nan_cols(eofsRight.T)
-        self._VLeft     = VLeftT.T
-        self._VRight    = VRightT.T
-
-        S   = np.sqrt(np.diag(eigenvalues) * self._observations)
-        Si  = np.diag(1./np.diag(S))
-
-        self._eigenvalues   = eigenvalues
-        self._ULeft, self._URight = [pcsLeft, pcsRight]
-
-        # loadings // EOF fields
-        self._LLeft 	= self._VLeft @ S
-        self._LRight 	= self._VRight @ S
+            self._fields[key] = fields[key]
