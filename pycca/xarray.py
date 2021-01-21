@@ -720,9 +720,9 @@ class xCCA(CCA):
 
         self._create_info_file(analysis_path)
 
-        fields = self._get_fields(original_scale = True)
-        eofs = self.eofs()
-        pcs = self.pcs()
+        fields      = self._get_fields(original_scale = True)
+        eofs        = self.eofs()
+        pcs         = self.pcs()
         eigenvalues = self.eigenvalues()
 
         self._save_data(eigenvalues, analysis_path, engine)
@@ -757,6 +757,7 @@ class xCCA(CCA):
         self._field_coords = {}
         for key, field in fields.items():
             self._field_coords[key] = field.coords
+            self._field_dims[key]   = field.dims
 
             fields[key]     = fields[key].data
             eofs[key]       = eofs[key].data
@@ -770,3 +771,6 @@ class xCCA(CCA):
             eofs = eofs,
             pcs  = pcs,
             eigenvalues = eigenvalues)
+
+        if self._analysis['is_coslat_corrected']:
+            self.apply_coslat()

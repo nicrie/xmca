@@ -238,22 +238,18 @@ class CCA(object):
     def normalize(self):
         """Normalize the input data to unit variance."""
 
-        if (self._analysis['is_normalized']):
-            print('Data already normalized. Nothing was done.')
-            return None
 
-        else:
-            keys        = self._fields.keys()
-            fields      = self._fields.values()
-            fields_std  = self._field_stds.values()
+        keys        = self._fields.keys()
+        fields      = self._fields.values()
+        fields_std  = self._field_stds.values()
 
-            for key,field,std in zip(keys,fields,fields_std):
-                self._fields[key] = field / std
+        for key,field,std in zip(keys,fields,fields_std):
+            self._fields[key] = field / std
 
-            self._analysis['is_normalized'] = True
-            self._analysis['is_coslat_corrected'] = False
-            self._analysis['method'] = self._get_method_id()
-            return None
+        self._analysis['is_normalized'] = True
+        self._analysis['is_coslat_corrected'] = False
+        self._analysis['method'] = self._get_method_id()
+        return None
 
 
     def _theta_forecast(self, series):
@@ -1031,11 +1027,6 @@ class CCA(object):
     def load_analysis(self, path, fields, eofs, pcs, eigenvalues):
         self._set_info_from_file(path)
 
-        self._n_observations        = {}
-        self._fields_spatial_shape  = {}
-        self._n_variables           = {}
-        self._no_nan_index          = {}
-
         self._V                     = {}
         self._L                     = {}
         self._U                     = {}
@@ -1055,4 +1046,10 @@ class CCA(object):
             self._L[key] 	= self._V[key] @ S
             self._U[key]    = pcs[key]
 
-            self._fields[key] = fields[key]
+            self._field_means[key]  = fields[key].mean(axis=0)
+            self._field_stds[key]   = fields[key].std(axis=0)
+
+            self._fields[key]       = fields[key] - fields[key].mean(axis=0)
+
+        if self._analysis['is_normalized']:
+            self.normalize()
