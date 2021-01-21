@@ -256,6 +256,12 @@ class CCA(object):
         period = self._analysis['theta_period']
         steps = len(series)
 
+        # replace last value of series by a mean value
+        # to avoid some extreme cases where the foecast starts at a single
+        # which may happen for very noisy data
+        series[0]   = np.mean(series[:period])
+        series[-1]  = np.mean(series[:-period])
+
         model = ThetaModel(series, period=period, deseasonalize=True, use_test=False).fit()
         forecast = model.forecast(steps=steps, theta=20)
 
