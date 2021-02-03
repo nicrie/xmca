@@ -259,8 +259,8 @@ class CCA(object):
         # replace last value of series by a mean value
         # to avoid some extreme cases where the foecast starts at a single
         # which may happen for very noisy data
-        series[0]   = np.mean(series[:period])
-        series[-1]  = np.mean(series[:-period])
+        # series[0]   = series[::period].mean()
+        # series[-1]  = series[::-period].mean()
 
         model = ThetaModel(series, period=period, deseasonalize=True, use_test=False).fit()
         forecast = model.forecast(steps=steps, theta=20)
@@ -581,16 +581,16 @@ class CCA(object):
         return exp_var
 
 
-    def pcs(self, n=None, scaling=False, phase_shift=0):
+    def pcs(self, n=None, scaling=None, phase_shift=0):
         """Return the first `n` PCs.
 
         Parameters
         ----------
         n : int, optional
             Number of PCs to be returned. The default is None.
-        scaling : boolean, optional
-            If True, scale PCs by square root of
-            eigenvalues. If False, return unscaled PCs. The default is False.
+        scaling : {None, 'eigen', 'max', 'std'}, optional
+            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            standard deviation ('std'). The default is None.
 
         Returns
         -------
@@ -600,33 +600,39 @@ class CCA(object):
         """
         n_obs       = self._n_observations['left']
         eigenvalues = self._eigenvalues
-        scaling     = int(scaling)
 
         if n is None:
             n = eigenvalues.size
 
         pcs = {}
         for key, U in self._U.items():
-            # scale PCs with their eigenvalues
-            pcs[key] = U[:,:n] * np.sqrt(n_obs * eigenvalues[:n])**scaling
-
+            pcs[key] = U[:,:n].copy()
+            # scale PCs by eigenvalues
+            if scaling == 'eigen':
+                pcs[key] *= np.sqrt(n_obs * eigenvalues[:n])
+            # scale PCs by maximum value
+            if scaling == 'max':
+                pcs[key] /= np.nanmax(abs(pcs[key].real), axis=0)
+            # scale PCs by standard deviation
+            if scaling == 'std':
+                pcs[key] /= np.nanstd(abs(pcs[key].real), axis=0)
             # apply phase shift
             if self._analysis['is_complex']:
-                pcs[key]    = pcs[key] * cmath.rect(1,phase_shift)
+                pcs[key] *= cmath.rect(1,phase_shift)
 
         return pcs
 
 
-    def eofs(self, n=None, scaling=False, phase_shift=0):
+    def eofs(self, n=None, scaling=None, phase_shift=0):
         """Return the first `n` EOFs.
 
         Parameters
         ----------
         n : int, optional
             Number of EOFs to be returned. The default is None.
-        scaling : boolean, optional
-            If True, scale EOFs by square root of
-            eigenvalues. If False, return unscaled EOFs. The default is False.
+        scaling : {None, 'eigen', 'max', 'std'}, optional
+            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            standard deviation ('std'). The default is None.
 
         Returns
         -------
@@ -639,7 +645,6 @@ class CCA(object):
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
         eigenvalues = self._eigenvalues
-        scaling     = int(scaling)
 
         if n is None:
             n = self._eigenvalues.size
@@ -653,15 +658,22 @@ class CCA(object):
             # reshape data fields to have original input shape
             eofs[key] 	= eofs[key].reshape(field_shape[key] + (n,))
             # scale EOFs with their eigenvalues
-            eofs[key] 	= eofs[key] * np.sqrt(n_obs * eigenvalues[:n])**scaling
+            if scaling == 'eigen':
+                eofs[key] *= np.sqrt(n_obs * eigenvalues[:n])
+            # scale EOFs by maximum value
+            if scaling == 'max':
+                eofs[key] /= np.nanmax(abs(eofs[key].real), axis=(0,1))
+            # scale EOFs by standard deviation
+            if scaling == 'std':
+                eofs[key] /= np.nanstd(abs(eofs[key].real), axis=(0,1))
             # apply phase shift
             if self._analysis['is_complex']:
-                eofs[key]   = eofs[key] * cmath.rect(1,phase_shift)
+                eofs[key] *=  cmath.rect(1,phase_shift)
 
         return eofs
 
 
-    def spatial_amplitude(self, n=None):
+    def spatial_amplitude(self, n=None, scaling=None):
         """Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -669,18 +681,22 @@ class CCA(object):
         n : int, optional
             Number of amplitude fields to be returned. If None, return all
             fields. The default is None.
-
+        scaling : {None, 'max', 'std'}, optional
+            Scale by maximum value ('max'). The default is None.
         Returns
         -------
         amplitudes : dict[ndarray, ndarray]
             Spatial amplitude fields associated to left and right field.
 
         """
-        eofs = self.eofs(n)
+        eofs = self.eofs(n, scaling=None)
 
         amplitudes = {}
         for key, eof in eofs.items():
             amplitudes[key] = np.sqrt(eof * eof.conjugate()).real
+
+            if scaling == 'max':
+                amplitudes[key] /= np.nanmax(amplitudes[key], axis=(0,1))
 
         return amplitudes
 
@@ -709,7 +725,7 @@ class CCA(object):
         return phases
 
 
-    def temporal_amplitude(self, n=None):
+    def temporal_amplitude(self, n=None, scaling=None):
         """Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
@@ -717,6 +733,8 @@ class CCA(object):
         n : int, optional
             Number of amplitude series to be returned. If None, return all series.
             The default is None.
+        scaling : {None, 'max'}, optional
+            Scale by maximum value ('max'). The default is None.
 
         Returns
         -------
@@ -724,11 +742,14 @@ class CCA(object):
             Temporal ampliude series associated to left and right field.
 
         """
-        pcs = self.pcs(n)
+        pcs = self.pcs(n, scaling=None)
 
         amplitudes = {}
         for key, pc in pcs.items():
             amplitudes[key] = np.sqrt(pc * pc.conjugate()).real
+
+            if scaling == 'max':
+                amplitudes[key] /= np.nanmax(amplitudes[key], axis=0)
 
         return amplitudes
 
@@ -782,8 +803,8 @@ class CCA(object):
         None.
 
         """
-        pcs     = self.pcs(mode, phase_shift=phase_shift)
-        eofs    = self.eofs(mode)
+        pcs     = self.pcs(mode, scaling='max', phase_shift=phase_shift)
+        eofs    = self.eofs(mode, scaling='max')
         phases  = self.spatial_phase(mode, phase_shift=phase_shift)
         var 	= self.explained_variance(mode)[mode-1]
 
@@ -800,7 +821,7 @@ class CCA(object):
 
         if self._analysis['is_complex']:
             n_cols          += 1
-            eofs            = self.spatial_amplitude(mode)
+            eofs            = self.spatial_amplitude(mode, scaling='max')
             eof_title       = 'Amplitude'
             cmap_eof_range  = [0, 1]
             cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
@@ -812,11 +833,6 @@ class CCA(object):
             pcs[key]    = pcs[key][:,mode-1].real
             eofs[key]   = eofs[key][:,:,mode-1]
             phases[key]  = phases[key][:,:,mode-1]
-
-            # normalize all EOFs/PCs to -1...+1
-            pcs[
-            key]    = norm_to_1(pcs[key], axis=(0))
-            eofs[key]   = norm_to_1(eofs[key], axis=(0,1))
 
             # apply amplitude threshold
             eofs[key]  = np.where(abs(eofs[key]) >= threshold, eofs[key], np.nan)
@@ -912,8 +928,8 @@ class CCA(object):
         format = '.png'
         file_name = '_'.join([self._get_analysis_id(),mode_id])
         file_path = os.path.join(path, file_name)
-        self.plot(mode=mode, **kwargs)
-        plt.tight_layout()
+        fig, axes= self.plot(mode=mode, **kwargs)
+        fig.subplots_adjust(left=0.06)
         plt.savefig(file_path + format, dpi=dpi)
 
 
