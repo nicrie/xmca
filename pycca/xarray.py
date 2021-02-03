@@ -23,8 +23,7 @@ import cmath
 from pycca.array import CCA
 from tools.text import secure_str, boldify_str, wrap_str
 from tools.xarray import is_DataArray, check_dims, get_attr, calc_temporal_corr
-from tools.xarray import get_extent, norm_time_to_1, norm_space_to_1
-from tools.xarray import split_complex, create_coords
+from tools.xarray import get_extent, split_complex, create_coords
 # =============================================================================
 # xCCA
 # =============================================================================
@@ -100,14 +99,14 @@ class xCCA(CCA):
 
         # constructor of base class for numpy.ndarray
         fields = {key : field.values for key, field in fields.items()}
-        CCA.__init__(self, *fields.values())
+        super().__init__(*fields.values())
 
 
     def _get_fields(self, original_scale=False):
         dims        = self._field_dims
         coords      = self._field_coords
         field_names = self._field_names
-        fields      = CCA._get_fields(self, original_scale=original_scale)
+        fields      = super()._get_fields(original_scale=original_scale)
 
         for key in fields.keys():
             fields[key] = xr.DataArray(
@@ -167,7 +166,7 @@ class xCCA(CCA):
 
         """
         # for n=Nonr, all eigenvalues are returned
-        values = CCA.eigenvalues(self, n)
+        values = super().eigenvalues(n)
 
         # if n is not provided, take all eigenvalues
         if n is None:
@@ -207,7 +206,7 @@ class xCCA(CCA):
             Associated uncertainty according to North's `rule of thumb`.
 
         """
-        variance 	= CCA.explained_variance(self, n)
+        variance 	= super().explained_variance(n)
 
         # if n is not provided, take all eigenvalues
         if n is None:
@@ -231,7 +230,7 @@ class xCCA(CCA):
         return variance
 
 
-    def pcs(self, n=None, scaling=0, phase_shift=0):
+    def pcs(self, n=None, scaling=None, phase_shift=0):
         """Return first `n` PCs.
 
         Parameters
@@ -239,6 +238,9 @@ class xCCA(CCA):
         n : int, optional
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
+        scaling : {None, 'eigen', 'max', 'std'}, optional
+            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            standard deviation ('std'). The default is None.
 
         Returns
         -------
@@ -248,7 +250,7 @@ class xCCA(CCA):
             PCs of right input field.
 
         """
-        pcs = CCA.pcs(self, n, scaling, phase_shift)
+        pcs = super().pcs(n, scaling, phase_shift)
 
         if n is None:
             n = self._eigenvalues.size
@@ -269,7 +271,7 @@ class xCCA(CCA):
         return pcs
 
 
-    def eofs(self, n=None, scaling=0, phase_shift=0):
+    def eofs(self, n=None, scaling=None, phase_shift=0):
         """Return the first `n` EOFs.
 
         Parameters
@@ -277,6 +279,9 @@ class xCCA(CCA):
         n : int, optional
             Number of EOFs to return If none, all EOFs are returned.
             The default is None.
+        scaling : {None, 'eigen', 'max', 'std'}, optional
+            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            standard deviation ('std'). The default is None.
 
         Returns
         -------
@@ -286,7 +291,7 @@ class xCCA(CCA):
             EOFs of right input field.
 
         """
-        eofs = CCA.eofs(self, n, scaling, phase_shift)
+        eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
             n = self._eigenvalues.size
@@ -311,7 +316,7 @@ class xCCA(CCA):
         return eofs
 
 
-    def spatial_amplitude(self, n=None):
+    def spatial_amplitude(self, n=None, scaling=None):
         """Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -319,6 +324,8 @@ class xCCA(CCA):
         n : int, optional
             Number of amplitude fields to return. If none, all fields are returned.
             The default is None.
+        scaling : {None, 'max'}, optional
+            Scale by maximum value ('max'). The default is None.
 
         Returns
         -------
@@ -328,15 +335,27 @@ class xCCA(CCA):
             Fields of right input field.
 
         """
-        eofs = self.eofs(n)
+        amplitudes = super().spatial_amplitude(n, scaling)
 
+        if n is None:
+            n = self._eigenvalues.size
+
+        modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
+        coords      = self._field_coords
         field_names = self._field_names
-        amplitudes = {}
-        for key, eof in eofs.items():
-            amplitudes[key]         = np.sqrt(eof * eof.conjugate()).real
-            amplitudes[key].name    = ' '.join([field_names[key],'spatial amplitude'])
-            amplitudes[key].attrs   = attrs
+
+        for key, amp in amplitudes.items():
+            amplitudes[key] = xr.DataArray(
+                data    = amp,
+                dims    = ['lat','lon','mode'],
+                coords  = {
+                'lon' : coords[key]['lon'],
+                'lat' : coords[key]['lat'],
+                'mode' : modes},
+                name    = ' '.join([field_names[key],'spatial amplitude']),
+                attrs   = attrs
+                )
 
         return amplitudes
 
@@ -349,6 +368,9 @@ class xCCA(CCA):
         n : int, optional
             Number of phase fields to return. If none, all fields are returned.
             The default is None.
+        scaling : {None, 'max', 'std'}, optional
+            Scale by maximum value ('max') or
+            standard deviation ('std'). The default is None.
 
         Returns
         -------
@@ -371,7 +393,7 @@ class xCCA(CCA):
         return phases
 
 
-    def temporal_amplitude(self, n=None):
+    def temporal_amplitude(self, n=None, scaling=None):
         """Return the temporal amplitude functions for the first `n` PCs.
 
         Parameters
@@ -379,6 +401,8 @@ class xCCA(CCA):
         n : int, optional
             Number of amplitude functions to return. If none, all functions are returned.
             The default is None.
+        scaling : {None, 'max'}, optional
+            Scale by maximum value ('max'). The default is None.
 
         Returns
         -------
@@ -388,16 +412,24 @@ class xCCA(CCA):
             Temporal amplitude function of right input field.
 
         """
-        pcs = self.pcs(n)
+        amplitudes = super().temporal_amplitude(n, scaling)
 
+        if n is None:
+            n = self._eigenvalues.size
+
+        modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
+        coords      = self._field_coords
         field_names = self._field_names
-        amplitudes = {}
-        for key,pc in pcs.items():
-            amplitudes[key]         = np.sqrt(pc * pc.conjugate()).real
-            name = ' '.join([field_names[key],'temporal amplitude'])
-            amplitudes[key].name    = name
-            amplitudes[key].attrs   = attrs
+
+        for key, amp in amplitudes.items():
+            amplitudes[key] = xr.DataArray(
+                data    = amp,
+                dims    = ['time','mode'],
+                coords  = {'time' : coords[key]['time'], 'mode' : modes},
+                name    = ' '.join([field_names[key],'temporal amplitude']),
+                attrs   = attrs
+                )
 
         return amplitudes
 
@@ -506,8 +538,8 @@ class xCCA(CCA):
 
 
     def reconstructed_fields(self, mode):
-        eofs    = self.eofs(scaling=0)
-        pcs     = self.pcs(scaling=1)
+        eofs    = self.eofs(scaling=None)
+        pcs     = self.pcs(scaling='eigen')
         coords  = self._field_coords
         std     = self._field_stds
         mean    = self._field_means
@@ -560,8 +592,8 @@ class xCCA(CCA):
 
         """
 
-        pcs         = self.pcs(mode, phase_shift=phase_shift)
-        eofs        = self.eofs(mode)
+        pcs         = self.pcs(mode, scaling='max', phase_shift=phase_shift)
+        eofs        = self.eofs(mode, scaling='max')
         phases      = self.spatial_phase(mode, phase_shift=phase_shift)
         var 		= self.explained_variance(mode)
         var 		= var.sel(mode=mode).values
@@ -578,7 +610,7 @@ class xCCA(CCA):
 
         if self._analysis['is_complex']:
             n_cols          += 1
-            eofs            = self.spatial_amplitude(mode)
+            eofs            = self.spatial_amplitude(mode, scaling='max')
             cmap_eof_range  = [0, 1]
             cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
             cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
@@ -605,10 +637,6 @@ class xCCA(CCA):
             pcs[key] = pcs[key].sel(mode=mode).real
             eofs[key] = eofs[key].sel(mode=mode)
             phases[key] = phases[key].sel(mode=mode)
-
-            # normalize all EOFs/PCs such that they range from -1...+1
-            eofs[key]   = norm_space_to_1(eofs[key])
-            pcs[key]    = norm_time_to_1(pcs[key])
 
             # apply amplitude threshold
             eofs[key]   = eofs[key].where(abs(eofs[key]) >= threshold)
@@ -697,6 +725,13 @@ class xCCA(CCA):
         axes_pc['left'].set_title(titles['pc'], fontweight='bold')
         axes_eof['left'].set_title(titles['eof'], fontweight='bold')
 
+        axes =  {
+            'pcs' : axes_pc,
+            'eofs': axes_eof,
+            'phase': axes_phase
+        }
+        return fig, axes
+
 
     def _save_data(self, data_array, path, engine='h5netcdf', *args, **kwargs):
         analysis_path   = path
@@ -764,8 +799,7 @@ class xCCA(CCA):
             pcs[key]        = pcs[key].data
 
 
-        CCA.load_analysis(
-            self,
+        super().load_analysis(
             path = path,
             fields = fields,
             eofs = eofs,
