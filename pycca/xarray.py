@@ -139,7 +139,7 @@ class xCCA(CCA):
         coords  = self._field_coords
         weights = {}
         for key, coord in coords.items():
-            weights[key] = np.cos(np.deg2rad(coord['lat']))
+            weights[key] = np.sqrt(np.cos(np.deg2rad(coord['lat'])))
 
         if (not self._analysis['is_coslat_corrected']):
             self.apply_weights(**weights)
@@ -552,7 +552,7 @@ class xCCA(CCA):
             rec_fields[key] = rec_fields[key].real
 
             if self._analysis['is_coslat_corrected']:
-                rec_fields[key] /= np.cos(np.deg2rad(coords[key]['lat']))
+                rec_fields[key] /= np.sqrt(np.cos(np.deg2rad(coords[key]['lat'])))
 
             if self._analysis['is_normalized']:
                 rec_fields[key] *= std[key]
