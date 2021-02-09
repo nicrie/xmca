@@ -6,20 +6,21 @@ Complex rotated maximum covariance analysis of two numpy arrays.
 # =============================================================================
 # Imports
 # =============================================================================
+import cmath
 import os
+from datetime import datetime
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
-from tqdm import tqdm
-from datetime import datetime
-import cmath
-
+from tools.array import (arrs_are_equal, check_nan_rows, check_time_dims,
+                         is_arr, is_not_empty, norm_to_1, remove_mean,
+                         remove_nan_cols)
 from tools.rotation import promax
-from tools.array import is_arr, arrs_are_equal, remove_nan_cols, remove_mean
-from tools.array import is_not_empty, check_time_dims, check_nan_rows, norm_to_1
-from tools.text import secure_str, boldify_str, wrap_str
+from tools.text import boldify_str, secure_str, wrap_str
+from tqdm import tqdm
+
 
 # =============================================================================
 # MCA
