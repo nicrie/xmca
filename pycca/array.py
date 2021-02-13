@@ -499,7 +499,7 @@ class CCA(object):
 
         # store rotation and correlation matrix of PCs + meta information
         self._rotation_matrix           = R
-        self._correlation_matrix        = Phi[var_idx,var_idx]
+        self._correlation_matrix        = Phi[var_idx,:][:,var_idx]
         self._analysis['is_rotated']    = True
         self._analysis['rotations']     = n_rot
         self._analysis['power']         = power
