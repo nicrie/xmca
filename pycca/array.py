@@ -133,8 +133,8 @@ class CCA(object):
             # Truncated solution
             'is_truncated'          : False,
             'is_truncated_at'       : 0,
-            'rank'       : 0,
-            'total_squared_covariance'              : 0.0
+            'rank'                  : 0,
+            'total_covariance'      : 0.0
             }
 
         self._analysis['method']        = self._get_method_id()
@@ -408,7 +408,7 @@ class CCA(object):
             # get PC scores by projecting fields on loaded EOFs
             self._U[key] = field_2d[key] @ V @ Si
 
-        self._analysis['total_squared_covariance'] = singular_values.sum()
+        self._analysis['total_covariance'] = singular_values.sum()
         self._analysis['rank'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
@@ -561,11 +561,11 @@ class CCA(object):
 
 
     def explained_variance(self, n=None):
-        """Return the SCF of the first `n` modes.
+        """Return the CF of the first `n` modes.
 
-        The squared covariance/correlation fraction (SCF) is a measure of
-        importance of each mode. It is calculated as the squared
-        singular values divided by the sum of squared singluar values.
+        The covariance/correlation fraction (CF) is a measure of
+        importance of each mode. It is calculated as the
+        singular values divided by the sum of singluar values.
 
         Parameters
         ----------
@@ -579,8 +579,8 @@ class CCA(object):
 
         """
         values  = self.singular_values(n)
-        scf     = values**2 / self._analysis['total_squared_covariance'] * 100
-        return scf
+        exp_var = values / self._analysis['total_covariance'] * 100
+        return exp_var
 
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
