@@ -569,7 +569,7 @@ class CCA(object):
 
         Parameters
         ----------
-        n : int, optioal
+        n : int, optional
             Number of modes to return. The default is None.
 
         Returns
