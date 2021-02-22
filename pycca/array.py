@@ -133,7 +133,7 @@ class CCA(object):
             # Truncated solution
             'is_truncated'          : False,
             'is_truncated_at'       : 0,
-            'eigen_dimension'       : 0,
+            'rank'       : 0,
             'eigensum'              : 0.0
             }
 
@@ -409,7 +409,7 @@ class CCA(object):
             self._U[key] = field_2d[key] @ V @ Si
 
         self._analysis['eigensum'] = singular_values.sum()
-        self._analysis['eigen_dimension'] = singular_values.size
+        self._analysis['rank'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
 
