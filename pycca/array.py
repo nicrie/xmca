@@ -561,25 +561,27 @@ class CCA(object):
 
 
     def explained_variance(self, n=None):
-        """Return the described variance of the first `n` PCs.
+        """Return the SCF of the first `n` modes.
+
+        The squared covariance/correlation fraction (SCF) is a measure of
+        importance of each mode. It is calculated as the squared
+        singular values divided by the sum of squared singluar values.
 
         Parameters
         ----------
         n : int, optioal
-            Number of PCs to return. The default is None.
+            Number of modes to return. The default is None.
 
         Returns
         -------
-        desVar : ndarray
-            Described variance of each PC.
-        desVarErr : ndarray
-            Associated uncertainty according to North's `rule of thumb`.
+        ndarray
+            Fraction of described covariance/correlation of each mode.
 
         """
-        values      = self.eigenvalues(n)
-        exp_var 	= values / self._analysis['eigensum'] * 100
+        values  = self.eigenvalues(n)
+        scf     = values**2 / self._analysis['eigensum'] * 100
         #desVarErr 	= error / self._analysis['eigensum'] * 100
-        return exp_var
+        return scf
 
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
