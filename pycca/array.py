@@ -134,7 +134,7 @@ class CCA(object):
             'is_truncated'          : False,
             'is_truncated_at'       : 0,
             'rank'       : 0,
-            'eigensum'              : 0.0
+            'total_squared_covariance'              : 0.0
             }
 
         self._analysis['method']        = self._get_method_id()
@@ -408,7 +408,7 @@ class CCA(object):
             # get PC scores by projecting fields on loaded EOFs
             self._U[key] = field_2d[key] @ V @ Si
 
-        self._analysis['eigensum'] = singular_values.sum()
+        self._analysis['total_squared_covariance'] = singular_values.sum()
         self._analysis['rank'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
@@ -579,8 +579,7 @@ class CCA(object):
 
         """
         values  = self.singular_values(n)
-        scf     = values**2 / self._analysis['eigensum'] * 100
-        #desVarErr 	= error / self._analysis['eigensum'] * 100
+        scf     = values**2 / self._analysis['total_squared_covariance'] * 100
         return scf
 
 
