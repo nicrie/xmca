@@ -148,27 +148,27 @@ class xCCA(CCA):
             print("Coslat correction already applied. Nothing was done.")
 
 
-    def eigenvalues(self, n=None):
-        """Return first `n` eigenvalues of the PCA.
+    def singular_values(self, n=None):
+        """Return first `n` singular_values of the PCA.
 
         Parameters
         ----------
         n : int, optional
-            Number of eigenvalues to return. If none, then all eigenvalues are returned.
+            Number of singular_values to return. If none, then all singular_values are returned.
             The default is None.
 
         Returns
         -------
         DataArray
-            Eigenvalues of PCA.
+            singular_values of PCA.
         DataArray
-            Uncertainty of eigenvalues according to North's rule of thumb.
+            Uncertainty of singular_values according to North's rule of thumb.
 
         """
-        # for n=Nonr, all eigenvalues are returned
-        values = super().eigenvalues(n)
+        # for n=Nonr, all singular_values are returned
+        values = super().singular_values(n)
 
-        # if n is not provided, take all eigenvalues
+        # if n is not provided, take all singular_values
         if n is None:
             n = values.size
 
@@ -178,7 +178,7 @@ class xCCA(CCA):
         values = xr.DataArray(values,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'eigenvalues',
+            name 	= 'singular values',
             attrs   = attrs)
 
         # error = xr.DataArray(error,
@@ -191,24 +191,26 @@ class xCCA(CCA):
 
 
     def explained_variance(self, n=None):
-        """Return the described variance of the first `n` PCs.
+        """Return the SCF of the first `n` modes.
+
+        The squared covariance/correlation fraction (SCF) is a measure of
+        importance of each mode. It is calculated as the squared singular
+        values divided by the sum of squared singular values.
 
         Parameters
         ----------
-        n : int, optioal
-            Number of PCs to return. The default is None.
+        n : int, optional
+            Number of modes to return. The default is None.
 
         Returns
         -------
         DataArray
-            Described variance of each PC.
-        DataArray
-            Associated uncertainty according to North's `rule of thumb`.
+            Fraction of described covariance/correlation of each mode.
 
         """
         variance 	= super().explained_variance(n)
 
-        # if n is not provided, take all eigenvalues
+        # if n is not provided, take all singular_values
         if n is None:
             n = variance.size
 
@@ -218,7 +220,7 @@ class xCCA(CCA):
         variance = xr.DataArray(variance,
             dims 	= ['mode'],
             coords 	= {'mode' : modes},
-            name 	= 'explained variance',
+            name 	= 'squared covariance fraction',
             attrs   = attrs)
 
         # error = xr.DataArray(error,
@@ -239,7 +241,7 @@ class xCCA(CCA):
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
 
         Returns
@@ -253,7 +255,7 @@ class xCCA(CCA):
         pcs = super().pcs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._eigenvalues.size
+            n = self._singular_values.size
 
         modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -280,7 +282,7 @@ class xCCA(CCA):
             Number of EOFs to return If none, all EOFs are returned.
             The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
 
         Returns
@@ -294,7 +296,7 @@ class xCCA(CCA):
         eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._eigenvalues.size
+            n = self._singular_values.size
 
         modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -338,7 +340,7 @@ class xCCA(CCA):
         amplitudes = super().spatial_amplitude(n, scaling)
 
         if n is None:
-            n = self._eigenvalues.size
+            n = self._singular_values.size
 
         modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -415,7 +417,7 @@ class xCCA(CCA):
         amplitudes = super().temporal_amplitude(n, scaling)
 
         if n is None:
-            n = self._eigenvalues.size
+            n = self._singular_values.size
 
         modes = list(range(1,n+1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -758,9 +760,9 @@ class xCCA(CCA):
         fields      = self._get_fields(original_scale = True)
         eofs        = self.eofs()
         pcs         = self.pcs()
-        eigenvalues = self.eigenvalues()
+        singular_values = self.singular_values()
 
-        self._save_data(eigenvalues, analysis_path, engine)
+        self._save_data(singular_values, analysis_path, engine)
         for key in pcs.keys():
             self._save_data(fields[key], analysis_path, engine)
             self._save_data(eofs[key], analysis_path, engine)
@@ -773,8 +775,8 @@ class xCCA(CCA):
         path_folder,_ = os.path.split(path)
         file_names = self._get_file_names(format='nc')
 
-        path_eigen   = os.path.join(path_folder,file_names['eigenvalues'])
-        eigenvalues = xr.open_dataarray(path_eigen, engine = engine).data
+        path_eigen   = os.path.join(path_folder,file_names['singular'])
+        singular_values = xr.open_dataarray(path_eigen, engine = engine).data
 
         fields  = {}
         pcs     = {}
@@ -804,7 +806,7 @@ class xCCA(CCA):
             fields = fields,
             eofs = eofs,
             pcs  = pcs,
-            eigenvalues = eigenvalues)
+            singular_values = singular_values)
 
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()

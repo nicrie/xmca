@@ -385,8 +385,8 @@ class CCA(object):
         try:
             if save_memory:
                 import scipy as sp
-                VLeft, eigenvalues, VTRight = sp.sparse.linalg.svd(kernel, full_matrices=False)
-            VLeft, eigenvalues, VTRight = np.linalg.svd(kernel, full_matrices=False)
+                VLeft, singular_values, VTRight = sp.sparse.linalg.svd(kernel, full_matrices=False)
+            VLeft, singular_values, VTRight = np.linalg.svd(kernel, full_matrices=False)
         except LinAlgError:
             raise LinAlgError("SVD failed. NaN entries may be the problem.")
 
@@ -397,10 +397,10 @@ class CCA(object):
         del(VLeft)
         del(VTRight)
 
-        S = np.sqrt(np.diag(eigenvalues) * n_observations['left'])
+        S = np.sqrt(np.diag(singular_values) * n_observations['left'])
         Si = np.diag(1./np.diag(S))
 
-        self._eigenvalues = eigenvalues
+        self._singular_values = singular_values
 
         for key, V in self._V.items():
             # "loaded" EOFs
@@ -408,9 +408,9 @@ class CCA(object):
             # get PC scores by projecting fields on loaded EOFs
             self._U[key] = field_2d[key] @ V @ Si
 
-        self._analysis['eigensum'] = eigenvalues.sum()
-        self._analysis['eigen_dimension'] = eigenvalues.size
-        self._analysis['is_truncated_at'] = eigenvalues.size
+        self._analysis['eigensum'] = singular_values.sum()
+        self._analysis['eigen_dimension'] = singular_values.size
+        self._analysis['is_truncated_at'] = singular_values.size
 
 
     def rotate(self, n_rot, power=1, tol=1e-5):
@@ -468,7 +468,7 @@ class CCA(object):
             rot_L['right']  = combined_L[truncated_L['left'].shape[0]:,:]
 
         for key, L in rot_L.items():
-            # calculate variance/reconstruct "eigenvalues"
+            # calculate variance/reconstruct "singular_values"
             w = np.linalg.norm(L, axis=0)
             # pull loadings from EOFs
             rot_V[key] 	=  L / w
@@ -489,9 +489,9 @@ class CCA(object):
             else:
                 rot_U[key] = pcs[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
 
-        # store rotated pcs, eofs and "eigenvalues"
+        # store rotated pcs, eofs and "singular_values"
         # and sort according to described variance
-        self._eigenvalues 	= variance[var_idx]
+        self._singular_values 	= variance[var_idx]
         for key in rot_L.keys():
             self._V[key] = rot_V[key][:,var_idx] # Standardized EOFs
             self._L[key] = rot_L[key][:,var_idx] # Loaded EOFs
@@ -536,23 +536,23 @@ class CCA(object):
             print('Apply `.rotate()` first to retrieve the correlation matrix.')
 
 
-    def eigenvalues(self,n=None):
-        """Return the first `n` eigenvalues.
+    def singular_values(self,n=None):
+        """Return the first `n` singular_values.
 
         Parameters
         ----------
         n : int, optional
-            Number of eigenvalues to return. The default is 5.
+            Number of singular_values to return. The default is 5.
 
         Returns
         -------
         values : ndarray
-            Eigenvalues of PCA.
+            singular_values of PCA.
         error : ndarray
-            Uncertainty of eigenvalues according to North's rule of thumb.
+            Uncertainty of singular_values according to North's rule of thumb.
 
         """
-        values = self._eigenvalues[:n]
+        values = self._singular_values[:n]
         n_observations = self._n_observations['left']
         # error according to North's Rule of Thumb
         error = np.sqrt(2 / n_observations) * values
@@ -578,7 +578,7 @@ class CCA(object):
             Fraction of described covariance/correlation of each mode.
 
         """
-        values  = self.eigenvalues(n)
+        values  = self.singular_values(n)
         scf     = values**2 / self._analysis['eigensum'] * 100
         #desVarErr 	= error / self._analysis['eigensum'] * 100
         return scf
@@ -592,7 +592,7 @@ class CCA(object):
         n : int, optional
             Number of PCs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
 
         Returns
@@ -602,17 +602,17 @@ class CCA(object):
 
         """
         n_obs       = self._n_observations['left']
-        eigenvalues = self._eigenvalues
+        singular_values = self._singular_values
 
         if n is None:
-            n = eigenvalues.size
+            n = singular_values.size
 
         pcs = {}
         for key, U in self._U.items():
             pcs[key] = U[:,:n].copy()
-            # scale PCs by eigenvalues
+            # scale PCs by singular_values
             if scaling == 'eigen':
-                pcs[key] *= np.sqrt(n_obs * eigenvalues[:n])
+                pcs[key] *= np.sqrt(n_obs * singular_values[:n])
             # scale PCs by maximum value
             if scaling == 'max':
                 pcs[key] /= np.nanmax(abs(pcs[key].real), axis=0)
@@ -634,7 +634,7 @@ class CCA(object):
         n : int, optional
             Number of EOFs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by eigenvalues ('eigen'), maximum value ('max') or
+            Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
 
         Returns
@@ -647,10 +647,10 @@ class CCA(object):
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
-        eigenvalues = self._eigenvalues
+        singular_values = self._singular_values
 
         if n is None:
-            n = self._eigenvalues.size
+            n = self._singular_values.size
 
         eofs = {}
         for key, V in self._V.items():
@@ -660,9 +660,9 @@ class CCA(object):
             eofs[key][no_nan_idx[key],:] = V[:,:n]
             # reshape data fields to have original input shape
             eofs[key] 	= eofs[key].reshape(field_shape[key] + (n,))
-            # scale EOFs with their eigenvalues
+            # scale EOFs with their singular_values
             if scaling == 'eigen':
-                eofs[key] *= np.sqrt(n_obs * eigenvalues[:n])
+                eofs[key] *= np.sqrt(n_obs * singular_values[:n])
             # scale EOFs by maximum value
             if scaling == 'max':
                 eofs[key] /= np.nanmax(abs(eofs[key].real), axis=(0,1))
@@ -946,8 +946,8 @@ class CCA(object):
 
 
         """
-        if (n < self._eigenvalues.size):
-            self._eigenvalues = self._eigenvalues[:n]
+        if (n < self._singular_values.size):
+            self._singular_values = self._singular_values[:n]
 
             for key in self._U.keys():
                 self._U[key] = self._U[key][:,:n]
@@ -1005,14 +1005,14 @@ class CCA(object):
             eofs[key]   = '.'.join([eof_name, format])
             pcs[key]    = '.'.join([pc_name, format])
 
-        eigenvalues = '_'.join([base_name, 'eigenvalues'])
-        eigenvalues = '.'.join([eigenvalues, format])
+        singular_values = '_'.join([base_name, 'singular_values'])
+        singular_values = '.'.join([singular_values, format])
 
         file_names = {
             'fields'    : fields,
             'eofs'      : eofs,
             'pcs'       : pcs,
-            'eigenvalues':eigenvalues
+            'singular'  : singular_values
         }
         return file_names
 
@@ -1049,19 +1049,19 @@ class CCA(object):
         info_file.close()
 
 
-    def load_analysis(self, path, fields, eofs, pcs, eigenvalues):
+    def load_analysis(self, path, fields, eofs, pcs, singular_values):
         self._set_info_from_file(path)
 
         self._V                     = {}
         self._L                     = {}
         self._U                     = {}
-        self._eigenvalues           = eigenvalues
+        self._singular_values           = singular_values
         for key in eofs.keys():
             self._n_observations[key]       = pcs[key].shape[0]
             self._fields_spatial_shape[key] = eofs[key].shape[:-1]
             self._n_variables[key]          = np.product(eofs[key].shape[:-1])
             n_modes                         = eofs[key].shape[-1]
-            S   = np.sqrt(np.diag(eigenvalues) * self._n_observations[key])
+            S   = np.sqrt(np.diag(singular_values) * self._n_observations[key])
             Si  = np.diag(1./np.diag(S))
 
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
