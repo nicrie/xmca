@@ -609,6 +609,9 @@ class CCA(object):
         pcs = {}
         for key, U in self._U.items():
             pcs[key] = U[:,:n].copy()
+            # apply phase shift
+            if self._analysis['is_complex']:
+                pcs[key] *= cmath.rect(1,phase_shift)
             # scale PCs by singular_values
             if scaling == 'eigen':
                 pcs[key] *= np.sqrt(n_obs * singular_values[:n])
@@ -618,9 +621,6 @@ class CCA(object):
             # scale PCs by standard deviation
             if scaling == 'std':
                 pcs[key] /= np.nanstd(abs(pcs[key].real), axis=0)
-            # apply phase shift
-            if self._analysis['is_complex']:
-                pcs[key] *= cmath.rect(1,phase_shift)
 
         return pcs
 
