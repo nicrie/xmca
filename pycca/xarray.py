@@ -628,7 +628,8 @@ class xCCA(CCA):
             The colormap used to map the spatial phase function.
             The default is 'twilight'.
         resolution : a named resolution to use from the Natural Earth dataset.
-            Currently can be one of '110m', '50m', and '10m'.
+            Currently can be one of `110m`, `50m`, and `10m`. If None, no
+            coastlines will be drawn. Default is `110m`.
 
         Returns
         -------
@@ -734,9 +735,10 @@ class xCCA(CCA):
             plt.colorbar(cb_eof, cbax_eof, orientation='horizontal')
             cbax_eof.xaxis.set_ticks(cmap_eof_range)
 
-            axes_eof[key].coastlines(lw = .5, resolution = resolution)
+            if resolution in ['110m','50m','10m']:
+                axes_eof[key].coastlines(lw = .5, resolution = resolution)
+                axes_eof[key].add_feature(cfeature.LAND, color='lightgrey', zorder=0)
             axes_eof[key].set_aspect('auto')
-            axes_eof[key].add_feature(cfeature.LAND, color='gray', zorder=0)
 
             # plot Phase function (if data is complex)
             if (self._analysis['is_complex']):
