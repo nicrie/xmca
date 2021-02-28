@@ -191,11 +191,11 @@ class xCCA(CCA):
 
 
     def explained_variance(self, n=None):
-        """Return the SCF of the first `n` modes.
+        """Return the CF of the first `n` modes.
 
-        The squared covariance/correlation fraction (SCF) is a measure of
-        importance of each mode. It is calculated as the squared singular
-        values divided by the sum of squared singular values.
+        The covariance fraction (CF) is a measure of
+        importance of each mode. It is calculated as the singular
+        values divided by the sum of singular values.
 
         Parameters
         ----------
@@ -205,10 +205,52 @@ class xCCA(CCA):
         Returns
         -------
         DataArray
-            Fraction of described covariance/correlation of each mode.
+            Fraction of described covariance of each mode.
 
         """
         variance 	= super().explained_variance(n)
+
+        # if n is not provided, take all singular_values
+        if n is None:
+            n = variance.size
+
+        modes = list(range(1,n+1))
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+
+        variance = xr.DataArray(variance,
+            dims 	= ['mode'],
+            coords 	= {'mode' : modes},
+            name 	= 'covariance fraction',
+            attrs   = attrs)
+
+        # error = xr.DataArray(error,
+        #     dims 	= ['mode'],
+        #     coords 	= {'mode' : modes},
+        #     name 	= 'error explained variance',
+        #     attrs   = attrs)
+
+        return variance
+
+    def scf(self, n=None):
+        """Return the SCF of the first `n` modes.
+
+        The squared covariance fraction (SCF) is a measure of
+        importance of each mode. It is calculated as the squared singular
+        values divided by the sum of squared singular values. In contrast to CF,
+        SCF is invariant under CCA.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default is None.
+
+        Returns
+        -------
+        DataArray
+            Fraction of described squared covariance of each mode.
+
+        """
+        variance 	= super().scf(n)
 
         # if n is not provided, take all singular_values
         if n is None:

@@ -134,7 +134,8 @@ class CCA(object):
             'is_truncated'          : False,
             'is_truncated_at'       : 0,
             'rank'                  : 0,
-            'total_covariance'      : 0.0
+            'total_covariance'      : 0.0,
+            'total_squared_covariance'      : 0.0
             }
 
         self._analysis['method']        = self._get_method_id()
@@ -409,6 +410,7 @@ class CCA(object):
             self._U[key] = field_2d[key] @ V @ Si
 
         self._analysis['total_covariance'] = singular_values.sum()
+        self._analysis['total_squared_covariance'] = (singular_values**2).sum()
         self._analysis['rank'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
@@ -558,6 +560,29 @@ class CCA(object):
         error = np.sqrt(2 / n_observations) * values
 
         return values
+
+    def scf(self, n=None):
+        """Return the SCF of the first `n` modes.
+
+        The squared ovariance/correlation fraction (SCF) is a measure of
+        importance of each mode. It is calculated as the
+        squared singular values divided by the sum of squared singluar values.
+        In contrast to CF, it is an invariant for CCA.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default is None.
+
+        Returns
+        -------
+        ndarray
+            Fraction of described squared covariance/correlation of each mode.
+
+        """
+        values  = self.singular_values(n)
+        scf = values**2 / self._analysis['total_squared_covariance'] * 100
+        return scf
 
 
     def explained_variance(self, n=None):
