@@ -607,10 +607,100 @@ class xCCA(CCA):
         return rec_fields
 
 
+    def _create_gridspec(self, figsize=None, orientation='horizontal', projection=None):
+        is_bivariate    = self._analysis['is_bivariate']
+        is_complex      = self._analysis['is_complex']
+
+        n_rows =  2 if is_bivariate else 1
+        n_cols =  3 if is_complex else 2
+        height_ratios   = [1] * n_rows
+        width_ratios    = [1] * n_cols
+        # add additional row for colorbar
+        n_rows += 1
+        height_ratios.append(0.05)
+
+        # horiontal layout
+        if orientation == 'horizontal':
+            grid = {
+                'pc'   : {'left': [0, 0]},
+                'eof'  : {'left': [0, 1]}
+                }
+
+            # position for phase
+            if is_complex:
+                grid['phase'] = {'left':[0,2]}
+
+            # positions for right field
+            if is_bivariate:
+                for k, panel in grid.items():
+                    yx = panel.get('left')
+                    grid[k]['right'] = [yx[0]+1,yx[1]]
+
+            # positions for colorbars
+            for k, panel in grid.items():
+                if k in ['eof','phase']:
+                    row_cb = len(panel)
+                    col_cb = panel.get('left')[1]
+                    grid[k]['cb'] = [row_cb,col_cb]
+
+        # vertical layout
+        if orientation == 'vertical':
+            grid = {
+                'pc'   : {'left': [-1, 1]},
+                'eof'  : {'left': [0, 1]}
+                }
+
+            # position for phase
+            if is_complex:
+                grid['phase'] = {'left':[1,1]}
+
+            # positions for right field
+            if is_bivariate:
+                for k, panel in grid.items():
+                    yx = panel.get('left')
+                    grid[k]['right'] = [yx[0], yx[1]+1]
+
+            # positions for colorbars
+            for k, panel in grid.items():
+                if k in ['eof','phase']:
+                    row, col = panel.get('left')
+                    grid[k]['cb'] = [row,col-1]
+
+            n_rows, n_cols = n_cols, n_rows
+            height_ratios = n_rows * [1]
+            width_ratios = n_cols * [1]
+            width_ratios[0] = 0.05
+
+        map_projs = {}
+        for k1, data in grid.items():
+            map_projs[k1] = {}
+            for k2 in data.keys():
+                map_projs[k1][k2] = None
+                if k1 in ['eof', 'phase']:
+                    if k2 in ['left', 'right']:
+                        map_projs[k1][k2] = projection.get(k2, None)
+
+        # create figure and axes
+        fig = plt.figure(figsize=figsize, dpi=150)
+        gs = fig.add_gridspec(
+            n_rows, n_cols,
+            height_ratios=height_ratios, width_ratios=width_ratios
+            )
+        axes = {}
+        for key_data,data in grid.items():
+            axes[key_data] = {}
+            for key_pos,pos in data.items():
+                row,col = pos
+                axes[key_data][key_pos] = fig.add_subplot(gs[row,col], projection=map_projs[key_data][key_pos])
+
+
+        return fig, axes
+
+
     def plot(
         self, mode, threshold=0, phase_shift=0,
-        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0),
-        resolution='110m', projection=None, c_lon=None):
+        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0), resolution='110m',
+        projection=None, c_lon=None, orientation='horizontal'):
         """
         Plot results for `mode`.
 
@@ -618,66 +708,90 @@ class xCCA(CCA):
         ----------
         mode : int, optional
             Mode to plot. The default is 1.
-        threshold : int, optional
+        threshold : float, optional
             Amplitude threshold below which the fields are masked out.
             The default is 0.
         cmap_eof : str or Colormap
             The colormap used to map the spatial patterns.
-            The default is 'Blues'.
+            The default is `Blues`.
         cmap_phase : str or Colormap
             The colormap used to map the spatial phase function.
-            The default is 'twilight'.
-        resolution : a named resolution to use from the Natural Earth dataset.
+            The default is `twilight`.
+        resolution : {None, '110m', '50m', '10m'}
+            A named resolution to use from the Natural Earth dataset.
             Currently can be one of `110m`, `50m`, and `10m`. If None, no
             coastlines will be drawn. Default is `110m`.
+        orientation : {'horizontal', 'vertical'}
+            Orientation of the plot. Default is horizontal.
 
         Returns
         -------
-        None.
+        fig :
+            Figure instance.
+        axes :
+            Dictionary of axes containing `pcs`, `eofs` and `phase`, if complex.
 
         """
+        complex     = self._analysis['is_complex']
+        bivariate   = self._analysis['is_bivariate']
 
+        # Get data
+        var 		= self.explained_variance(mode).sel(mode=mode).values
         pcs         = self.pcs(mode, scaling='max', phase_shift=phase_shift)
         eofs        = self.eofs(mode, scaling='max')
         phases      = self.spatial_phase(mode, phase_shift=phase_shift)
-        var 		= self.explained_variance(mode)
-        var 		= var.sel(mode=mode).values
-        cmap_eof_range  = [-1, 0, 1]
-        eof_title   = 'EOF'
+        if complex:
+            eofs = self.spatial_amplitude(mode, scaling='max')
 
-        n_cols          = 2
-        n_rows          = len(pcs)
-        height_ratios   = [1] * n_rows
-
-        # add additional row for colorbar
-        n_rows += 1
-        height_ratios.append(0.05)
-
-        if self._analysis['is_complex']:
-            n_cols          += 1
-            eofs            = self.spatial_amplitude(mode, scaling='max')
-            cmap_eof_range  = [0, 1]
-            cmap_eof        = 'Blues' if cmap_eof is None else cmap_eof
-            cmap_phase      = 'twilight' if cmap_phase is None else cmap_phase
-            eof_title       = 'Amplitude'
-        else:
-            cmap_eof        = 'RdBu_r' if cmap_eof is None else cmap_eof
-
-        titles = {
-        'pc'    : 'PC {:d} ({:.1f} \%)'.format(mode,var),
-        'eof'   : eof_title,
-        'phase' :'Phase'
+        # ticks
+        ticks = {
+            'pc'       : [-1, 0, 1],
+            'eof'      : [0, 1] if complex else [-1,0,1],
+            'phase'    : [-np.pi, 0, np.pi]
         }
+
+        # tick labels
+        tick_labels = {
+            'phase' : [r'-$\pi$','0',r'$\pi$']
+        }
+
+        # colormaps
+        cmaps = {
+            'eof'      : 'Blues' if complex else 'RdBu_r',
+            'phase'    : 'twilight'
+        }
+
+        if not cmap_eof is None:
+            cmaps['eof'] = cmap_eof
+        if not cmap_phase is None:
+            cmaps['phase'] = cmap_phase
+
+        # titles
+        titles = {
+            'pc'        : 'PC',
+            'eof'       : 'Amplitude' if complex else 'EOF',
+            'phase'     : 'Phase',
+            'mode'      : 'Mode {:d} ({:.1f} \%)'.format(mode,var)
+        }
+
         for key, name in self._field_names.items():
             titles[key] = name
 
         titles.update({k: v.replace('_',' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
 
-        map_c_lons      = {} # center longitude of maps
-        map_projs       = {} # projections for maps
-        map_boundaries  = {} # west, east, south, north limit of maps
+        # map projections and boundaries
+        map = {
+            # center longitude of maps
+            'c_lon' : {'left' : c_lon, 'right' : c_lon},
+            # projections pf maps
+            'projection' : {'left':None, 'right':None},
+            # west, east, south, north limit of maps
+            'boundaries' : {'left': None, 'right' : None}
+        }
+        data_projection  = ccrs.PlateCarree()
 
+        # plot PCs, EOFs, and Phase
         for key in pcs.keys():
             pcs[key] = pcs[key].sel(mode=mode).real
             eofs[key] = eofs[key].sel(mode=mode)
@@ -688,94 +802,107 @@ class xCCA(CCA):
             phases[key] = phases[key].where(abs(eofs[key]) >= threshold)
 
             # map projections and center longitude
-            data_projection  = ccrs.PlateCarree()
-            if c_lon is None:
-                map_c_lons[key]  = eofs[key].lon[[0,-1]].mean()
-            else:
-                map_c_lons[key]  = c_lon
+            if map['c_lon'][key] is None:
+                map['c_lon'][key]  = eofs[key].lon[[0,-1]].mean()
 
             if projection is None:
-                projection  = ccrs.PlateCarree
-            map_projs[key]  = projection(central_longitude=map_c_lons[key])
+                map['projection'][key]  = ccrs.PlateCarree(central_longitude=map['c_lon'][key])
+            else:
+                map['projection'][key]  = projection(central_longitude=map['c_lon'][key])
 
             # map boundaries as [east, west, south, north]
-            map_boundaries[key] = get_extent(eofs[key], map_c_lons[key])
+            map['boundaries'][key] = get_extent(eofs[key], map['c_lon'][key])
 
-        # create figure environment
-        fig = plt.figure(figsize=figsize, dpi=150)
-        fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
-        gs = fig.add_gridspec(n_rows, n_cols, height_ratios=height_ratios)
-        axes_pc     = {}
-        axes_eof    = {}
-        axes_phase  = {}
-        cbax_eof    = fig.add_subplot(gs[-1,1])
+
+        fig, axes = self._create_gridspec(figsize=figsize, orientation=orientation, projection=map['projection'])
 
         for i, key in enumerate(pcs.keys()):
-            axes_pc[key]    = fig.add_subplot(gs[i,0])
-            axes_eof[key]   = fig.add_subplot(gs[i,1], projection=map_projs[key])
-
             # plot PCs
-            pcs[key].plot(ax=axes_pc[key])
-            axes_pc[key].set_ylim(-1.2,1.2)
-            axes_pc[key].set_yticks([-1,0,1])
-            axes_pc[key].set_ylabel(titles[key], fontweight='bold')
-            axes_pc[key].set_xlabel('')
-            axes_pc[key].set_title('')
-            axes_pc[key].spines['right'].set_visible(False)
-            axes_pc[key].spines['top'].set_visible(False)
+            pcs[key].plot(ax=axes['pc'][key])
+            axes['pc'][key].set_ylim(-1.2,1.2)
+            axes['pc'][key].set_yticks([-1,0,1])
+            axes['pc'][key].set_ylabel(titles[key], fontweight='bold')
+            axes['pc'][key].set_xlabel('')
+            axes['pc'][key].set_title('')
+            axes['pc'][key].spines['right'].set_visible(False)
+            axes['pc'][key].spines['top'].set_visible(False)
 
             # plot EOFs
             cb_eof = eofs[key].plot(
-                ax=axes_eof[key], transform=data_projection,
-                vmin=cmap_eof_range[0], vmax=cmap_eof_range[-1], cmap=cmap_eof,
+                ax=axes['eof'][key], transform=data_projection,
+                vmin=ticks['eof'][0], vmax=ticks['eof'][-1], cmap=cmaps['eof'],
                 add_colorbar = False)
-            axes_eof[key].set_extent(map_boundaries[key], crs=data_projection)
-            axes_eof[key].set_title('')
-
-            plt.colorbar(cb_eof, cbax_eof, orientation='horizontal')
-            cbax_eof.xaxis.set_ticks(cmap_eof_range)
+            axes['eof'][key].set_extent(map['boundaries'][key], crs=data_projection)
+            axes['eof'][key].set_title('')
 
             if resolution in ['110m','50m','10m']:
-                axes_eof[key].coastlines(lw = .5, resolution = resolution)
-                axes_eof[key].add_feature(cfeature.LAND, color='lightgrey', zorder=0)
-            axes_eof[key].set_aspect('auto')
+                axes['eof'][key].coastlines(lw = .5, resolution = resolution)
+                axes['eof'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
+            axes['eof'][key].set_aspect('auto')
 
-            # plot Phase function (if data is complex)
-            if (self._analysis['is_complex']):
-                axes_phase[key] = fig.add_subplot(gs[i,2], projection=map_projs[key])
-                cbax_phase = fig.add_subplot(gs[-1,2])
+            plt.colorbar(cb_eof, axes['eof']['cb'], orientation=orientation)
+            if orientation == 'horizontal':
+                axes['eof']['cb'].xaxis.set_ticks(ticks['eof'])
+            elif orientation == 'vertical':
+                axes['eof']['cb'].yaxis.set_ticks(ticks['eof'])
 
-                # plot Phase
+            # plot Phase function
+            if complex:
                 cb_phase = phases[key].plot(
-                    ax=axes_phase[key], transform=data_projection,
-                    vmin=-np.pi, vmax=np.pi, cmap=cmap_phase,
-                    add_colorbar = False)
-                axes_phase[key].set_extent(map_boundaries[key], crs=data_projection)
-                axes_phase[key].set_title('')
+                    ax=axes['phase'][key], transform=data_projection,
+                    vmin=ticks['phase'][0], vmax=ticks['phase'][-1],
+                    cmap=cmaps['phase'], add_colorbar = False)
+                axes['phase'][key].set_extent(map['boundaries'][key], crs=data_projection)
+                axes['phase'][key].set_title('')
 
-                plt.colorbar(cb_phase, cbax_phase, orientation='horizontal')
-                cbax_phase.xaxis.set_ticks([-3.14,0,3.14])
-                cbax_phase.set_xticklabels([r'-$\pi$','0',r'$\pi$'])
+                plt.colorbar(cb_phase, axes['phase']['cb'], orientation=orientation)
+                if orientation=='horizontal':
+                    axes['phase']['cb'].xaxis.set_ticks(ticks['phase'])
+                    axes['phase']['cb'].set_xticklabels(tick_labels['phase'])
+                elif orientation == 'vertical':
+                    axes['phase']['cb'].yaxis.set_ticks(ticks['phase'])
+                    axes['phase']['cb'].set_yticklabels(tick_labels['phase'])
 
-                axes_phase[key].coastlines(lw = .5, resolution = resolution)
-                axes_phase[key].set_aspect('auto')
-                axes_phase[key].add_feature(cfeature.LAND, color='gray', zorder=0)
-                axes_phase['left'].set_title(titles['phase'], fontweight='bold')
+                axes['phase'][key].coastlines(lw = .5, resolution = resolution)
+                axes['phase'][key].set_aspect('auto')
+                axes['phase'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
+                axes['phase']['left'].set_title(titles['phase'], fontweight='bold')
 
 
-        # if more than 1 row, remove xaxis
-        if (len(pcs) == 2):
-            axes_pc['left'].xaxis.set_visible(False)
-            axes_pc['left'].spines['bottom'].set_visible(False)
+        # special tweaking of axes according to orientation
+        if orientation == 'horizontal':
+            # titles
+            axes['pc']['left'].set_title(titles['pc'], fontweight='bold')
+            axes['eof']['left'].set_title(titles['eof'], fontweight='bold')
 
-        axes_pc['left'].set_title(titles['pc'], fontweight='bold')
-        axes_eof['left'].set_title(titles['eof'], fontweight='bold')
+            if bivariate:
+                axes['pc']['left'].xaxis.set_visible(False)
+                axes['pc']['left'].spines['bottom'].set_visible(False)
 
-        axes =  {
-            'pcs' : axes_pc,
-            'eofs': axes_eof,
-            'phase': axes_phase
-        }
+        elif orientation == 'vertical':
+            # titles
+            axes['pc']['left'].set_ylabel(titles['pc'], fontweight='bold')
+            axes['pc']['left'].set_title('')
+            axes['eof']['left'].set_title(titles['left'], fontweight='bold')
+            axes['eof']['cb'].set_ylabel(titles['eof'], fontweight='bold')
+            axes['eof']['cb'].yaxis.set_label_position('left')
+            axes['eof']['cb'].yaxis.set_ticks_position('left')
+            if bivariate:
+                axes['pc']['right'].yaxis.set_visible(False)
+                axes['pc']['right'].spines['left'].set_visible(False)
+                axes['eof']['right'].set_title(titles['right'], fontweight='bold')
+
+            if complex:
+                axes['phase']['cb'].set_ylabel(titles['phase'], fontweight='bold')
+                axes['phase']['left'].set_title('')
+                axes['phase']['cb'].yaxis.set_label_position('left')
+                axes['phase']['cb'].yaxis.set_ticks_position('left')
+
+
+
+        fig.subplots_adjust(wspace=.1)
+        fig.suptitle(titles['mode'], horizontalalignment='left')
+
         return fig, axes
 
 
