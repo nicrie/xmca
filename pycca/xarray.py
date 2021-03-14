@@ -700,7 +700,7 @@ class xCCA(CCA):
     def plot(
         self, mode, threshold=0, phase_shift=0,
         cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0), resolution='110m',
-        projection=None, c_lon=None, orientation='horizontal'):
+        projection=None, c_lon=None, orientation='horizontal', land=True):
         """
         Plot results for `mode`.
 
@@ -783,12 +783,20 @@ class xCCA(CCA):
         # map projections and boundaries
         map = {
             # center longitude of maps
-            'c_lon' : {'left' : c_lon, 'right' : c_lon},
+            'c_lon'     : {'left' : c_lon, 'right' : c_lon},
             # projections pf maps
-            'projection' : {'left':None, 'right':None},
+            'projection' : {
+                'left':ccrs.PlateCarree(),
+                'right':ccrs.PlateCarree()
+                },
             # west, east, south, north limit of maps
             'boundaries' : {'left': None, 'right' : None}
         }
+        if projection is not None:
+            try:
+                map['projection'].update(projection)
+            except TypeError:
+                map['projection'] = {k: projection for k in map['projection'].keys()}
         data_projection  = ccrs.PlateCarree()
 
         # plot PCs, EOFs, and Phase
@@ -801,17 +809,18 @@ class xCCA(CCA):
             eofs[key]   = eofs[key].where(abs(eofs[key]) >= threshold)
             phases[key] = phases[key].where(abs(eofs[key]) >= threshold)
 
-            # map projections and center longitude
-            if map['c_lon'][key] is None:
-                map['c_lon'][key]  = eofs[key].lon[[0,-1]].mean()
-
-            if projection is None:
-                map['projection'][key]  = ccrs.PlateCarree(central_longitude=map['c_lon'][key])
-            else:
-                map['projection'][key]  = projection(central_longitude=map['c_lon'][key])
+            # # map projections and center longitude
+            # if map['c_lon'][key] is None:
+            #     map['c_lon'][key]  = eofs[key].lon[[0,-1]].mean()
+            #
+            # # if projection is None:
+            # #     map['projection'][key]  = ccrs.PlateCarree(central_longitude=map['c_lon'][key])
+            # # else:
+            # #     map['projection'][key]  = projection(central_longitude=map['c_lon'][key])
 
             # map boundaries as [east, west, south, north]
-            map['boundaries'][key] = get_extent(eofs[key], map['c_lon'][key])
+            c_lon = map['projection'][key].proj4_params['lon_0']
+            map['boundaries'][key] = get_extent(eofs[key], c_lon)
 
 
         fig, axes = self._create_gridspec(figsize=figsize, orientation=orientation, projection=map['projection'])
@@ -836,7 +845,8 @@ class xCCA(CCA):
             axes['eof'][key].set_title('')
 
             if resolution in ['110m','50m','10m']:
-                axes['eof'][key].coastlines(lw = .5, resolution = resolution)
+                axes['eof'][key].coastlines(lw = .4, resolution = resolution)
+            if land:
                 axes['eof'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
             axes['eof'][key].set_aspect('auto')
 
@@ -863,9 +873,11 @@ class xCCA(CCA):
                     axes['phase']['cb'].yaxis.set_ticks(ticks['phase'])
                     axes['phase']['cb'].set_yticklabels(tick_labels['phase'])
 
-                axes['phase'][key].coastlines(lw = .5, resolution = resolution)
+                if resolution in ['110m','50m','10m']:
+                    axes['phase'][key].coastlines(lw = .4, resolution = resolution)
+                if land:
+                    axes['phase'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
                 axes['phase'][key].set_aspect('auto')
-                axes['phase'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
                 axes['phase']['left'].set_title(titles['phase'], fontweight='bold')
 
 
