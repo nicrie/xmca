@@ -115,8 +115,11 @@ def promax(A, power=1, maxIter=1000, tol=1e-8):
     X = (1./h)[:,np.newaxis] * X
     #X = np.diag(1./h) @ X
 
+    # max-normalisation of columns
+    Xn = X / np.max(abs(X), axis=0)
+
     # "Procustes" equation
-    P = X * np.abs(X)**(power - 1)
+    P = Xn * np.abs(Xn)**(power - 1)
 
     # fit linear regression model of "Procrustes" equation
     # see Richman 1986 for derivation
