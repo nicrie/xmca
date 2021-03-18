@@ -19,22 +19,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from matplotlib.gridspec import GridSpec
-from pycca.array import CCA
+from xmca.array import MCA
 from tools.text import boldify_str, secure_str, wrap_str
 from tools.xarray import (calc_temporal_corr, check_dims, create_coords,
                           get_attr, get_extent, is_DataArray, split_complex)
 
 # =============================================================================
-# xCCA
+# xMCA
 # =============================================================================
 
-class xCCA(CCA):
-    """Perform Canonical Correlation Analysis (CCA) for two `xarray.DataArray`.
+class xMCA(MCA):
+    """Perform Maximum Covariance Analysis (MCA) for two `xarray.DataArray`.
 
-    CCA is a generalized form of Principal Component Analysis (PCA)
+    MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
-    it is equivalent to PCA. Non-normalized CCA is called Maximum Covariance
-    Analysis (MCA).
+    it is equivalent to PCA.
 
     Parameters
     ----------
@@ -54,7 +53,8 @@ class xCCA(CCA):
 
     >>> pca = MCA(data1)
     >>> pca.solve()
-    >>> pcs,_ = pca.pcs()
+    >>> pcs = pca.pcs()
+    >>> pcs['left'].sel(mode=1).plot()
 
     To perform MCA use:
 

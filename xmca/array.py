@@ -25,13 +25,12 @@ from tqdm import tqdm
 # =============================================================================
 # MCA
 # =============================================================================
-class CCA(object):
-    """Perform Canonical Correlation Analysis (CCA) for two `numpy.ndarray`.
+class MCA(object):
+    """Perform Maximum Covariance Analysis (MCA) for two `numpy.ndarray`.
 
-    CCA is a generalized form of Principal Component Analysis (PCA)
+    MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
-    it is equivalent to PCA. Non-normalized CCA is called Maximum Covariance
-    Analysis (MCA).
+    it is equivalent to PCA.
 
     Parameters
     ----------
@@ -58,13 +57,6 @@ class CCA(object):
     >>> mca = CCA(data1, data2)
     >>> mca.solve()
     >>> pcs_data1, pcs_data2 = mca.pcs()
-
-    To perform CCA use:
-
-    >>> cca = CCA(data1, data2)
-    >>> cca.normalize()
-    >>> cca.solve()
-    >>> pcs_data1, pcs_data2 = cca.pcs()
 
     """
 
@@ -152,8 +144,6 @@ class CCA(object):
         id = 'pca'
         if self._analysis['is_bivariate']:
             id = 'mca'
-            if self._analysis['is_normalized']:
-                id = 'cca'
         return id
 
 
@@ -187,7 +177,7 @@ class CCA(object):
         if base_path is None:
             base_path = os.getcwd()
 
-        base_folder = 'pycca'
+        base_folder = 'xmca'
 
         analysis_folder = '_'.join(self._field_names.values())
         analysis_folder = secure_str(analysis_folder)
@@ -987,7 +977,7 @@ class CCA(object):
 
         file_header = (
             'This file contains information neccessary to load stored analysis '
-            'data from pyCCA module.')
+            'data from xmca module.')
 
         path_output   = os.path.join(path, self._get_analysis_id())
         path_output = '.'.join([path_output,'info'])
@@ -995,9 +985,9 @@ class CCA(object):
         file = open(path_output,"w+")
         file.write(wrap_str(file_header))
         file.write('\n# To load this analysis use:')
-        file.write('\n# from cca.xarray import xCCA')
-        file.write('\n# cca = xCCA()')
-        file.write('\n# cca.load_analysis(PATH_TO_THIS_FILE)')
+        file.write('\n# from xmca.xarray import xMCA')
+        file.write('\n# mca = xMCA()')
+        file.write('\n# mca.load_analysis(PATH_TO_THIS_FILE)')
         file.write('\n')
         file.write(sep_line)
         file.write(sep_line)
