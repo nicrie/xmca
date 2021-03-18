@@ -17,7 +17,7 @@ setuptools.setup(
     description = "Maximum Covariance Analysis in Python",
     long_description = long_description,
     long_description_content_type = "text/markdown",
-    url = "https://github.com/NiclasRieger/xmca",
+    url = "https://github.com/nicrie/xmca",
     packages = setuptools.find_packages(),
     license = "GPL-3.0",
     classifiers = [
@@ -25,4 +25,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    verion_config = True,
+    setup_requires=['setuptools-git-versioning'],
 )
