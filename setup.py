@@ -11,7 +11,6 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "xmca",
-    version =  "0.1.0",
     author = "Niclas Rieger",
     author_email = "niclasrieger@gmail.com",
     description = "Maximum Covariance Analysis in Python",
@@ -25,6 +24,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
-    verion_config = True,
+    version_config = True,
     setup_requires=['setuptools-git-versioning'],
 )
