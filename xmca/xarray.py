@@ -581,7 +581,7 @@ class xMCA(MCA):
         return het_patterns
 
 
-    def reconstructed_fields(self, mode):
+    def reconstructed_fields(self, mode=slice(1,None)):
         eofs    = self.eofs(scaling=None)
         pcs     = self.pcs(scaling='eigen')
         coords  = self._field_coords
