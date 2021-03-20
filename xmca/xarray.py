@@ -708,9 +708,9 @@ class xMCA(MCA):
         ----------
         mode : int, optional
             Mode to plot. The default is 1.
-        threshold : float, optional
-            Amplitude threshold below which the fields are masked out.
-            The default is 0.
+        threshold : [0,1], optional
+            Threshold of max-normalised amplitude below which the fields are
+            masked out. The default is 0.
         cmap_eof : str or Colormap
             The colormap used to map the spatial patterns.
             The default is `Blues`.
@@ -799,7 +799,7 @@ class xMCA(MCA):
                 map['projection'] = {k: projection for k in map['projection'].keys()}
         data_projection  = ccrs.PlateCarree()
 
-        # plot PCs, EOFs, and Phase
+        # pre-process data and maps
         for key in pcs.keys():
             pcs[key] = pcs[key].sel(mode=mode).real
             eofs[key] = eofs[key].sel(mode=mode)
@@ -809,15 +809,6 @@ class xMCA(MCA):
             eofs[key]   = eofs[key].where(abs(eofs[key]) >= threshold)
             phases[key] = phases[key].where(abs(eofs[key]) >= threshold)
 
-            # # map projections and center longitude
-            # if map['c_lon'][key] is None:
-            #     map['c_lon'][key]  = eofs[key].lon[[0,-1]].mean()
-            #
-            # # if projection is None:
-            # #     map['projection'][key]  = ccrs.PlateCarree(central_longitude=map['c_lon'][key])
-            # # else:
-            # #     map['projection'][key]  = projection(central_longitude=map['c_lon'][key])
-
             # map boundaries as [east, west, south, north]
             c_lon = map['projection'][key].proj4_params['lon_0']
             map['boundaries'][key] = get_extent(eofs[key], c_lon)
@@ -825,6 +816,7 @@ class xMCA(MCA):
 
         fig, axes = self._create_gridspec(figsize=figsize, orientation=orientation, projection=map['projection'])
 
+        # plot PCs, EOFs, and Phase
         for i, key in enumerate(pcs.keys()):
             # plot PCs
             pcs[key].plot(ax=axes['pc'][key])
