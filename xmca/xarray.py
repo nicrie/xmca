@@ -85,6 +85,10 @@ class xMCA(MCA):
         if len(data) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
+        if not all(isinstance(d, xr.DataArray) for d in data):
+            raise TypeError("""One or more fields are not `xarray.DataArray`.
+            Please provide `xarray.DataArray` only.""")
+
         # set fields
         keys    = ['left', 'right']
         fields  = {keys[i] : field for i,field in enumerate(data)}
@@ -98,6 +102,8 @@ class xMCA(MCA):
             self._field_coords[key] = field.coords
 
         # constructor of base class for numpy.ndarray
+        if len(fields) == 0:
+            fields = {'left': xr.DataArray([])}
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
 

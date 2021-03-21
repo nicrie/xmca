@@ -8,13 +8,14 @@ Complex rotated maximum covariance analysis of two numpy arrays.
 # =============================================================================
 import cmath
 import os
+import warnings
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
-from tools.array import (arrs_are_equal, check_nan_rows, check_time_dims,
+from tools.array import (arrs_are_equal, check_time_dims, has_nan_time_steps,
                          is_arr, is_not_empty, norm_to_1, remove_mean,
                          remove_nan_cols)
 from tools.rotation import promax
@@ -74,8 +75,24 @@ class MCA(object):
             The default is None.
 
         """
+        if len(data) == 0:
+            data = np.array([])
+
         if len(data) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
+
+        if len(data) == 2:
+            if data[0].shape[0] != data[1].shape[0]:
+                raise ValueError("""Time dimensions of given fields are different.
+                Time series should have same time lengths.""")
+
+        if not all(isinstance(d, np.ndarray) for d in data):
+            raise TypeError("""One or more fields are not `numpy.ndarray`.
+            Please provide `numpy.ndarray` only.""")
+
+        if any(has_nan_time_steps(d) for d in data):
+            raise ValueError("""One or more fields contain NaN time steps.
+            Please remove these prior to analysis.""")
 
         self._fields                = {} # input fields
         self._field_names           = {} # names of input fields
@@ -96,10 +113,14 @@ class MCA(object):
 
         # set class variables
         for key, field in self._fields.items():
-            is_arr(field)
             self._field_names[key]          = key
-            self._field_means[key]          = field.mean(axis=0)
-            self._field_stds[key]           = field.std(axis=0)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore',r'Mean of empty slice.')
+                warnings.filterwarnings('ignore',r'invalid value encountered in double_scalars')
+                warnings.filterwarnings('ignore',r'Degrees of freedom <= 0 for slice')
+                warnings.filterwarnings('ignore',r'invalid value encountered in true_divide')
+                self._field_means[key]          = field.mean(axis=0)
+                self._field_stds[key]           = field.std(axis=0)
             self._fields_spatial_shape[key] = field.shape[1:]
             self._n_variables[key]          = np.product(field.shape[1:])
             self._n_observations[key]       = field.shape[0]
@@ -334,6 +355,10 @@ class MCA(object):
             Seasonal period used for Theta model. Default is 365, representing
             a yearly cycle for daily data.
         """
+        if any([np.isnan(field).all() for field in self._fields.values()]):
+            raise RuntimeError('Fields are empty. Did you forgot to load data?')
+
+
         self._analysis['is_complex']    = complexify
         self._analysis['theta']         = theta
         self._analysis['theta_period']  = period
@@ -342,15 +367,12 @@ class MCA(object):
         n_variables     = self._n_variables
 
         field_2d = {}
-
         for key,field in self._fields.items():
-            # create 2D matrix in order to perform PCA
+            # create 2D matrix in order to perform SVD
             field = field.reshape(n_observations[key], n_variables[key])
-            # check for NaN time steps
-            check_nan_rows(field)
+
             # remove NaNs columns in data fields
             field, no_nan_index   = remove_nan_cols(field)
-            is_not_empty(field)
 
             # complexify input data via Hilbert transform
             if self._analysis['is_complex']:

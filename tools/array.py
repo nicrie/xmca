@@ -2,12 +2,10 @@
 # -*- coding: utf-8 -*-
 """ Collection of tools for numpy.array modifications. """
 
-# =============================================================================
-# Imports
-# =============================================================================
-import numpy as np
-import warnings
 import textwrap
+import warnings
+
+import numpy as np
 
 # =============================================================================
 # Tools
@@ -70,18 +68,15 @@ def remove_nan_cols(arr):
     return new_arr, index
 
 
-def check_nan_rows(arr):
-    """Check if `arr` contains at least one row filled with NaN.
+def has_nan_time_steps(array):
+    """ Checks if an array has NaN time steps.
 
-    A NaN row is problematic since it will lead to only NaN data when removing
-    the mean via `np.mean()`.
+    Time is assumed to be on axis=0. The array is then reshaped to be 2D with
+    time along axis 0 and variables along axis 1. A NaN time step is a row which
+    contain NaN only.
     """
-    if (np.isnan(arr).all(axis=1).any()):
-        raise ValueError(textwrap.fill(textwrap.dedent("""
-        Gaps (np.NaN) in time series detected. Either remove or interpolate
-        all NaN time steps in your data.""")))
-    else:
-        pass
+
+    return (np.isnan(array).all(axis=tuple(range(1, array.ndim))).any())
 
 
 def is_not_empty(arr):
