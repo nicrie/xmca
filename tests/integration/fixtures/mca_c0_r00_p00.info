@@ -1,0 +1,33 @@
+# This file contains information neccessary to load stored analysis data from xmca
+# module.
+# To load this analysis use:
+# from xmca.xarray import xMCA
+# mca = xMCA()
+# mca.load_analysis(PATH_TO_THIS_FILE)
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+created              : 2021-03-19 22:28:42                                      
+#-------------------------------------------------------------------------------
+left                 : sst                                                      
+right                : prcp                                                     
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+is_bivariate         : True                                                     
+is_normalized        : False                                                    
+is_coslat_corrected  : False                                                    
+method               : mca                                                      
+#-------------------------------------------------------------------------------
+is_complex           : False                                                    
+theta                : True                                                     
+theta_period         : 12                                                       
+#-------------------------------------------------------------------------------
+is_rotated           : False                                                    
+rotations            : 0                                                        
+power                : 0                                                        
+#-------------------------------------------------------------------------------
+is_truncated         : False                                                    
+is_truncated_at      : 155                                                      
+rank                 : 155                                                      
+total_covariance     : 127.319405                                               
+total_squared_covariance : 10164.125                                                
