@@ -11,6 +11,7 @@ with open("README.md", "r") as fh:
 
 
 requirements = ['numpy',
+                'xarray',
                 'matplotlib',
                 'statsmodels',
                 'tqdm',
