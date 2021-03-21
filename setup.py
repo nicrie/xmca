@@ -35,7 +35,10 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
-    version_config = True,
+    version_config={
+        "dev_template": "{tag}.post{ccount}",
+        "dirty_template": "{tag}.post{ccount}"
+    },
     setup_requires=['setuptools-git-versioning'],
     install_requires = requirements,
 )
