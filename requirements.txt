@@ -1,5 +1,6 @@
-numpy
-statsmodels
-matplotlib
-cartopy
+numpy>1.19.2
+xarray>=0.16.2
+statsmodels>=0.12.2
+matplotlib>=3.3.2
+cartopy>=0.18.0
 tqdm

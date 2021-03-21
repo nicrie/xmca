@@ -10,12 +10,12 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 
-requirements = ['numpy==1.19.2',
-                'xarray',
-                'matplotlib',
-                'statsmodels',
+requirements = ['numpy >= 1.19.2',
+                'xarray >= 0.16.2',
+                'matplotlib >= 3.3.2',
+                'statsmodels >= 0.12.2',
                 'tqdm',
-                'cartopy==0.18']
+                'cartopy >= 0.18.0']
 
 
 setup(
