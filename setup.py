@@ -36,5 +36,5 @@ setup(
     python_requires='>=3.6',
     version_config = True,
     setup_requires=['setuptools-git-versioning'],
-    install_requirements = requirements,
+    install_requires = requirements,
 )
