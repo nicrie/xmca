@@ -8,6 +8,11 @@ fields.
 
 The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fields.
 
+## Testing
+```
+python -m unittest discover -v -s tests/
+```
+
 ## Core Features
 - Standard MCA/PCA
 - maximise covariance instead of correlation ==> Maximum Covariance Analysis (MCA)
