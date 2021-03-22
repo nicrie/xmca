@@ -39,6 +39,6 @@ setup(
         "dev_template": "{tag}.post{ccount}",
         "dirty_template": "{tag}.post{ccount}"
     },
-    setup_requires=['setuptools-git-versioning'],
+    setup_requires=['setuptools-git-versioning','numpy'],
     install_requires = requirements,
 )
