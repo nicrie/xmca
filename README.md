@@ -8,16 +8,24 @@ fields.
 
 The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fields.
 
+## Installation 
+```
+pip install xmca
+```
+
 ## Testing
+After cloning the repository
 ```
 python -m unittest discover -v -s tests/
 ```
 
 ## Core Features
-- Standard MCA/PCA
-- maximise covariance instead of correlation ==> Maximum Covariance Analysis (MCA)
-- apply latitute correction to data fields to compensate for stretched areas in higher latitutes
-- apply rotation of singular vectors
-  - Orthogonal Varimax rotation
-  - Oblique Promax rotation
-- complexify data via Hilbert transform to inspect amplitude and phase information
+- Standard PCA/MCA
+- Rotated PCA/MCA
+	- Orthogonal Varimax rotation
+	- Oblique Promax rotation
+- Complex PCA/MCA (also known as Hilbert EOF analysis)
+	- Optimised Theta model extension
+- normalization of input data
+- latitude correction to compensate for stretched areas in higher latitutes
+
