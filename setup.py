@@ -6,9 +6,10 @@ $ python setup.py develop
 '''
 
 
-with open("README.md", "r") as fh:
+with open('README.md', 'r') as fh:
     long_description = fh.read()
-
+with open('requirements.txt', 'r') as fh:
+    install_requires = fh.read()
 
 requirements = ['numpy >= 1.19.2',
                 'xarray >= 0.16.2',
