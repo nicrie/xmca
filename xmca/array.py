@@ -13,6 +13,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.polynomial.polynomial import polyfit
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
 from tools.array import (arrs_are_equal, check_time_dims, has_nan_time_steps,
@@ -137,7 +138,7 @@ class MCA(object):
             'method'                : 'pca',
             # Complex solution
             'is_complex'            : False,
-            'theta'                 : False,
+            'extend'                : False,
             'theta_period'          : 365,
             #Rotated solution
             'is_rotated'            : False,
@@ -264,32 +265,55 @@ class MCA(object):
         self._analysis['method'] = self._get_method_id()
         return None
 
-
     def _theta_forecast(self, series):
         period = self._analysis['theta_period']
         steps = len(series)
 
-        # replace last value of series by a mean value
-        # to avoid some extreme cases where the foecast starts at a single
-        # which may happen for very noisy data
-        # series[0]   = series[::period].mean()
-        # series[-1]  = series[::-period].mean()
-
-        model = ThetaModel(series, period=period, deseasonalize=True, use_test=False).fit()
+        model = ThetaModel(
+            series, period=period, deseasonalize=True, use_test=False
+        ).fit()
         forecast = model.forecast(steps=steps, theta=20)
 
         return forecast
 
+    def _exp_forecast(self, series):
 
-    def _extend_data(self, data):
-        extendedData = [self._theta_forecast(col) for col in tqdm(data.T)]
-        extendedData = np.array(extendedData).T
+        N = len(series)
+        x = np.arange(N)
+        intercept, slope = polyfit(x, series, deg=1)
+        linear_end = slope * x[-1] + intercept
+        series_end = series[-1]
+        offset      = series_end - linear_end
 
-        return extendedData
+        b = 1
+        tau = b * 50 / N
+        # start x at 1, because exp(0) would produce same value as the last
+        # point of the original time series
+        x_shift = x + 1
+        exp_extension = offset * np.exp(-tau * x_shift)
+        lin_extension = (slope * x) + linear_end
 
+        return exp_extension + lin_extension
 
-    def _complexify_data(self, data):
-        """Complexify data via Hilbert transform.
+    def _extend(self, field):
+        extend = self._analysis['extend']
+        # Theta extension
+        if extend == 'theta':
+            extended = [self._theta_forecast(col) for col in tqdm(field.T)]
+        # Exponential extension
+        elif extend == 'exp':
+            extended = [self._exp_forecast(col) for col in tqdm(field.T)]
+        else:
+            error_message = '''{:} is not a valid extension. Choose either
+            `exp` or `theta`.'''.format(extend)
+            raise ValueError(error_message)
+
+        extended = np.array(extended).T
+
+        return extended
+
+    def _complexify(self, field):
+        '''Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
         through Fast Fourier Transform. If the time series exhibits some
@@ -303,42 +327,35 @@ class MCA(object):
 
         Parameters
         ----------
-        data : ndarray
-            Real input data which is to be transformed via Hilbert transform.
-        theta : boolean, optional
-            If True, input time series are extended via forecast/backcast to
-            3 * original length. This helps avoiding boundary effects of FFT.
-        period : int, optional
-            Period used to extend time series via Theta model. Using daily
-            data a period of 365 represents seasonal cycle. The default is 365.
+        field : ndarray
+            Real input field which is to be transformed via Hilbert transform.
 
         Returns
         -------
         ndarray
-            Analytical signal of input data.
+            Analytical signal of input field.
 
-        """
+        '''
         n_observations = self._n_observations['left']
 
-        if self._analysis['theta']:
-            forecast    = self._extend_data(data)
-            backcast    = self._extend_data(data[::-1])[::-1]
+        if self._analysis['extend']:
+            post    = self._extend(field)
+            pre     = self._extend(field[::-1])[::-1]
 
-            data = np.concatenate([backcast, data, forecast])
+            field = np.concatenate([pre, field, post])
 
         # perform actual Hilbert transform of (extended) time series
-        data = hilbert(data,axis=0)
+        field = hilbert(field, axis=0)
 
-        if self._analysis['theta']:
+        if self._analysis['extend']:
             # cut out the first and last third of Hilbert transform
             # which belong to the forecast/backcast
-            data = data[n_observations:(2*n_observations)]
-            data = remove_mean(data)
+            field = field[n_observations:(2 * n_observations)]
+            field = remove_mean(field)
 
-        return data
+        return field
 
-
-    def solve(self, complexify=False, theta=False, period=365):
+    def solve(self, complexify=False, extend=False, period=365):
         """Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
@@ -346,28 +363,30 @@ class MCA(object):
         complexify : boolean, optional
             Use Hilbert transform to complexify the input data fields
             in order to perform complex PCA/MCA. Default is false.
-        theta : boolean, optional
-            If True, extend time series by fore/backcasting based on
-            Theta model. New time series will have 3 * original length.
-            Only used for complex time series (complexify=True).
-            Default is False.
+        extend : ['exp', 'theta', False], optional
+            If specified, time series are extended by fore/backcasting based on
+            either an exponential or a Theta model. New time series will have
+            3 * original length. Only used for complex time series i.e. when
+            complexify=True. Default is False.
         period : int, optional
             Seasonal period used for Theta model. Default is 365, representing
-            a yearly cycle for daily data.
+            a yearly cycle for daily data. If Theta model is not selected
+            this parameter has no effect.
         """
         if any([np.isnan(field).all() for field in self._fields.values()]):
-            raise RuntimeError('Fields are empty. Did you forgot to load data?')
-
+            raise RuntimeError("""
+            Fields are empty. Did you forgot to load data?
+            """)
 
         self._analysis['is_complex']    = complexify
-        self._analysis['theta']         = theta
+        self._analysis['extend']        = extend
         self._analysis['theta_period']  = period
 
         n_observations  = self._n_observations
         n_variables     = self._n_variables
 
         field_2d = {}
-        for key,field in self._fields.items():
+        for key, field in self._fields.items():
             # create 2D matrix in order to perform SVD
             field = field.reshape(n_observations[key], n_variables[key])
 
@@ -376,12 +395,11 @@ class MCA(object):
 
             # complexify input data via Hilbert transform
             if self._analysis['is_complex']:
-                field = self._complexify_data(field)
+                field = self._complexify(field)
 
             field_2d[key]           = field
             # save index of real variables for recontruction of original field
             self._no_nan_index[key] = no_nan_index
-
 
         # create covariance matrix
         if self._analysis['is_bivariate']:
@@ -390,9 +408,9 @@ class MCA(object):
             kernel = field_2d['left'].conjugate().T @ field_2d['left']
         kernel = kernel / n_observations['left']
 
-        self._V = {} # singular vectors (EOFs)
-        self._L = {} # "loaded" singular vectors
-        self._U = {} # projections // (PCs)
+        self._V = {}  # singular vectors (EOFs)
+        self._L = {}  # "loaded" singular vectors
+        self._U = {}  # projections // (PCs)
 
         # perform singular value decomposition
         try:
