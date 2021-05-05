@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
+'''
 Complex rotated maximum covariance analysis of two numpy arrays.
-"""
+'''
 # =============================================================================
 # Imports
 # =============================================================================
@@ -28,7 +28,7 @@ from tqdm import tqdm
 # MCA
 # =============================================================================
 class MCA(object):
-    """Perform Maximum Covariance Analysis (MCA) for two `numpy.ndarray`.
+    '''Perform Maximum Covariance Analysis (MCA) for two `numpy.ndarray`.
 
     MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
@@ -60,10 +60,10 @@ class MCA(object):
     >>> mca.solve()
     >>> pcs_data1, pcs_data2 = mca.pcs()
 
-    """
+    '''
 
     def __init__(self, *data):
-        """Load data fields and store information about data size/shape.
+        '''Load data fields and store information about data size/shape.
 
         Parameters
         ----------
@@ -75,7 +75,7 @@ class MCA(object):
             the same as left field. In this case, MCA reducdes to normal PCA.
             The default is None.
 
-        """
+        '''
         if len(data) == 0:
             data = np.array([])
 
@@ -84,16 +84,16 @@ class MCA(object):
 
         if len(data) == 2:
             if data[0].shape[0] != data[1].shape[0]:
-                raise ValueError("""Time dimensions of given fields are different.
-                Time series should have same time lengths.""")
+                raise ValueError('''Time dimensions of given fields are different.
+                Time series should have same time lengths.''')
 
         if not all(isinstance(d, np.ndarray) for d in data):
-            raise TypeError("""One or more fields are not `numpy.ndarray`.
-            Please provide `numpy.ndarray` only.""")
+            raise TypeError('''One or more fields are not `numpy.ndarray`.
+            Please provide `numpy.ndarray` only.''')
 
         if any(has_nan_time_steps(d) for d in data):
-            raise ValueError("""One or more fields contain NaN time steps.
-            Please remove these prior to analysis.""")
+            raise ValueError('''One or more fields contain NaN time steps.
+            Please remove these prior to analysis.''')
 
         self._fields                = {} # input fields
         self._field_names           = {} # names of input fields
@@ -229,7 +229,7 @@ class MCA(object):
 
 
     def apply_weights(self,left=None, right=None):
-        """Apply weights to data sets.
+        '''Apply weights to data sets.
 
         Supplied weights are applied via broadcasting.
 
@@ -241,7 +241,7 @@ class MCA(object):
             Weights for right data set.
 
 
-        """
+        '''
         field_items = self._fields.items()
 
         weights = {'left' : left, 'right' : right}
@@ -250,7 +250,7 @@ class MCA(object):
 
 
     def normalize(self):
-        """Normalize the input data to unit variance."""
+        '''Normalize the input data to unit variance.'''
 
 
         keys        = self._fields.keys()
@@ -356,7 +356,7 @@ class MCA(object):
         return field
 
     def solve(self, complexify=False, extend=False, period=365):
-        """Solve eigenvalue equation by performing SVD on covariance matrix.
+        '''Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
         ----------
@@ -372,11 +372,11 @@ class MCA(object):
             Seasonal period used for Theta model. Default is 365, representing
             a yearly cycle for daily data. If Theta model is not selected
             this parameter has no effect.
-        """
+        '''
         if any([np.isnan(field).all() for field in self._fields.values()]):
-            raise RuntimeError("""
+            raise RuntimeError('''
             Fields are empty. Did you forgot to load data?
-            """)
+            ''')
 
         self._analysis['is_complex']    = complexify
         self._analysis['extend']        = extend
@@ -443,7 +443,7 @@ class MCA(object):
 
 
     def rotate(self, n_rot, power=1, tol=1e-5):
-        """Perform Promax rotation on the first `n` EOFs.
+        '''Perform Promax rotation on the first `n` EOFs.
 
         Promax rotation (Hendrickson & White 1964) is an oblique rotation which
         seeks to find `simple structures` in the EOFs. It transforms the EOFs
@@ -470,7 +470,7 @@ class MCA(object):
         -------
         None.
 
-        """
+        '''
         if(n_rot < 2):
             print('`n_rot` must be >=2. Solution not rotated.')
             return None
@@ -535,14 +535,14 @@ class MCA(object):
 
 
     def rotation_matrix(self):
-        """
+        '''
         Return the rotation matrix.
 
         Returns
         -------
         ndarray
             Rotation matrix.
-        """
+        '''
         if (self._analysis['is_rotated']):
             return self._rotation_matrix
         else:
@@ -550,7 +550,7 @@ class MCA(object):
 
 
     def correlation_matrix(self):
-        """
+        '''
         Return the correlation matrix of rotated PCs.
 
         Returns
@@ -558,7 +558,7 @@ class MCA(object):
         ndarray
             Correlation matrix.
 
-        """
+        '''
         if (self._analysis['is_rotated']):
             return self._correlation_matrix
         else:
@@ -566,7 +566,7 @@ class MCA(object):
 
 
     def singular_values(self,n=None):
-        """Return the first `n` singular_values.
+        '''Return the first `n` singular_values.
 
         Parameters
         ----------
@@ -580,7 +580,7 @@ class MCA(object):
         error : ndarray
             Uncertainty of singular_values according to North's rule of thumb.
 
-        """
+        '''
         values = self._singular_values[:n]
         n_observations = self._n_observations['left']
         # error according to North's Rule of Thumb
@@ -589,7 +589,7 @@ class MCA(object):
         return values
 
     def scf(self, n=None):
-        """Return the SCF of the first `n` modes.
+        '''Return the SCF of the first `n` modes.
 
         The squared ovariance/correlation fraction (SCF) is a measure of
         importance of each mode. It is calculated as the
@@ -606,14 +606,14 @@ class MCA(object):
         ndarray
             Fraction of described squared covariance/correlation of each mode.
 
-        """
+        '''
         values  = self.singular_values(n)
         scf = values**2 / self._analysis['total_squared_covariance'] * 100
         return scf
 
 
     def explained_variance(self, n=None):
-        """Return the CF of the first `n` modes.
+        '''Return the CF of the first `n` modes.
 
         The covariance/correlation fraction (CF) is a measure of
         importance of each mode. It is calculated as the
@@ -629,14 +629,14 @@ class MCA(object):
         ndarray
             Fraction of described covariance/correlation of each mode.
 
-        """
+        '''
         values  = self.singular_values(n)
         exp_var = values / self._analysis['total_covariance'] * 100
         return exp_var
 
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
-        """Return the first `n` PCs.
+        '''Return the first `n` PCs.
 
         Parameters
         ----------
@@ -651,7 +651,7 @@ class MCA(object):
         pcs : dict[ndarray, ndarray]
             PCs associated to left and right input field.
 
-        """
+        '''
         n_obs       = self._n_observations['left']
         singular_values = self._singular_values
 
@@ -678,7 +678,7 @@ class MCA(object):
 
 
     def eofs(self, n=None, scaling=None, phase_shift=0):
-        """Return the first `n` EOFs.
+        '''Return the first `n` EOFs.
 
         Parameters
         ----------
@@ -693,7 +693,7 @@ class MCA(object):
         eofs : dict[ndarray, ndarray]
             EOFs associated to left and right input field.
 
-        """
+        '''
         n_obs       = self._n_observations['left']
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
@@ -728,7 +728,7 @@ class MCA(object):
 
 
     def spatial_amplitude(self, n=None, scaling=None):
-        """Return the spatial amplitude fields for the first `n` EOFs.
+        '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
         ----------
@@ -742,7 +742,7 @@ class MCA(object):
         amplitudes : dict[ndarray, ndarray]
             Spatial amplitude fields associated to left and right field.
 
-        """
+        '''
         eofs = self.eofs(n, scaling=None)
 
         amplitudes = {}
@@ -756,7 +756,7 @@ class MCA(object):
 
 
     def spatial_phase(self, n=None, phase_shift=0):
-        """Return the spatial phase fields for the first `n` EOFs.
+        '''Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
         ----------
@@ -769,7 +769,7 @@ class MCA(object):
         amplitudes : dict[ndarray, ndarray]
             Spatial phase fields associated to left and right field.
 
-        """
+        '''
         eofs = self.eofs(n, phase_shift=phase_shift)
 
         phases = {}
@@ -780,7 +780,7 @@ class MCA(object):
 
 
     def temporal_amplitude(self, n=None, scaling=None):
-        """Return the temporal amplitude time series for the first `n` PCs.
+        '''Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
         ----------
@@ -795,7 +795,7 @@ class MCA(object):
         amplitudes : dict[ndarray, ndarray]
             Temporal ampliude series associated to left and right field.
 
-        """
+        '''
         pcs = self.pcs(n, scaling=None)
 
         amplitudes = {}
@@ -809,7 +809,7 @@ class MCA(object):
 
 
     def temporal_phase(self, n=None, phase_shift=0):
-        """Return the temporal phase function for the first `n` PCs.
+        '''Return the temporal phase function for the first `n` PCs.
 
         Parameters
         ----------
@@ -822,7 +822,7 @@ class MCA(object):
         amplitudes : dict[ndarray, ndarray]
             Temporal phase function associated to left and right field.
 
-        """
+        '''
         pcs = self.pcs(n, phase_shift=phase_shift)
 
         phases = {}
@@ -835,7 +835,7 @@ class MCA(object):
     def plot(
         self, mode, threshold=0, phase_shift=0,
         cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0)):
-        """
+        '''
         Plot results for `mode`.
 
         Parameters
@@ -856,7 +856,7 @@ class MCA(object):
         -------
         None.
 
-        """
+        '''
         pcs     = self.pcs(mode, scaling='max', phase_shift=phase_shift)
         eofs    = self.eofs(mode, scaling='max')
         phases  = self.spatial_phase(mode, phase_shift=phase_shift)
@@ -988,7 +988,7 @@ class MCA(object):
 
 
     def truncate(self, n):
-        """Truncate solution.
+        '''Truncate solution.
 
         Parameters
         ----------
@@ -996,7 +996,7 @@ class MCA(object):
             Cut off after mode `n`.
 
 
-        """
+        '''
         if (n < self._singular_values.size):
             self._singular_values = self._singular_values[:n]
 

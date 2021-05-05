@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
-"""
+'''
 Run the following code in your conda environment to make the package available
 $ python setup.py develop
-"""
+'''
 
 
 with open("README.md", "r") as fh:

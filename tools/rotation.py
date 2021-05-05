@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" Implementation of VARIMAX and PROMAX rotation. """
+''' Implementation of VARIMAX and PROMAX rotation. '''
 
 # =============================================================================
 # Imports

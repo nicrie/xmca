@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Collection of tools for text-related modifications. """
+''' Collection of tools for text-related modifications. '''
 
 # =============================================================================
 # Imports
