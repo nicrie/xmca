@@ -10,6 +10,7 @@ jobs:
       - checkout
       - python/load-cache:
           key: pip
+      - run: pip install numpy
       - run: pip install -r requirements.txt
       - python/save-cache:
           key: pip
