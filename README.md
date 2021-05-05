@@ -1,4 +1,9 @@
 # xMCA | Maximum Covariance Analysis in Python
+
+[![version](https://img.shields.io/pypi/v/xmca)](https://pypi.org/project/xmca/)
+[![downloads](https://img.shields.io/pypi/dm/xmca)](https://pypi.org/project/xmca/)
+[![commit](https://img.shields.io/github/commit-activity/m/nicrie/xmca)](https://github.com/nicrie/xmca/graphs/contributors)
+
 Maximum Covariance Analysis (MCA) maximises the temporal covariance between two different
 data fields and is closely related to Principal Component Analysis (PCA) / Empirical
 Orthogonal Function (EOF) analysis, which maximises the variance within a single data
@@ -68,7 +73,6 @@ eigenvalues = pca.singular_values() # singular vales = eigenvalues for PCA
 pcs         = pca.pcs()             # Principal component scores (PCs)
 eofs        = pca.eofs()            # spatial patterns (EOFs)
 
-pca.plot(mode=1)                    # plot mode 1
 ```
 
 ### Maximum Covariance Analysis
@@ -81,7 +85,6 @@ eigenvalues = mca.singular_values() # singular vales
 pcs = mca.pcs()                     # expansion coefficient (PCs)
 eofs = mca.eofs()                   # spatial patterns (EOFs)
 
-mca.plot(mode=1)                    # plot mode 1
 ```
 ### Save/load an analysis
 ```py
@@ -94,7 +97,45 @@ mca2.load_analysis('./mca/left_right/mca_c0_r00_p00.info') # analysis can be
                                     # info file created earlier
 mca2.plot(mode=1)
 ```
+### Plot your results
+The package provides a method to visually inspect the individual modes, e.g. for mode 2.
 
+*Note: The following plots use real data (ERA5 SST & precipitation) instead of the toy data shown at the beginning of the tutorial. Apart from that the figures show exactly what is produced by calling the convenience plotting method.*
+```py
+mca2.set_field_names('SST', 'Precipitation')  # add variable names, optional
+mca2.plot(mode=2)
+```
+![example-plot1](figs/example-plot1.png)
+
+You may want to modify the plot for some better optics:
+```py
+import cartopy.crs as ccrs  # for different map projections
+
+# map projections for "left" and "right" field
+projections = {
+    'left': ccrs.EqualEarth(central_longitude=200),
+    'right': ccrs.EqualEarth(central_longitude=160)
+}
+
+plot_kwargs = {
+    "figsize"     : (8, 5),
+    "threshold"   : 0.25,       # mask out values < 0.25 max-normalised amplitude
+    "orientation" : 'vertical',
+    'cmap_eof'    : 'viridis',  # colormap amplitude
+    'cmap_phase'  : 'twilight', # colormap phase
+    "phase_shift" : 2.2,        # apply phase shift to PCs
+    "projection"  : projections,
+}
+mca2.plot(mode=2, **plot_kwargs)
+```
+
+![example-plot2](figs/example-plot2.png)
+
+You can save the plot to your local disk as a `.png` file via
+```py
+save_kwargs={'dpi':200, 'transparent':True}
+mca2.save_plot(mode=2, plot_kwargs=plot_kwargs, save_kwargs=save_kwargs)
+```
 
 [cartopy]: https://scitools.org.uk/cartopy/docs/latest/installing.html
 
