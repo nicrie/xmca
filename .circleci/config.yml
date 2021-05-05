@@ -11,8 +11,8 @@ jobs:
       - python/load-cache:
           key: pip
       - run: pip install numpy
-      - run: apt-get install libproj-dev proj-data proj-bin
-      - run: apt-get install libgeos-dev
+      - run: sudo apt-get install libproj-dev proj-data proj-bin
+      - run: sudo apt-get install libgeos-dev
       - run: pip install cython
       - run: pip install cartopy
       - run: pip install -r requirements.txt
