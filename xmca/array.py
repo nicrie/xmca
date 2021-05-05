@@ -338,7 +338,7 @@ class MCA(object):
         return data
 
 
-    def solve(self, complexify=False, theta=False, period=365, save_memory=False):
+    def solve(self, complexify=False, theta=False, period=365):
         """Solve eigenvalue equation by performing SVD on covariance matrix.
 
         Parameters
@@ -396,9 +396,6 @@ class MCA(object):
 
         # perform singular value decomposition
         try:
-            if save_memory:
-                import scipy as sp
-                VLeft, singular_values, VTRight = sp.sparse.linalg.svd(kernel, full_matrices=False)
             VLeft, singular_values, VTRight = np.linalg.svd(kernel, full_matrices=False)
         except LinAlgError:
             raise LinAlgError("SVD failed. NaN entries may be the problem.")
