@@ -30,7 +30,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/nicrie/xmca',
     packages=find_packages(),
-    license='GPL-3.0',
+    license='MIT',
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
