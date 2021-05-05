@@ -959,7 +959,7 @@ class MCA(object):
             axes_pc[0].spines['bottom'].set_visible(False)
 
 
-    def save_plot(self, mode, path=None, dpi=96, **kwargs):
+    def save_plot(self, mode, path=None, plot_kwargs={}, save_kwargs={}):
         if path is None:
             path = self._get_analysis_path()
 
@@ -967,9 +967,9 @@ class MCA(object):
         format = '.png'
         file_name = '_'.join([self._get_analysis_id(),mode_id])
         file_path = os.path.join(path, file_name)
-        fig, axes= self.plot(mode=mode, **kwargs)
+        fig, axes= self.plot(mode=mode, **plot_kwargs)
         fig.subplots_adjust(left=0.06)
-        plt.savefig(file_path + format, dpi=dpi)
+        plt.savefig(file_path + format, **save_kwargs)
 
 
     def truncate(self, n):
