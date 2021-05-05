@@ -10,18 +10,21 @@ jobs:
       - checkout
       - python/load-cache:
           key: pip
-      - run: pip install numpy
-      - run: sudo apt-get install libproj-dev proj-data proj-bin
-      - run: sudo apt-get install libgeos-dev
-      - run: pip install cython
-      - run: pip install cartopy
-      - run: pip install -r requirements.txt
+      - run:
+          command:
+            pip install numpy
+            sudo apt-get install libproj-dev proj-data proj-bin
+            sudo apt-get install libgeos-dev
+            pip install cython
+            pip install cartopy
+            pip install -r requirements.txt
       - python/save-cache:
           key: pip
       - run:
-          command: ./manage.py test
+          command: python -m unittest discover -v -s tests/
           name: Test
 
+ 
 workflows:
   main:
     jobs:
