@@ -26,8 +26,8 @@ jobs:
       - python/save-cache:
         key: pip
       - run:
-          command 
-            python -m unittest discover -v -s tests/
+          command: python -m unittest discover -v -s tests/
+          name: Test
   
 workflows:
   main:
