@@ -1,0 +1,38 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@0.2.1
+
+jobs:
+  build-pip:
+    executor: python/default
+    steps:
+      - checkout
+      - python/load-cache:
+          key: pip
+      - run:
+          command: |
+            pip install numpy
+            sudo apt-get install libproj-dev proj-data proj-bin
+            sudo apt-get install libgeos-dev
+            pip install cython
+            pip install cartopy
+            pip install netcdf4
+            pip install h5netcdf
+            pip uninstall -y shapely
+            pip install shapely --no-binary shapely
+            pip install -r requirements.txt
+          name: 'Get dependencies'
+      - python/save-cache:
+        key: pip
+  test:
+    executor: python/default
+    steps:
+      - checkout
+      - run: python -m unittest discover -v -s tests/
+
+workflows:
+  main:
+    jobs:
+      - build-pip
+      - test
