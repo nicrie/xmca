@@ -16,10 +16,11 @@ jobs:
             sudo apt-get install libproj-dev proj-data proj-bin
             sudo apt-get install libgeos-dev
             pip install cython
-            pip install shapely
             pip install cartopy
             pip install netcdf4
             pip install h5netcdf
+            pip uninstall shapely
+            pip install shapely --no-binary shapely
             pip install -r requirements.txt
           name: get-dependencies 
       - python/save-cache:
