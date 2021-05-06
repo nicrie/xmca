@@ -27,7 +27,7 @@ jobs:
         key: pip
       - run:
           command 
-            - python -m unittest discover -v -s tests/
+            python -m unittest discover -v -s tests/
   
 workflows:
   main:
