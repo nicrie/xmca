@@ -25,14 +25,11 @@ jobs:
           name: 'Get dependencies'
       - python/save-cache:
         key: pip
-  test:
-    executor: python/default
-    steps:
-      - checkout
-      - run: python -m unittest discover -v -s tests/
-
+      - run:
+          command 
+            - python -m unittest discover -v -s tests/
+  
 workflows:
   main:
     jobs:
       - build-pip
-      - test
