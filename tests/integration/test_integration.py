@@ -23,6 +23,11 @@ class TestIntegration(unittest.TestCase):
             self.A = xr.open_dataarray(join(self.path, 'sst.nc'))
             self.B = xr.open_dataarray(join(self.path, 'prcp.nc'))
 
+        # how many modes to compare
+        self.modes = 10
+        # acceptable tolerance for comparison
+        self.tols = {'atol': 1e-5, 'rtol': 1e-3}
+
     def test_standard_mca(self):
         files = {
             'svalues' : 'mca_c0_r00_p00_singular_values.nc',
@@ -31,43 +36,80 @@ class TestIntegration(unittest.TestCase):
             'pcs_A' : 'mca_c0_r00_p00_sst_pcs.nc',
             'pcs_B' : 'mca_c0_r00_p00_prcp_pcs.nc',
         }
-        svalues = xr.open_dataarray(join(self.path, files['svalues']))
-        eofs_A = xr.open_dataarray(join(self.path, files['eofs_A']))
-        eofs_B = xr.open_dataarray(join(self.path, files['eofs_B']))
-        pcs_A = xr.open_dataarray(join(self.path, files['pcs_A']))
-        pcs_B = xr.open_dataarray(join(self.path, files['pcs_B']))
+        svalues = xr.open_dataarray(
+            join(self.path, files['svalues'])
+        )[:self.modes]
+        eofs_A = xr.open_dataarray(
+            join(self.path, files['eofs_A'])
+        )[..., :self.modes]
+        eofs_B = xr.open_dataarray(
+            join(self.path, files['eofs_B'])
+        )[..., :self.modes]
+        pcs_A = xr.open_dataarray(
+            join(self.path, files['pcs_A'])
+        )[:, :self.modes]
+        pcs_B = xr.open_dataarray(
+            join(self.path, files['pcs_B'])
+        )[:, :self.modes]
 
         mca = xMCA(self.A, self.B)
         mca.set_field_names('sst', 'prcp')
         mca.solve()
-        vals = mca.singular_values()
-        eofs = mca.eofs()
-        pcs = mca.pcs()
-        fields = mca.reconstructed_fields()
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='svalues do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='eofs A do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='eofs B do not match')
-        assert_allclose(pcs_A, pcs['left'], err_msg='pcs A do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='pcs B do not match')
-        assert_allclose(self.A, fields['left'])
-        assert_allclose(self.B, fields['right'], atol=9e-2)
+        vals = mca.singular_values(self.modes)
+        eofs = mca.eofs(self.modes)
+        pcs = mca.pcs(self.modes)
+        # fields = mca.reconstructed_fields()
+        assert_allclose(
+            svalues, vals, err_msg='svalues do not match', **self.tols
+        )
+        assert_allclose(
+            eofs_A, eofs['left'], err_msg='eofs A do not match', **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'], err_msg='eofs B do not match', **self.tols
+        )
+        assert_allclose(
+            pcs_A, pcs['left'], err_msg='pcs A do not match', **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'], err_msg='pcs B do not match', **self.tols
+        )
+        # assert_allclose(self.A, fields['left'], rtol=1e-3)
+        # assert_allclose(self.B, fields['right'], rtol=1e-3, atol=9e-2)
         mca.plot(1)
         mca.save_analysis('./tests/integration')
 
         path = './tests/integration/xmca/sst_prcp/mca_c0_r00_p00.info'
         mca2 = xMCA()
         mca2.load_analysis(path)
-        vals = mca2.singular_values()
-        eofs = mca2.eofs()
-        pcs = mca2.pcs()
-        fields = mca2.reconstructed_fields()
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='singular values do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='left eofs do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='right eofs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='left eofs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='right eofs do not match')
-        assert_allclose(self.A, fields['left'], err_msg='left reconstructed field does not match')
-        assert_allclose(self.B, fields['right'], atol=9e-2, err_msg='right reconstructed field does not match')
+        vals = mca2.singular_values(self.modes)
+        eofs = mca2.eofs(self.modes)
+        pcs = mca2.pcs(self.modes)
+        # fields = mca2.reconstructed_fields()
+        assert_allclose(
+            svalues, vals, err_msg='singular values do not match', **self.tols
+        )
+        assert_allclose(
+            eofs_A, eofs['left'], err_msg='left eofs do not match', **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'],
+            err_msg='right eofs do not match', **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'], err_msg='left eofs do not match', **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'], err_msg='right eofs do not match', **self.tols
+        )
+        # assert_allclose(
+        #   self.A, fields['left'],
+        #   err_msg='left reconstructed field does not match'
+        # )
+        # assert_allclose(
+        #   self.B, fields['right'],
+        #   err_msg='right reconstructed field does not match'
+        # )
 
         rmtree(join(getcwd(), 'tests/integration/xmca/'))
 
@@ -79,39 +121,90 @@ class TestIntegration(unittest.TestCase):
             'pcs_A' : 'mca_c0_r10_p01_sst_pcs.nc',
             'pcs_B' : 'mca_c0_r10_p01_prcp_pcs.nc',
         }
-        svalues = xr.open_dataarray(join(self.path, files['svalues']))
-        eofs_A = xr.open_dataarray(join(self.path, files['eofs_A']))
-        eofs_B = xr.open_dataarray(join(self.path, files['eofs_B']))
-        pcs_A = xr.open_dataarray(join(self.path, files['pcs_A']))
-        pcs_B = xr.open_dataarray(join(self.path, files['pcs_B']))
+
+        svalues = xr.open_dataarray(
+            join(self.path, files['svalues'])
+        )[:self.modes]
+        eofs_A = xr.open_dataarray(
+            join(self.path, files['eofs_A'])
+        )[..., :self.modes]
+        eofs_B = xr.open_dataarray(
+            join(self.path, files['eofs_B'])
+        )[..., :self.modes]
+        pcs_A = xr.open_dataarray(
+            join(self.path, files['pcs_A'])
+        )[:, :self.modes]
+        pcs_B = xr.open_dataarray(
+            join(self.path, files['pcs_B'])
+        )[:, :self.modes]
 
         mca = xMCA(self.A, self.B)
         mca.set_field_names('sst', 'prcp')
         mca.solve()
         mca.rotate(10)
-        vals = mca.singular_values()
-        eofs = mca.eofs()
-        pcs = mca.pcs()
+        vals = mca.singular_values(self.modes)
+        eofs = mca.eofs(self.modes)
+        pcs = mca.pcs(self.modes)
 
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='singular values do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='left eofs do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='right eofs do not match')
-        assert_allclose(pcs_A, pcs['left'], err_msg='left pcs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='right pcs do not match')
+        assert_allclose(
+            svalues, vals,
+            err_msg='singular values do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_A, eofs['left'],
+            err_msg='left eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'],
+            err_msg='right eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_A, pcs['left'],
+            err_msg='left pcs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'],
+            err_msg='right pcs do not match',
+            **self.tols
+        )
         mca.plot(1)
         mca.save_analysis('./tests/integration')
 
         path = './tests/integration/xmca/sst_prcp/mca_c0_r10_p01.info'
         mca2 = xMCA()
         mca2.load_analysis(path)
-        vals = mca2.singular_values()
-        eofs = mca2.eofs()
-        pcs = mca2.pcs()
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='singular values do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='left eofs do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='right eofs do not match')
-        assert_allclose(pcs_A, pcs['left'], err_msg='left pcs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='right pcs do not match')
+        vals = mca2.singular_values(self.modes)
+        eofs = mca2.eofs(self.modes)
+        pcs = mca2.pcs(self.modes)
+
+        assert_allclose(
+            svalues[:20], vals[:20],
+            err_msg='singular values do not match',
+            **self.tols)
+        assert_allclose(
+            eofs_A, eofs['left'],
+            err_msg='left eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'],
+            err_msg='right eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_A, pcs['left'],
+            err_msg='left pcs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'],
+            err_msg='right pcs do not match',
+            **self.tols
+        )
 
         rmtree(join(getcwd(), 'tests/integration/xmca/'))
 
@@ -123,38 +216,96 @@ class TestIntegration(unittest.TestCase):
             'pcs_A' : 'mca_c1_r10_p01_sst_pcs.nc',
             'pcs_B' : 'mca_c1_r10_p01_prcp_pcs.nc',
         }
-        svalues = xr.open_dataarray(join(self.path, files['svalues']), engine='h5netcdf')
-        eofs_A = xr.open_dataarray(join(self.path, files['eofs_A']), engine='h5netcdf')
-        eofs_B = xr.open_dataarray(join(self.path, files['eofs_B']), engine='h5netcdf')
-        pcs_A = xr.open_dataarray(join(self.path, files['pcs_A']), engine='h5netcdf')
-        pcs_B = xr.open_dataarray(join(self.path, files['pcs_B']), engine='h5netcdf')
+
+        svalues = xr.open_dataarray(
+            join(self.path, files['svalues']),
+            engine='h5netcdf'
+        )[:self.modes]
+        eofs_A = xr.open_dataarray(
+            join(self.path, files['eofs_A']),
+            engine='h5netcdf'
+        )[..., :self.modes]
+        eofs_B = xr.open_dataarray(
+            join(self.path, files['eofs_B']),
+            engine='h5netcdf'
+        )[..., :self.modes]
+        pcs_A = xr.open_dataarray(
+            join(self.path, files['pcs_A']),
+            engine='h5netcdf'
+        )[:, :self.modes]
+        pcs_B = xr.open_dataarray(
+            join(self.path, files['pcs_B']),
+            engine='h5netcdf'
+        )[:, :self.modes]
 
         mca = xMCA(self.A, self.B)
         mca.set_field_names('sst', 'prcp')
         mca.solve(complexify=True, extend='theta', period=12)
         mca.rotate(10)
-        vals = mca.singular_values()
-        eofs = mca.eofs()
-        pcs = mca.pcs()
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='singular values do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='left eofs do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='right eofs do not match')
-        assert_allclose(pcs_A, pcs['left'], err_msg='left pcs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='right pcs do not match')
+        vals = mca.singular_values(self.modes)
+        eofs = mca.eofs(self.modes)
+        pcs = mca.pcs(self.modes)
+
+        assert_allclose(
+            svalues, vals,
+            err_msg='singular values do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_A, eofs['left'],
+            err_msg='left eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'],
+            err_msg='right eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_A, pcs['left'],
+            err_msg='left pcs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'],
+            err_msg='right pcs do not match',
+            **self.tols
+        )
         mca.plot(1)
         mca.save_analysis('./tests/integration')
 
         path = './tests/integration/xmca/sst_prcp/mca_c1_r10_p01.info'
         mca2 = xMCA()
         mca2.load_analysis(path)
-        vals = mca2.singular_values()
-        eofs = mca2.eofs()
-        pcs = mca2.pcs()
-        assert_allclose(svalues[:20], vals[:20], rtol=1e-3, err_msg='singular values do not match')
-        assert_allclose(eofs_A, eofs['left'], err_msg='left eofs do not match')
-        assert_allclose(eofs_B, eofs['right'], err_msg='right eofs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='left pcs do not match')
-        assert_allclose(pcs_B, pcs['right'], err_msg='right pcs do not match')
+        vals = mca2.singular_values(self.modes)
+        eofs = mca2.eofs(self.modes)
+        pcs = mca2.pcs(self.modes)
+
+        assert_allclose(
+            svalues, vals,
+            err_msg='singular values do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_A, eofs['left'],
+            err_msg='left eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            eofs_B, eofs['right'],
+            err_msg='right eofs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_A, pcs['left'],
+            err_msg='left pcs do not match',
+            **self.tols
+        )
+        assert_allclose(
+            pcs_B, pcs['right'],
+            err_msg='right pcs do not match',
+            **self.tols
+        )
 
         rmtree(join(getcwd(), 'tests/integration/xmca/'))
 
