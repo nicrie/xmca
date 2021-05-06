@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Collection of tools for xarray.DataArray modifications. """
+''' Collection of tools for xarray.DataArray modifications. '''
 
 # =============================================================================
 # Imports
@@ -13,7 +13,7 @@ import xarray as xr
 # =============================================================================
 
 def is_DataArray(data):
-    """Check if data is of type `xr.DataArray`.
+    '''Check if data is of type `xr.DataArray`.
 
     Parameters
     ----------
@@ -25,7 +25,7 @@ def is_DataArray(data):
     bool
         Input data is of type `DataArray`.
 
-    """
+    '''
     if(isinstance(data,xr.DataArray)):
         pass
     else:
@@ -61,7 +61,7 @@ def calc_temporal_corr(x, y):
 
 
 def wrap_lon_to_180(da, lon='lon'):
-    """
+    '''
     Wrap longitude coordinates of DatArray to -180..179
 
     Parameters
@@ -75,7 +75,7 @@ def wrap_lon_to_180(da, lon='lon'):
     -------
     wrapped : Dataset
         Another dataset array wrapped around.
-    """
+    '''
 
     # wrap 0..359 to -180..179
     da = da.assign_coords(lon=(((da[lon] + 180) % 360) - 180))

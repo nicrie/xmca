@@ -1,35 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
+'''
 Complex rotated maximum covariance analysis of two xarray DataArrays.
-"""
+'''
 
-import cmath
 # =============================================================================
 # Imports
 # =============================================================================
 import os
-from datetime import datetime
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from matplotlib.gridspec import GridSpec
 from xmca.array import MCA
-from tools.text import boldify_str, secure_str, wrap_str
-from tools.xarray import (calc_temporal_corr, check_dims, create_coords,
-                          get_attr, get_extent, is_DataArray, split_complex)
+from xmca.tools.text import boldify_str, secure_str
+from xmca.tools.xarray import calc_temporal_corr, get_extent
 
 # =============================================================================
 # xMCA
 # =============================================================================
 
+
 class xMCA(MCA):
-    """Perform Maximum Covariance Analysis (MCA) for two `xarray.DataArray`.
+    '''Perform Maximum Covariance Analysis (MCA) for two `xarray.DataArray`.
 
     MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
@@ -61,10 +57,10 @@ class xMCA(MCA):
     >>> mca = MCA(data1, data2)
     >>> mca.solve()
     >>> pcsData1, pcsData2 = mca.pcs()
-    """
+    '''
 
     def __init__(self, *data):
-        """Load data fields and store information about data size/shape.
+        '''Load data fields and store information about data size/shape.
 
         Parameters
         ----------
@@ -81,13 +77,13 @@ class xMCA(MCA):
         -------
         None.
 
-        """
+        '''
         if len(data) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
         if not all(isinstance(d, xr.DataArray) for d in data):
-            raise TypeError("""One or more fields are not `xarray.DataArray`.
-            Please provide `xarray.DataArray` only.""")
+            raise TypeError('''One or more fields are not `xarray.DataArray`.
+            Please provide `xarray.DataArray` only.''')
 
         # set fields
         keys    = ['left', 'right']
@@ -139,9 +135,9 @@ class xMCA(MCA):
 
 
     def apply_coslat(self):
-        """Apply area correction to higher latitudes.
+        '''Apply area correction to higher latitudes.
 
-        """
+        '''
         coords  = self._field_coords
         weights = {}
         for key, coord in coords.items():
@@ -155,7 +151,7 @@ class xMCA(MCA):
 
 
     def singular_values(self, n=None):
-        """Return first `n` singular_values of the PCA.
+        '''Return first `n` singular_values of the PCA.
 
         Parameters
         ----------
@@ -170,7 +166,7 @@ class xMCA(MCA):
         DataArray
             Uncertainty of singular_values according to North's rule of thumb.
 
-        """
+        '''
         # for n=Nonr, all singular_values are returned
         values = super().singular_values(n)
 
@@ -197,7 +193,7 @@ class xMCA(MCA):
 
 
     def explained_variance(self, n=None):
-        """Return the CF of the first `n` modes.
+        '''Return the CF of the first `n` modes.
 
         The covariance fraction (CF) is a measure of
         importance of each mode. It is calculated as the singular
@@ -213,7 +209,7 @@ class xMCA(MCA):
         DataArray
             Fraction of described covariance of each mode.
 
-        """
+        '''
         variance 	= super().explained_variance(n)
 
         # if n is not provided, take all singular_values
@@ -238,7 +234,7 @@ class xMCA(MCA):
         return variance
 
     def scf(self, n=None):
-        """Return the SCF of the first `n` modes.
+        '''Return the SCF of the first `n` modes.
 
         The squared covariance fraction (SCF) is a measure of
         importance of each mode. It is calculated as the squared singular
@@ -255,7 +251,7 @@ class xMCA(MCA):
         DataArray
             Fraction of described squared covariance of each mode.
 
-        """
+        '''
         variance 	= super().scf(n)
 
         # if n is not provided, take all singular_values
@@ -281,7 +277,7 @@ class xMCA(MCA):
 
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
-        """Return first `n` PCs.
+        '''Return first `n` PCs.
 
         Parameters
         ----------
@@ -299,7 +295,7 @@ class xMCA(MCA):
         DataArray
             PCs of right input field.
 
-        """
+        '''
         pcs = super().pcs(n, scaling, phase_shift)
 
         if n is None:
@@ -322,7 +318,7 @@ class xMCA(MCA):
 
 
     def eofs(self, n=None, scaling=None, phase_shift=0):
-        """Return the first `n` EOFs.
+        '''Return the first `n` EOFs.
 
         Parameters
         ----------
@@ -340,7 +336,7 @@ class xMCA(MCA):
         DataArray
             EOFs of right input field.
 
-        """
+        '''
         eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
@@ -367,7 +363,7 @@ class xMCA(MCA):
 
 
     def spatial_amplitude(self, n=None, scaling=None):
-        """Return the spatial amplitude fields for the first `n` EOFs.
+        '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
         ----------
@@ -384,7 +380,7 @@ class xMCA(MCA):
         DataArray
             Fields of right input field.
 
-        """
+        '''
         amplitudes = super().spatial_amplitude(n, scaling)
 
         if n is None:
@@ -411,7 +407,7 @@ class xMCA(MCA):
 
 
     def spatial_phase(self, n=None, phase_shift=0):
-        """Return the spatial phase fields for the first `n` EOFs.
+        '''Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
         ----------
@@ -429,7 +425,7 @@ class xMCA(MCA):
         DataArray
             Fields of right input field.
 
-        """
+        '''
         eofs = self.eofs(n, phase_shift=phase_shift)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -444,7 +440,7 @@ class xMCA(MCA):
 
 
     def temporal_amplitude(self, n=None, scaling=None):
-        """Return the temporal amplitude functions for the first `n` PCs.
+        '''Return the temporal amplitude functions for the first `n` PCs.
 
         Parameters
         ----------
@@ -461,7 +457,7 @@ class xMCA(MCA):
         DataArray
             Temporal amplitude function of right input field.
 
-        """
+        '''
         amplitudes = super().temporal_amplitude(n, scaling)
 
         if n is None:
@@ -485,7 +481,7 @@ class xMCA(MCA):
 
 
     def temporal_phase(self, n=None, phase_shift=0):
-        """Return the temporal phase function for the first `n` PCs.
+        '''Return the temporal phase function for the first `n` PCs.
 
         Parameters
         ----------
@@ -500,7 +496,7 @@ class xMCA(MCA):
         DataArray
             Temporal phase function of right input field.
 
-        """
+        '''
         pcs = self.pcs(n, phase_shift=phase_shift)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -517,7 +513,7 @@ class xMCA(MCA):
 
 
     def homogeneous_patterns(self, n=None, phase_shift=0):
-        """
+        '''
         Return left and right homogeneous correlation maps.
 
         Parameters
@@ -533,7 +529,7 @@ class xMCA(MCA):
         xr.DataArray
             Right homogeneous correlation maps.
 
-        """
+        '''
 
         fields  = self._get_fields()
         pcs     = self.pcs(n, phase_shift)
@@ -551,7 +547,7 @@ class xMCA(MCA):
 
 
     def heterogeneous_patterns(self, n=None, phase_shift=0):
-        """
+        '''
         Return left and right heterogeneous correlation maps.
 
         Parameters
@@ -567,7 +563,7 @@ class xMCA(MCA):
         xr.DataArray
             Right heterogeneous correlation maps.
 
-        """
+        '''
         fields  = self._get_fields()
         pcs     = self.pcs(n, phase_shift)
 
@@ -707,7 +703,7 @@ class xMCA(MCA):
         self, mode, threshold=0, phase_shift=0,
         cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0), resolution='110m',
         projection=None, c_lon=None, orientation='horizontal', land=True):
-        """
+        '''
         Plot results for `mode`.
 
         Parameters
@@ -737,7 +733,7 @@ class xMCA(MCA):
         axes :
             Dictionary of axes containing `pcs`, `eofs` and `phase`, if complex.
 
-        """
+        '''
         complex     = self._analysis['is_complex']
         bivariate   = self._analysis['is_bivariate']
 
