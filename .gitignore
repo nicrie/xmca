@@ -1,3 +1,6 @@
+# Personal
+stuff/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -8,7 +11,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-figs/
 build/
 develop-eggs/
 dist/
