@@ -19,7 +19,7 @@ jobs:
             pip install cartopy
             pip install netcdf4
             pip install h5netcdf
-            pip uninstall shapely
+            pip uninstall -y shapely
             pip install shapely --no-binary shapely
             pip install -r requirements.txt
           name: get-dependencies 
