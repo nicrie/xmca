@@ -16,7 +16,7 @@ The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fie
 
 ## Installation
 ```
-pip install xmca==0.1.0
+pip install xmca
 ```
 ### Dependencies
 The file [requirements.txt](requirements.txt) lists all the dependencies. For
