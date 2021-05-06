@@ -1,6 +1,7 @@
 # xMCA | Maximum Covariance Analysis in Python
 
 [![version](https://img.shields.io/pypi/v/xmca)](https://pypi.org/project/xmca/)
+![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca/develop)
 [![downloads](https://img.shields.io/pypi/dm/xmca)](https://pypi.org/project/xmca/)
 [![commit](https://img.shields.io/github/commit-activity/m/nicrie/xmca)](https://github.com/nicrie/xmca/graphs/contributors)
 
