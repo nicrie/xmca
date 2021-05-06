@@ -16,11 +16,9 @@ import numpy as np
 from numpy.polynomial.polynomial import polyfit
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
-from tools.array import (arrs_are_equal, check_time_dims, has_nan_time_steps,
-                         is_arr, is_not_empty, norm_to_1, remove_mean,
-                         remove_nan_cols)
-from tools.rotation import promax
-from tools.text import boldify_str, secure_str, wrap_str
+from xmca.tools.array import has_nan_time_steps, remove_mean, remove_nan_cols
+from xmca.tools.rotation import promax
+from xmca.tools.text import boldify_str, secure_str, wrap_str
 from tqdm import tqdm
 
 
@@ -375,7 +373,7 @@ class MCA(object):
         '''
         if any([np.isnan(field).all() for field in self._fields.values()]):
             raise RuntimeError('''
-            Fields are empty. Did you forgot to load data?
+            Fields are empty. Did you forget to load data?
             ''')
 
         self._analysis['is_complex']    = complexify

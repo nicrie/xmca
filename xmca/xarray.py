@@ -5,28 +5,24 @@
 Complex rotated maximum covariance analysis of two xarray DataArrays.
 '''
 
-import cmath
 # =============================================================================
 # Imports
 # =============================================================================
 import os
-from datetime import datetime
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from matplotlib.gridspec import GridSpec
 from xmca.array import MCA
-from tools.text import boldify_str, secure_str, wrap_str
-from tools.xarray import (calc_temporal_corr, check_dims, create_coords,
-                          get_attr, get_extent, is_DataArray, split_complex)
+from xmca.tools.text import boldify_str, secure_str
+from xmca.tools.xarray import calc_temporal_corr, get_extent
 
 # =============================================================================
 # xMCA
 # =============================================================================
+
 
 class xMCA(MCA):
     '''Perform Maximum Covariance Analysis (MCA) for two `xarray.DataArray`.
