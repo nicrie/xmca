@@ -15,10 +15,11 @@ The module ``xmca`` works with ``numpy.ndarray`` and ``xarray.DataArray`` as inp
 
 Core Features
 -------------
+
 - Standard PCA/`MCA`_
-- PCA/MCA with rotation_
-	- Orthogonal Varimax_ rotation
-	- Oblique Promax_ rotation
+- PCA/MCA with `rotation`_
+	- Orthogonal `Varimax`_ rotation
+	- Oblique `Promax`_ rotation
 - `Complex PCA`_/MCA (also known as Hilbert EOF analysis)
 	- Optimised `Theta model`_ extension
 - normalization of input data
@@ -54,5 +55,3 @@ Indices and tables
 .. _`Complex PCA`: https://journals.ametsoc.org/doi/abs/10.1175/1520-0450(1984)023%3C1660%3ACPCATA%3E2.0.CO%3B2
 
 .. _`Theta model`: https://linkinghub.elsevier.com/retrieve/pii/S0169207016300243
-
-

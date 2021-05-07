@@ -1,5 +1,5 @@
-Getting started
-===============
+Quickstart
+==========
 Import the module for `xarray` via
 
 .. code-block:: python
@@ -14,29 +14,31 @@ Create some dummy data, which should be of type ``xarrar.DataArray``.
    import numpy as np
    import xarray as xr
 
-   t = 300                 						  # number of time steps
-   lat1, lon1 = 20, 30     					      # number of latitudes/longitudes of field A
-   lat2, lon2 = 15, 10     					      # number of latitudes/longitudes of field B
-   A = xr.DataArray(np.random.randn(t,lat1,lon1)) # dummy field A
-   B = xr.DataArray(np.random.randn(t,lat1,lon2)) # dummy field B
+   n_time = 300
+   n_lat1, n_lon1 = 20, 30
+   n_lat2, n_lon2 = 15, 10
+   A = xr.DataArray(np.random.randn(t, n_lat1, n_lon1))   # dummy field A
+   B = xr.DataArray(np.random.randn(t, n_lat2, n_lon2))   # dummy field B
 
 
 Principal Component Analysis
 ----------------------------
+
 .. code-block:: python
 
-   pca = xMCA(A)                       # PCA on field A
-   pca.solve(complexfify=False)        # True for complex PCA
-   #pca.rotate(10)                     # optional; Varimax rotated solution
-	                                   # using 10 first EOFs
-   eigenvalues = pca.singular_values() # singular vales = eigenvalues for PCA
-   pcs         = pca.pcs()             # Principal component scores (PCs)
-   eofs        = pca.eofs()            # spatial patterns (EOFs)
+   pca = xMCA(A)                        # PCA on field A
+   pca.solve(complexfify=False)         # True for complex PCA
+   pca.rotate(10)                       # optional; Varimax rotated solution
+	                                      # using 10 first EOFs
+   eigenvalues = pca.singular_values()  # singular vales = eigenvalues for PCA
+   pcs         = pca.pcs()              # Principal component scores (PCs)
+   eofs        = pca.eofs()             # spatial patterns (EOFs)
 
 
 
 Maximum Covariance Analysis
 ---------------------------
+
 .. code-block:: python
 
    mca = xMCA(A,B)                     # MCA of field A and B
@@ -51,13 +53,15 @@ Maximum Covariance Analysis
 
 Save/load an analysis
 ---------------------
+
 .. code-block:: python
 
    mca.save_analysis()                 # this will save the data and a respective
                                        # info file. The files will be stored in a
                                        # special directory
+   info = './mca/left_right/mca_c0_r00_p00.info'
    mca2 = xMCA()                       # create a new, empty instance
-   mca2.load_analysis('./mca/left_right/mca_c0_r00_p00.info') # analysis can be
+   mca2.load_analysis(info)            # analysis can be
                                        # loaded via specifying the path to the
                                        # info file created earlier
 
@@ -108,5 +112,3 @@ You can save the plot to your local disk as a `.png` file via
 
    save_kwargs={'dpi':200, 'transparent':True}
    mca2.save_plot(mode=2, plot_kwargs=plot_kwargs, save_kwargs=save_kwargs)
-
-
