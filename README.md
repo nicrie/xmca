@@ -10,31 +10,7 @@ Orthogonal Function (EOF) analysis, which maximises the variance within a single
 field. MCA allows to extract the dominant co-varying patterns between two different data
 fields.
 
-
 The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fields.
-
-## Installation
-```
-pip install xmca
-```
-### Dependencies
-The file [requirements.txt](requirements.txt) lists all the dependencies. For
-automatic installation, you may want to clone and run
-```
-pip install -r requirements.txt
-```
-
-### Known Issues
-The dependencies of `cartopy` themselves are not installed via `pip` which is
-why the setup will fail if some dependencies are not met. In this case, please
-[install][cartopy] `cartopy` first before installing `xmca`.
-
-## Testing
-After cloning the repository
-```
-python -m unittest discover -v -s tests/
-```
-
 
 ## Core Features
 - Standard PCA/[MCA][mca]
@@ -45,6 +21,30 @@ python -m unittest discover -v -s tests/
 	- Optimised [Theta model][theta] extension
 - normalization of input data
 - latitude correction to compensate for stretched areas in higher latitutes
+
+
+## Installation
+Installation is simply performed via
+```
+pip install xmca
+```
+
+### Known Issues
+Actually `pip` should take care of installing the correct dependencies. However, the dependencies of `cartopy` themselves are not installed via `pip` which is
+why the setup may fail in some cases. In this case, please
+[install][cartopy] `cartopy` first before installing `xmca`. If you are using a `conda` environment, this can be achieved by
+```
+conda install cartopy
+```
+
+
+### Testing
+After cloning the repository
+```
+python -m unittest discover -v -s tests/
+```
+
+
 
 ## Getting started
 Import the module for `xarray` via
