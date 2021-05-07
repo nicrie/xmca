@@ -10,4 +10,4 @@ dependencies:
   - statsmodels
   - tqdm
   - pip:
-    - sphinx_materialdesign_theme
+    - git+https://github.com/bashtage/sphinx-material.git

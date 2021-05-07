@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-xmca: Maximum Covariance Analysis in Python
+Maximum Covariance Analysis in Python
 ===========================================
 Maximum Covariance Analysis (MCA) maximises the temporal covariance between two different
 data fields and is closely related to Principal Component Analysis (PCA) / Empirical
@@ -21,15 +21,15 @@ Core Features
 	- Orthogonal `Varimax`_ rotation
 	- Oblique `Promax`_ rotation
 - `Complex PCA`_/MCA (also known as Hilbert EOF analysis)
-	- Optimised `Theta model`_ extension
-- normalization of input data
-- latitude correction to compensate for stretched areas in higher latitutes
+	- Optimized `Theta model`_ extension
+- normalisation of input data
+- latitude correction to compensate for stretched areas in higher latitudes
 
 
-
+Documentation
+-------------
 .. toctree::
    :maxdepth: 2
-   :caption: Documentation
 
    installation
    quickstart

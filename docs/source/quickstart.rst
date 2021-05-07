@@ -79,6 +79,8 @@ The package provides a method to visually inspect the individual modes, e.g. for
    mca2.plot(mode=2)
 
 .. image:: ../../figs/example-plot1.png
+  :scale: 50 %
+  :align: center
 
 You may want to modify the plot for some better optics:
 
@@ -105,6 +107,9 @@ You may want to modify the plot for some better optics:
 
 
 .. image:: ../../figs/example-plot2.png
+  :scale: 50 %
+  :align: center 
+
 
 You can save the plot to your local disk as a `.png` file via
 

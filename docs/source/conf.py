@@ -55,9 +55,45 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_materialdesign_theme'
+html_theme = 'sphinx_material'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+# Material theme options (see theme.conf for more information)
+html_theme_options = {
+
+    # Set the name of the project to appear in the navigation.
+    'nav_title': 'xMCA',
+
+    # Set you GA account ID to enable tracking
+    'google_analytics_account': 'UA-XXXXX',
+
+    # Specify a base_url used to generate sitemap.xml. If not
+    # specified, then no sitemap will be built.
+    'base_url': 'https://github.com/nicrie/xmca',
+
+    # Set the color and the accent color
+    'theme_color': 'blue-grey',
+    'color_primary': 'blue-grey',
+    'color_accent': 'deep-orange',
+
+    # Set the repo location to get a badge with stats
+    'repo_url': 'https://github.com/nicrie/xmca',
+    'repo_name': 'xMCA',
+    'repo_type': 'github',
+
+    # Visible levels of the global TOC; -1 means unlimited
+    'globaltoc_depth': 1,
+    # If False, expand all TOC entries
+    'globaltoc_collapse': True,
+    # If True, show hidden TOC entries
+    'globaltoc_includehidden': False,
+}
+
+html_sidebars = {
+    # exclude "localtoc.html"
+    '**': ['logo-text.html', 'globaltoc.html', 'localtoc.html', 'searchbox.html']
+}
