@@ -2,21 +2,19 @@ API Reference
 =============
 
 
-For numpy: ``MCA()``
---------------------
+Using ``numpy``
+---------------
 
 .. automodule:: xmca.array
-   :members: 
+   :members:
    :undoc-members:
    :show-inheritance:
 
-For xarray: ``xMCA()``
-----------------------
+Using ``xarray``
+----------------
 
 .. automodule:: xmca.xarray
-   :members: 
+   :members:
    :undoc-members:
    :show-inheritance:
    :inherited-members:
-
-
