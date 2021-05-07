@@ -225,11 +225,8 @@ class MCA(object):
 
         return new_fields
 
-
-    def apply_weights(self,left=None, right=None):
-        '''Apply weights to data sets.
-
-        Supplied weights are applied via broadcasting.
+    def apply_weights(self, left=None, right=None):
+        '''Apply weights to left and/or right field.
 
         Parameters
         ----------
@@ -243,8 +240,10 @@ class MCA(object):
         field_items = self._fields.items()
 
         weights = {'left' : left, 'right' : right}
-        weights.update({k : 1 if w is None else w for k,w in weights.items()})
-        self._fields.update({k : field * weight for k,field in field_items})
+        weights.update({k : 1 if w is None else w for k, w in weights.items()})
+        self._fields.update({
+            k : field * weights[k] for k, field in field_items
+        })
 
 
     def normalize(self):
