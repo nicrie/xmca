@@ -5,7 +5,7 @@ API Reference
 Using ``numpy``
 ---------------
 
-.. automodule:: xmca.array
+.. autoclass:: xmca.array
    :members:
    :undoc-members:
    :show-inheritance:
@@ -13,7 +13,7 @@ Using ``numpy``
 Using ``xarray``
 ----------------
 
-.. automodule:: xmca.xarray
+.. autoclass:: xmca.xarray
    :members:
    :undoc-members:
    :show-inheritance:
