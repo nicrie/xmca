@@ -11,3 +11,4 @@ dependencies:
   - tqdm
   - pip:
     - git+https://github.com/bashtage/sphinx-material.git
+    - xmca
