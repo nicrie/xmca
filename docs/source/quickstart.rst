@@ -17,8 +17,8 @@ Create some dummy data, which should be of type ``xarrar.DataArray``.
    n_time = 300
    n_lat1, n_lon1 = 20, 30
    n_lat2, n_lon2 = 15, 10
-   A = xr.DataArray(np.random.randn(t, n_lat1, n_lon1))   # dummy field A
-   B = xr.DataArray(np.random.randn(t, n_lat2, n_lon2))   # dummy field B
+   A = xr.DataArray(np.random.randn(n_time, n_lat1, n_lon1))   # dummy field A
+   B = xr.DataArray(np.random.randn(n_time, n_lat2, n_lon2))   # dummy field B
 
 
 Principal Component Analysis
@@ -108,7 +108,7 @@ You may want to modify the plot for some better optics:
 
 .. image:: ../../figs/example-plot2.png
   :scale: 50 %
-  :align: center 
+  :align: center
 
 
 You can save the plot to your local disk as a `.png` file via
