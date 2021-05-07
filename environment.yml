@@ -7,3 +7,7 @@ dependencies:
   - matplotlib
   - xarray
   - cartopy
+  - statsmodels
+  - tqdm
+  - pip:
+    - sphinx_materialdesign_theme
