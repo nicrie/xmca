@@ -237,35 +237,19 @@ class MCA(object):
 
         Parameters
         ----------
-        left : type
-            Description of parameter `left` (the default is None).
-        right : type
-            Description of parameter `right` (the default is None).
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        '''
-        '''Apply weights to data sets.
-
-        Supplied weights are applied via broadcasting.
-
-        Parameters
-        ----------
         left : ndarray
             Weights for left data set.
         right : ndarray
             Weights for right data set.
 
-
         '''
         field_items = self._fields.items()
 
         weights = {'left' : left, 'right' : right}
-        weights.update({k : 1 if w is None else w for k,w in weights.items()})
-        self._fields.update({k : field * weight for k,field in field_items})
+        weights.update({k : 1 if w is None else w for k, w in weights.items()})
+        self._fields.update({
+            k : field * weights[k] for k, field in field_items
+        })
 
 
     def normalize(self):
