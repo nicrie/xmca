@@ -1,8 +1,8 @@
 # xMCA | Maximum Covariance Analysis in Python
 
-[![version](https://img.shields.io/pypi/v/xmca)](https://pypi.org/project/xmca/)
+[![version](https://img.shields.io/pypi/v/xmca?color=green&label=PyPI)](https://pypi.org/project/xmca/)
 ![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca/master)
-[![downloads](https://img.shields.io/pypi/dm/xmca)](https://pypi.org/project/xmca/)
+[![downloads](https://img.shields.io/pypi/dm/xmca?color=green)](https://pypi.org/project/xmca/)
 
 Maximum Covariance Analysis (MCA) maximises the temporal covariance between two different
 data fields and is closely related to Principal Component Analysis (PCA) / Empirical
