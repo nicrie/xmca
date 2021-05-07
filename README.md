@@ -21,6 +21,7 @@ The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fie
 	- Oblique [Promax][promax] rotation
 - [Complex PCA][complex-pca]/MCA (also known as Hilbert EOF analysis)
 	- Optimised [Theta model][theta] extension
+  - *New in v0.2.1:* Exponential extension
 - normalization of input data
 - latitude correction to compensate for stretched areas in higher latitutes
 
