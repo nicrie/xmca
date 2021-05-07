@@ -13,16 +13,16 @@
 import os
 import sys
 
-import subprocess
+# import subprocess
 
 sys.path.insert(0, os.path.abspath('../../xmca/'))
 
 
-if os.environ.get('READTHEDOCS') == 'True':
-    # Install cartopy dependencies
-    subprocess.check_output([
-        'apt-get', 'install', '-y', 'libproj-dev', 'proj-data', 'proj-bin'
-    ])
+# if os.environ.get('READTHEDOCS') == 'True':
+#     # Install cartopy dependencies
+#     subprocess.check_output([
+#         'apt-get', 'install', '-y', 'libproj-dev', 'proj-data', 'proj-bin'
+#     ])
 
 # -- Project information -----------------------------------------------------
 
