@@ -45,19 +45,17 @@ class MCA(object):
 
     Examples
     --------
-    Let `data1` and `data2` be some geophysical fields (e.g. SST and pressure).
-    To perform PCA use:
+    Let `left` and `right` be some geophysical fields (e.g. SST and pressure).
+    To perform PCA on `left` use:
 
-    >>> pca = CCA(data1)
-    >>> pca.solve()
-    >>> pcs,_ = pca.pcs()
-
-    To perform MCA use:
-
-    >>> mca = CCA(data1, data2)
+    >>> from xmca.array import MCA
+    >>> mca = MCA(left)
     >>> mca.solve()
-    >>> pcs_data1, pcs_data2 = mca.pcs()
 
+    To perform MCA on `left` and `right` use:
+
+    >>> mca = MCA(left, right)
+    >>> mca.solve()
     '''
 
     def __init__(self, *data):
@@ -93,31 +91,42 @@ class MCA(object):
             raise ValueError('''One or more fields contain NaN time steps.
             Please remove these prior to analysis.''')
 
-        self._fields                = {} # input fields
-        self._field_names           = {} # names of input fields
-        self._field_means           = {} # mean of fields
-        self._field_stds            = {} # standard deviation of fields
-        self._fields_spatial_shape  = {} # spatial shapes of fields
-        self._n_variables           = {} # number of variables of fields
-        self._no_nan_index          = {} # index of variables containing data
-        self._n_observations        = {} # number of observations/samples
+        self._fields                = {}  # input fields
+        self._field_names           = {}  # names of input fields
+        self._field_means           = {}  # mean of fields
+        self._field_stds            = {}  # standard deviation of fields
+        self._fields_spatial_shape  = {}  # spatial shapes of fields
+        self._n_variables           = {}  # number of variables of fields
+        self._no_nan_index          = {}  # index of variables containing data
+        self._n_observations        = {}  # number of observations/samples
 
         # set fields
         self._keys    = ['left', 'right']
-        self._fields  = {key : field for key,field in zip(self._keys,data)}
+        self._fields  = {key : field for key, field in zip(self._keys, data)}
         # set fields
-        #self._fields = {'left'  : np.array([]) if left is None else left.copy()}
-        #if right is not None:
+        # self._fields = {
+        # 'left'  : np.array([]) if left is None else left.copy()
+        # }
+        # if right is not None:
         #    self._fields['right'] = right.copy()
 
         # set class variables
         for key, field in self._fields.items():
             self._field_names[key]          = key
             with warnings.catch_warnings():
-                warnings.filterwarnings('ignore',r'Mean of empty slice.')
-                warnings.filterwarnings('ignore',r'invalid value encountered in double_scalars')
-                warnings.filterwarnings('ignore',r'Degrees of freedom <= 0 for slice')
-                warnings.filterwarnings('ignore',r'invalid value encountered in true_divide')
+                warnings.filterwarnings('ignore', r'Mean of empty slice.')
+                warnings.filterwarnings(
+                    'ignore',
+                    r'invalid value encountered in double_scalars'
+                )
+                warnings.filterwarnings(
+                    'ignore',
+                    r'Degrees of freedom <= 0 for slice'
+                )
+                warnings.filterwarnings(
+                    'ignore',
+                    r'invalid value encountered in true_divide'
+                )
                 self._field_means[key]          = field.mean(axis=0)
                 self._field_stds[key]           = field.std(axis=0)
             self._fields_spatial_shape[key] = field.shape[1:]
@@ -138,7 +147,7 @@ class MCA(object):
             'is_complex'            : False,
             'extend'                : False,
             'theta_period'          : 365,
-            #Rotated solution
+            # Rotated solution
             'is_rotated'            : False,
             'rotations'             : 0,
             'power'                 : 0,
@@ -148,17 +157,25 @@ class MCA(object):
             'rank'                  : 0,
             'total_covariance'      : 0.0,
             'total_squared_covariance'      : 0.0
-            }
+        }
 
         self._analysis['method']        = self._get_method_id()
 
+    def set_field_names(self, left='left', right='right'):
+        '''Set the name of the left and/or right field.
 
-    def set_field_names(self, left = None, right = None):
-        if left is not None:
-            self._field_names['left']   = left
-        if right is not None:
-            self._field_names['right']   = right
+        Field names will be reflected when results are plotted or saved.
 
+        Parameters
+        ----------
+        left : string
+            Name of the `left` field. (the default is 'left').
+        right : string
+            Name of the `right` field. (the default is 'right').
+
+        '''
+        self._field_names['left']   = left
+        self._field_names['right']  = right
 
     def _get_method_id(self):
         id = 'pca'
@@ -166,21 +183,17 @@ class MCA(object):
             id = 'mca'
         return id
 
-
     def _get_complex_id(self):
         id = int(self._analysis['is_complex'])
         return 'c{:}'.format(id)
-
 
     def _get_rotation_id(self):
         id = self._analysis['rotations']
         return 'r{:02}'.format(id)
 
-
     def _get_power_id(self):
         id = self._analysis['power']
         return 'p{:02}'.format(id)
-
 
     def _get_analysis_id(self):
         method      = self._get_method_id()
@@ -188,9 +201,8 @@ class MCA(object):
         rotation    = self._get_rotation_id()
         power       = self._get_power_id()
 
-        analysis    = '_'.join([method,hilbert,rotation,power])
+        analysis    = '_'.join([method, hilbert, rotation, power])
         return analysis
-
 
     def _get_analysis_path(self, path=None):
         base_path   = path
@@ -209,7 +221,6 @@ class MCA(object):
 
         return analysis_path
 
-
     def _get_fields(self, original_scale=False):
         std     = self._field_stds
         mean    = self._field_means
@@ -225,37 +236,49 @@ class MCA(object):
 
         return new_fields
 
-
-    def apply_weights(self,left=None, right=None):
-        '''Apply weights to data sets.
-
-        Supplied weights are applied via broadcasting.
+    def apply_weights(self, left=None, right=None):
+        '''Apply weights to the left and/or right field.
 
         Parameters
         ----------
         left : ndarray
-            Weights for left data set.
+            Weights for left field.
         right : ndarray
-            Weights for right data set.
+            Weights for right field.
 
+        Examples
+        --------
+        Let `left` and `right` be some input data (e.g. SST and precipitation).
+
+        >>> left = np.random.randn(100, 30)
+        >>> right = np.random.randn(100, 40)
+
+        Call constructor, apply weights and then solve:
+
+        >>> left_weights = np.random.randn(1, 30)  # some random weights
+        >>> right_weights = np.random.randn(1, 40)
+        >>> mca = MCA(left, right)
+        >>> mca.apply_weights(lw, rw)
+        >>> mca.solve()
 
         '''
         field_items = self._fields.items()
 
         weights = {'left' : left, 'right' : right}
-        weights.update({k : 1 if w is None else w for k,w in weights.items()})
-        self._fields.update({k : field * weight for k,field in field_items})
-
+        weights.update({k : 1 if w is None else w for k, w in weights.items()})
+        self._fields.update({
+            k : field * weights[k] for k, field in field_items
+        })
 
     def normalize(self):
-        '''Normalize the input data to unit variance.'''
+        '''Normalize each time series by its standard deviation.
 
-
+        '''
         keys        = self._fields.keys()
         fields      = self._fields.values()
         fields_std  = self._field_stds.values()
 
-        for key,field,std in zip(keys,fields,fields_std):
+        for key, field, std in zip(keys, fields, fields_std):
             self._fields[key] = field / std
 
         self._analysis['is_normalized'] = True
@@ -412,7 +435,9 @@ class MCA(object):
 
         # perform singular value decomposition
         try:
-            VLeft, singular_values, VTRight = np.linalg.svd(kernel, full_matrices=False)
+            VLeft, singular_values, VTRight = np.linalg.svd(
+                kernel, full_matrices=False
+            )
         except LinAlgError:
             raise LinAlgError("SVD failed. NaN entries may be the problem.")
 
@@ -424,7 +449,7 @@ class MCA(object):
         del(VTRight)
 
         S = np.sqrt(np.diag(singular_values) * n_observations['left'])
-        Si = np.diag(1./np.diag(S))
+        Si = np.diag(1. / np.diag(S))
 
         self._singular_values = singular_values
 
@@ -438,7 +463,6 @@ class MCA(object):
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
         self._analysis['rank'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
-
 
     def rotate(self, n_rot, power=1, tol=1e-5):
         '''Perform Promax rotation on the first `n` EOFs.
@@ -472,33 +496,33 @@ class MCA(object):
         if(n_rot < 2):
             print('`n_rot` must be >=2. Solution not rotated.')
             return None
-        if(power<1):
+        if(power < 1):
             raise ValueError('`power` must be >=1')
 
         n_observations = self._n_observations['left']
 
         truncated_L = {}
         for key, L in self._L.items():
-            truncated_L[key] = L[:,:n_rot]
+            truncated_L[key] = L[:, :n_rot]
 
         # rotate loadings (Cheng and Dunkerton 1995)
         combined_L = np.concatenate(list(truncated_L.values()))
         combined_L, R, Phi = promax(combined_L, power, maxIter=1000, tol=tol)
 
-        rot_V   = {} # rotated singular vectors (EOFs)
-        rot_L   = {} # rotated "loading"
-        rot_U   = {} # rotated projections (PCs)
-        weights = {} # weights associated to "loadings"
+        rot_V   = {}    # rotated singular vectors (EOFs)
+        rot_L   = {}    # rotated "loading"
+        rot_U   = {}    # rotated projections (PCs)
+        weights = {}    # weights associated to "loadings"
 
-        rot_L['left']   = combined_L[:truncated_L['left'].shape[0],:]
+        rot_L['left']   = combined_L[:truncated_L['left'].shape[0], :]
         if self._analysis['is_bivariate']:
-            rot_L['right']  = combined_L[truncated_L['left'].shape[0]:,:]
+            rot_L['right']  = combined_L[truncated_L['left'].shape[0]:, :]
 
         for key, L in rot_L.items():
             # calculate variance/reconstruct "singular_values"
             w = np.linalg.norm(L, axis=0)
             # pull loadings from EOFs
-            rot_V[key] 	=  L / w
+            rot_V[key] = L / w
             weights[key] = w
 
         if self._analysis['is_bivariate']:
@@ -511,30 +535,29 @@ class MCA(object):
         # If rotation is orthogonal: R.T = R
         # If rotation is oblique (p>1): R^(-1).T = R
         for key, pcs in self._U.items():
-            if(power==1):
-                rot_U[key] = pcs[:,:n_rot] @ R
+            if(power == 1):
+                rot_U[key] = pcs[:, :n_rot] @ R
             else:
-                rot_U[key] = pcs[:,:n_rot] @ np.linalg.pinv(R).conjugate().T
+                rot_U[key] = pcs[:, :n_rot] @ np.linalg.pinv(R).conjugate().T
 
         # store rotated pcs, eofs and "singular_values"
         # and sort according to described variance
-        self._singular_values 	= variance[var_idx]
+        self._singular_values   = variance[var_idx]
         for key in rot_L.keys():
-            self._V[key] = rot_V[key][:,var_idx] # Standardized EOFs
-            self._L[key] = rot_L[key][:,var_idx] # Loaded EOFs
-            self._U[key] = rot_U[key][:,var_idx] # Standardized PC scores
+            self._V[key] = rot_V[key][:, var_idx]   # Standardized EOFs
+            self._L[key] = rot_L[key][:, var_idx]   # Loaded EOFs
+            self._U[key] = rot_U[key][:, var_idx]   # Standardized PC scores
 
         # store rotation and correlation matrix of PCs + meta information
         self._rotation_matrix           = R
-        self._correlation_matrix        = Phi[var_idx,:][:,var_idx]
+        self._correlation_matrix        = Phi[var_idx, :][:, var_idx]
         self._analysis['is_rotated']    = True
         self._analysis['rotations']     = n_rot
         self._analysis['power']         = power
 
-
     def rotation_matrix(self):
         '''
-        Return the rotation matrix.
+        Calculate the rotation matrix used for rotation.
 
         Returns
         -------
@@ -544,12 +567,16 @@ class MCA(object):
         if (self._analysis['is_rotated']):
             return self._rotation_matrix
         else:
-            print('Apply `.rotate()` first to retrieve the correlation matrix.')
-
+            print(
+                'Apply `.rotate()` first to retrieve the correlation matrix.'
+            )
 
     def correlation_matrix(self):
         '''
-        Return the correlation matrix of rotated PCs.
+        Calculate the correlation matrix of rotated PCs.
+
+        For non-rotated and Varimax-rotated solutions the correlation matrix
+        is equivalent to the unit matrix.
 
         Returns
         -------
@@ -560,10 +587,11 @@ class MCA(object):
         if (self._analysis['is_rotated']):
             return self._correlation_matrix
         else:
-            print('Apply `.rotate()` first to retrieve the correlation matrix.')
+            print(
+                'Apply `.rotate()` first to retrieve the correlation matrix.'
+            )
 
-
-    def singular_values(self,n=None):
+    def singular_values(self, n=None):
         '''Return the first `n` singular_values.
 
         Parameters
@@ -574,79 +602,74 @@ class MCA(object):
         Returns
         -------
         values : ndarray
-            singular_values of PCA.
-        error : ndarray
-            Uncertainty of singular_values according to North's rule of thumb.
+            Singular values of the obtained solution.
 
         '''
-        values = self._singular_values[:n]
-        n_observations = self._n_observations['left']
-        # error according to North's Rule of Thumb
-        error = np.sqrt(2 / n_observations) * values
 
-        return values
+        return self._singular_values[:n]
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
 
-        The squared ovariance/correlation fraction (SCF) is a measure of
+        The squared covariance fraction (SCF) is a measure of
         importance of each mode. It is calculated as the
-        squared singular values divided by the sum of squared singluar values.
-        In contrast to CF, it is an invariant for CCA.
+        squared singular values divided by the sum of all squared singluar
+        values.
 
         Parameters
         ----------
         n : int, optional
-            Number of modes to return. The default is None.
+            Number of modes to return. The default is all.
 
         Returns
         -------
         ndarray
-            Fraction of described squared covariance/correlation of each mode.
+            Fraction of described squared covariance of each mode.
 
         '''
         values  = self.singular_values(n)
         scf = values**2 / self._analysis['total_squared_covariance'] * 100
         return scf
 
-
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
 
-        The covariance/correlation fraction (CF) is a measure of
+        The covariance fraction (CF) is a measure of
         importance of each mode. It is calculated as the
-        singular values divided by the sum of singluar values.
+        singular values divided by the sum of all singluar values.
 
         Parameters
         ----------
         n : int, optional
-            Number of modes to return. The default is None.
+            Number of modes to return. The default is all.
 
         Returns
         -------
         ndarray
-            Fraction of described covariance/correlation of each mode.
+            Fraction of described covariance of each mode.
 
         '''
         values  = self.singular_values(n)
         exp_var = values / self._analysis['total_covariance'] * 100
         return exp_var
 
-
     def pcs(self, n=None, scaling=None, phase_shift=0):
         '''Return the first `n` PCs.
+
 
         Parameters
         ----------
         n : int, optional
             Number of PCs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
-            standard deviation ('std'). The default is None.
+            Scale PCs by singular_values ('eigen'), maximum value ('max') or
+            standard deviation ('std').
+        phase_shift : float, optional
+            If complex, apply a phase shift to the PCs. Default is 0.
 
         Returns
         -------
-        pcs : dict[ndarray, ndarray]
+        dict[ndarray, ndarray]
             PCs associated to left and right input field.
 
         '''
@@ -658,10 +681,10 @@ class MCA(object):
 
         pcs = {}
         for key, U in self._U.items():
-            pcs[key] = U[:,:n].copy()
+            pcs[key] = U[:, :n].copy()
             # apply phase shift
             if self._analysis['is_complex']:
-                pcs[key] *= cmath.rect(1,phase_shift)
+                pcs[key] *= cmath.rect(1, phase_shift)
             # scale PCs by singular_values
             if scaling == 'eigen':
                 pcs[key] *= np.sqrt(n_obs * singular_values[:n])
@@ -674,7 +697,6 @@ class MCA(object):
 
         return pcs
 
-
     def eofs(self, n=None, scaling=None, phase_shift=0):
         '''Return the first `n` EOFs.
 
@@ -684,11 +706,13 @@ class MCA(object):
             Number of EOFs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
             Scale by singular_values ('eigen'), maximum value ('max') or
-            standard deviation ('std'). The default is None.
+            standard deviation ('std').
+        phase_shift : float, optional
+            If complex, apply a phase shift to the EOFs. Default is 0.
 
         Returns
         -------
-        eofs : dict[ndarray, ndarray]
+        dict[ndarray, ndarray]
             EOFs associated to left and right input field.
 
         '''
@@ -705,25 +729,24 @@ class MCA(object):
         for key, V in self._V.items():
             # create data fields with original NaNs
             dtype       = V.dtype
-            eofs[key]   = np.zeros([n_var[key], n], dtype = dtype) * np.nan
-            eofs[key][no_nan_idx[key],:] = V[:,:n]
+            eofs[key]   = np.zeros([n_var[key], n], dtype=dtype) * np.nan
+            eofs[key][no_nan_idx[key], :] = V[:, :n]
             # reshape data fields to have original input shape
-            eofs[key] 	= eofs[key].reshape(field_shape[key] + (n,))
+            eofs[key]   = eofs[key].reshape(field_shape[key] + (n,))
             # scale EOFs with their singular_values
             if scaling == 'eigen':
                 eofs[key] *= np.sqrt(n_obs * singular_values[:n])
             # scale EOFs by maximum value
             if scaling == 'max':
-                eofs[key] /= np.nanmax(abs(eofs[key].real), axis=(0,1))
+                eofs[key] /= np.nanmax(abs(eofs[key].real), axis=(0, 1))
             # scale EOFs by standard deviation
             if scaling == 'std':
-                eofs[key] /= np.nanstd(abs(eofs[key].real), axis=(0,1))
+                eofs[key] /= np.nanstd(abs(eofs[key].real), axis=(0, 1))
             # apply phase shift
             if self._analysis['is_complex']:
-                eofs[key] *=  cmath.rect(1,phase_shift)
+                eofs[key] *= cmath.rect(1, phase_shift)
 
         return eofs
-
 
     def spatial_amplitude(self, n=None, scaling=None):
         '''Return the spatial amplitude fields for the first `n` EOFs.
@@ -735,9 +758,10 @@ class MCA(object):
             fields. The default is None.
         scaling : {None, 'max', 'std'}, optional
             Scale by maximum value ('max'). The default is None.
+
         Returns
         -------
-        amplitudes : dict[ndarray, ndarray]
+        dict[ndarray, ndarray]
             Spatial amplitude fields associated to left and right field.
 
         '''
@@ -748,10 +772,9 @@ class MCA(object):
             amplitudes[key] = np.sqrt(eof * eof.conjugate()).real
 
             if scaling == 'max':
-                amplitudes[key] /= np.nanmax(amplitudes[key], axis=(0,1))
+                amplitudes[key] /= np.nanmax(amplitudes[key], axis=(0, 1))
 
         return amplitudes
-
 
     def spatial_phase(self, n=None, phase_shift=0):
         '''Return the spatial phase fields for the first `n` EOFs.
@@ -759,12 +782,14 @@ class MCA(object):
         Parameters
         ----------
         n : int, optional
-            Number of phase fields to return. If none, all fields are returned.
+            Number of phase fields to return. If None, all fields are returned.
             The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the spatial phase. Default is 0.
 
         Returns
         -------
-        amplitudes : dict[ndarray, ndarray]
+        dict[ndarray, ndarray]
             Spatial phase fields associated to left and right field.
 
         '''
@@ -776,15 +801,14 @@ class MCA(object):
 
         return phases
 
-
     def temporal_amplitude(self, n=None, scaling=None):
         '''Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
         ----------
         n : int, optional
-            Number of amplitude series to be returned. If None, return all series.
-            The default is None.
+            Number of amplitude series to be returned. If None, return all
+            series. The default is None.
         scaling : {None, 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
@@ -805,7 +829,6 @@ class MCA(object):
 
         return amplitudes
 
-
     def temporal_phase(self, n=None, phase_shift=0):
         '''Return the temporal phase function for the first `n` PCs.
 
@@ -814,6 +837,9 @@ class MCA(object):
         n : int, optional
             Number of phase functions to return. If none, return all series.
             The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the temporal phase.
+            Default is 0.
 
         Returns
         -------
@@ -829,10 +855,10 @@ class MCA(object):
 
         return phases
 
-
     def plot(
         self, mode, threshold=0, phase_shift=0,
-        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0)):
+        cmap_eof=None, cmap_phase=None, figsize=(8.3, 5.0)
+    ):
         '''
         Plot results for `mode`.
 
@@ -843,22 +869,22 @@ class MCA(object):
         threshold : int, optional
             Amplitude threshold below which the fields are masked out.
             The default is 0.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the shown results. Default is 0.
         cmap_eof : str or Colormap
             The colormap used to map the spatial patterns.
             The default is 'Blues'.
         cmap_phase : str or Colormap
             The colormap used to map the spatial phase function.
             The default is 'twilight'.
-
-        Returns
-        -------
-        None.
+        figsize : tuple
+            Figure size provided to plt.figure().
 
         '''
         pcs     = self.pcs(mode, scaling='max', phase_shift=phase_shift)
         eofs    = self.eofs(mode, scaling='max')
         phases  = self.spatial_phase(mode, phase_shift=phase_shift)
-        var 	= self.explained_variance(mode)[mode-1]
+        var     = self.explained_variance(mode)[-1]
 
         n_cols          = 2
         n_rows          = len(pcs)
@@ -882,34 +908,36 @@ class MCA(object):
             cmap_eof        = 'RdBu_r' if cmap_eof is None else cmap_eof
 
         for key in pcs.keys():
-            pcs[key]    = pcs[key][:,mode-1].real
-            eofs[key]   = eofs[key][:,:,mode-1]
-            phases[key]  = phases[key][:,:,mode-1]
+            pcs[key]    = pcs[key][:, -1].real
+            eofs[key]   = eofs[key][:, :, -1]
+            phases[key]  = phases[key][:, :, -1]
 
             # apply amplitude threshold
-            eofs[key]  = np.where(abs(eofs[key]) >= threshold, eofs[key], np.nan)
-            phases[key] = np.where(abs(eofs[key]) >= threshold, phases[key], np.nan)
-
+            eofs[key]  = np.where(
+                abs(eofs[key]) >= threshold, eofs[key], np.nan
+            )
+            phases[key] = np.where(
+                abs(eofs[key]) >= threshold, phases[key], np.nan
+            )
 
         titles = {
-        'pc' : 'PC {:d} ({:.1f} \%)'.format(mode,var),
-        'eof': eof_title,
-        'phase':'Phase',
-        'var1' : self._field_names['left'],
-        'var2' : self._field_names['right']
+            'pc'    : r'PC {:d} ({:.1f} \%)'.format(mode, var),
+            'eof'   : eof_title,
+            'phase' : 'Phase',
+            'var1'  : self._field_names['left'],
+            'var2'  : self._field_names['right']
         }
 
-        titles.update({k: v.replace('_',' ') for k, v in titles.items()})
+        titles.update({k: v.replace('_', ' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
-
 
         # create figure environment
         fig = plt.figure(figsize=figsize, dpi=150)
         fig.subplots_adjust(hspace=0.1, wspace=.1, left=0.25)
         gs = fig.add_gridspec(n_rows, n_cols, height_ratios=height_ratios)
-        axes_pc = [fig.add_subplot(gs[i,0]) for i in range(n_rows-1)]
-        axes_eof = [fig.add_subplot(gs[i,1]) for i in range(n_rows-1)]
-        cbax_eof = fig.add_subplot(gs[-1,1])
+        axes_pc = [fig.add_subplot(gs[i, 0]) for i in range(n_rows - 1)]
+        axes_eof = [fig.add_subplot(gs[i, 1]) for i in range(n_rows - 1)]
+        cbax_eof = fig.add_subplot(gs[-1, 1])
 
         axes_space = axes_eof
 
@@ -918,11 +946,11 @@ class MCA(object):
         # plot PCs
         for i, pc in enumerate(pcs.values()):
             axes_pc[i].plot(pc)
-            axes_pc[i].set_ylim(-1.2,1.2)
+            axes_pc[i].set_ylim(-1.2, 1.2)
             axes_pc[i].set_xlabel('')
             axes_pc[i].set_ylabel(var_names[i], fontweight='bold')
             axes_pc[i].set_title('')
-            axes_pc[i].set_yticks([-1,0,1])
+            axes_pc[i].set_yticks([-1, 0, 1])
             axes_pc[i].spines['right'].set_visible(False)
             axes_pc[i].spines['top'].set_visible(False)
 
@@ -942,8 +970,8 @@ class MCA(object):
 
         # plot Phase function (if data is complex)
         if (self._analysis['is_complex']):
-            axes_phase = [fig.add_subplot(gs[i,2]) for i in range(n_rows-1)]
-            cbax_phase = fig.add_subplot(gs[-1,2])
+            axes_phase = [fig.add_subplot(gs[i, 2]) for i in range(n_rows - 1)]
+            cbax_phase = fig.add_subplot(gs[-1, 2])
 
             for i, phase in enumerate(phases.values()):
                 cb_phase = axes_phase[i].imshow(
@@ -952,8 +980,8 @@ class MCA(object):
                 axes_phase[i].set_title('')
 
             plt.colorbar(cb_phase, cbax_phase, orientation='horizontal')
-            cbax_phase.xaxis.set_ticks([-3.14,0,3.14])
-            cbax_phase.set_xticklabels([r'-$\pi$','0',r'$\pi$'])
+            cbax_phase.xaxis.set_ticks([-3.14, 0, 3.14])
+            cbax_phase.set_xticklabels([r'-$\pi$', '0', r'$\pi$'])
 
             for a in axes_phase:
                 axes_space.append(a)
@@ -971,53 +999,76 @@ class MCA(object):
             axes_pc[0].xaxis.set_visible(False)
             axes_pc[0].spines['bottom'].set_visible(False)
 
+    def save_plot(
+            self, mode, path=None, format='png',
+            plot_kwargs={}, save_kwargs={}
+    ):
+        '''Create and save a plot to local disk.
 
-    def save_plot(self, mode, path=None, plot_kwargs={}, save_kwargs={}):
+        Parameters
+        ----------
+        mode : int
+            Mode to plot.
+        format : string
+            Format the plot should be stored as. Valid formats include e.g.
+            'png', 'jpg', 'eps' etc.
+        path : type
+            Storage location of the saved plot. If none is provided, the plot
+            will be stored at './xmca/<left>_<right>/' where <left> and <right>
+            denote the given field names.
+        plot_kwargs : dict
+            Additional parameters provided to `.plot()`.
+        save_kwargs : dict
+            Additional parameters provided to `plt.savefig()`.
+
+        '''
         if path is None:
             path = self._get_analysis_path()
 
-        mode_id = ''.join(['mode',str(mode)])
+        mode_id = ''.join(['mode', str(mode)])
         format = '.png'
-        file_name = '_'.join([self._get_analysis_id(),mode_id])
+        file_name = '_'.join([self._get_analysis_id(), mode_id])
         file_path = os.path.join(path, file_name)
-        fig, axes= self.plot(mode=mode, **plot_kwargs)
-        fig.subplots_adjust(left=0.06)
-        plt.savefig(file_path + format, **save_kwargs)
+        output = '.'.join([file_path, format])
 
+        fig, axes = self.plot(mode=mode, **plot_kwargs)
+        fig.subplots_adjust(left=0.06)
+        plt.savefig(output, **save_kwargs)
 
     def truncate(self, n):
-        '''Truncate solution.
+        '''Truncate the solution to the first `n` modes.
+
+        This may be helpful when the full model takes up to much space to be
+        saved.
 
         Parameters
         ----------
         n : int
-            Cut off after mode `n`.
-
+            Number of modes to be retained.
 
         '''
         if (n < self._singular_values.size):
             self._singular_values = self._singular_values[:n]
 
             for key in self._U.keys():
-                self._U[key] = self._U[key][:,:n]
-                self._V[key] = self._V[key][:,:n]
+                self._U[key] = self._U[key][:, :n]
+                self._V[key] = self._V[key][:, :n]
 
             self._analysis['is_truncated'] = True
             self._analysis['is_truncated_at'] = n
-
 
     def _create_info_file(self, path):
         sep_line = '\n#' + '-' * 79
         now  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         file_header = (
-            'This file contains information neccessary to load stored analysis '
+            'This file contains information neccessary to load stored analysis'
             'data from xmca module.')
 
         path_output   = os.path.join(path, self._get_analysis_id())
-        path_output = '.'.join([path_output,'info'])
+        path_output = '.'.join([path_output, 'info'])
 
-        file = open(path_output,"w+")
+        file = open(path_output, 'w+')
         file.write(wrap_str(file_header))
         file.write('\n# To load this analysis use:')
         file.write('\n# from xmca.xarray import xMCA')
@@ -1026,17 +1077,18 @@ class MCA(object):
         file.write('\n')
         file.write(sep_line)
         file.write(sep_line)
-        file.write('\n{:<20} : {:<57}'.format('created',now))
+        file.write('\n{:<20} : {:<57}'.format('created', now))
         file.write(sep_line)
         for key, name in self._field_names.items():
             file.write('\n{:<20} : {:<57}'.format(key, str(name)))
         file.write(sep_line)
         for key, info in self._analysis.items():
-            if key in ['is_bivariate','is_complex', 'is_rotated','is_truncated']:
+            if key in [
+                    'is_bivariate', 'is_complex', 'is_rotated', 'is_truncated'
+            ]:
                 file.write(sep_line)
             file.write('\n{:<20} : {:<57}'.format(key, str(info)))
         file.close()
-
 
     def _get_file_names(self, format):
         base_name = self._get_analysis_id()
@@ -1065,10 +1117,8 @@ class MCA(object):
         }
         return file_names
 
-
     def _save_data(self, data_array, path, *args, **kwargs):
         raise NotImplementedError('only works for `xarray`')
-
 
     def _set_analysis(self, key, value):
         try:
@@ -1079,7 +1129,6 @@ class MCA(object):
             self._analysis[key] = (value == 'True')
         else:
             self._analysis[key] = key_type(value)
-
 
     def _set_info_from_file(self, path):
 
@@ -1097,8 +1146,29 @@ class MCA(object):
                     self._set_analysis(key, value)
         info_file.close()
 
+    def load_analysis(
+            self, path,
+            fields=None, eofs=None, pcs=None, singular_values=None
+    ):
+        '''Load a model.
 
-    def load_analysis(self, path, fields, eofs, pcs, singular_values):
+        This method allows to load a models which was saved by
+        `.save_analysis()`.
+
+        Parameters
+        ----------
+        path : str
+            Location of the `.info` file created by `.save_analysis()`.
+        fields : ndarray
+            The original input fields.
+        eofs : ndarray
+            The obtained EOFs.
+        pcs : ndarray
+            The obtained PCs.
+        singular_values : ndarray
+            The obtained singular values.
+
+        '''
         self._set_info_from_file(path)
 
         self._V                     = {}
@@ -1111,13 +1181,12 @@ class MCA(object):
             self._n_variables[key]          = np.product(eofs[key].shape[:-1])
             n_modes                         = eofs[key].shape[-1]
             S   = np.sqrt(np.diag(singular_values) * self._n_observations[key])
-            Si  = np.diag(1./np.diag(S))
 
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
             VT, self._no_nan_index[key]   = remove_nan_cols(eofs[key].T)
 
             self._V[key]    = VT.T
-            self._L[key] 	= self._V[key] @ S
+            self._L[key]    = self._V[key] @ S
             self._U[key]    = pcs[key]
 
             self._field_means[key]  = fields[key].mean(axis=0)

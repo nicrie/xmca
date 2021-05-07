@@ -1,8 +1,10 @@
 # xMCA | Maximum Covariance Analysis in Python
 
-[![version](https://img.shields.io/pypi/v/xmca?color=green&label=PyPI)](https://pypi.org/project/xmca/)
+[![version](https://img.shields.io/pypi/v/xmca?color=#2E8B57&label=PyPI)](https://pypi.org/project/xmca/)
 ![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca/master)
-[![downloads](https://img.shields.io/pypi/dm/xmca?color=green)](https://pypi.org/project/xmca/)
+[![Documentation Status](https://readthedocs.org/projects/pyxmca/badge/?version=latest)](https://pyxmca.readthedocs.io/en/latest/?badge=latest)
+![Maintenance](https://img.shields.io/maintenance/yes/2021)
+[![downloads](https://img.shields.io/pypi/dm/xmca?color=#2E8B57)](https://pypi.org/project/xmca/)
 
 Maximum Covariance Analysis (MCA) maximises the temporal covariance between two different
 data fields and is closely related to Principal Component Analysis (PCA) / Empirical
@@ -10,31 +12,7 @@ Orthogonal Function (EOF) analysis, which maximises the variance within a single
 field. MCA allows to extract the dominant co-varying patterns between two different data
 fields.
 
-
 The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fields.
-
-## Installation
-```
-pip install xmca
-```
-### Dependencies
-The file [requirements.txt](requirements.txt) lists all the dependencies. For
-automatic installation, you may want to clone and run
-```
-pip install -r requirements.txt
-```
-
-### Known Issues
-The dependencies of `cartopy` themselves are not installed via `pip` which is
-why the setup will fail if some dependencies are not met. In this case, please
-[install][cartopy] `cartopy` first before installing `xmca`.
-
-## Testing
-After cloning the repository
-```
-python -m unittest discover -v -s tests/
-```
-
 
 ## Core Features
 - Standard PCA/[MCA][mca]
@@ -43,8 +21,36 @@ python -m unittest discover -v -s tests/
 	- Oblique [Promax][promax] rotation
 - [Complex PCA][complex-pca]/MCA (also known as Hilbert EOF analysis)
 	- Optimised [Theta model][theta] extension
+  - *New in v0.2.1:* Exponential extension
 - normalization of input data
 - latitude correction to compensate for stretched areas in higher latitutes
+
+
+## Documentation
+Learn more about `xmca` at the official [Documentation page](https://pyxmca.readthedocs.io/en/latest/index.html).
+
+## Installation
+Installation is simply performed via
+```
+pip install xmca
+```
+
+### Known Issues
+Actually `pip` should take care of installing the correct dependencies. However, the dependencies of `cartopy` themselves are not installed via `pip` which is
+why the setup may fail in some cases. In this case, please
+[install][cartopy] `cartopy` first before installing `xmca`. If you are using a `conda` environment, this can be achieved by
+```
+conda install cartopy
+```
+
+
+### Testing
+After cloning the repository
+```
+python -m unittest discover -v -s tests/
+```
+
+
 
 ## Getting started
 Import the module for `xarray` via

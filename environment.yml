@@ -1,0 +1,14 @@
+name: xmca
+channels:
+  - defaults
+dependencies:
+  - python>3.7
+  - numpy
+  - matplotlib
+  - xarray
+  - cartopy
+  - statsmodels
+  - tqdm
+  - pip:
+    - git+https://github.com/bashtage/sphinx-material.git
+    - xmca
