@@ -45,19 +45,17 @@ class MCA(object):
 
     Examples
     --------
-    Let `data1` and `data2` be some geophysical fields (e.g. SST and pressure).
-    To perform PCA use:
+    Let `left` and `right` be some geophysical fields (e.g. SST and pressure).
+    To perform PCA on `left` use:
 
-    >>> pca = CCA(data1)
-    >>> pca.solve()
-    >>> pcs,_ = pca.pcs()
-
-    To perform MCA use:
-
-    >>> mca = CCA(data1, data2)
+    >>> from xmca.array import MCA
+    >>> mca = MCA(left)
     >>> mca.solve()
-    >>> pcs_data1, pcs_data2 = mca.pcs()
 
+    To perform MCA on `left` and `right` use:
+
+    >>> mca = MCA(left, right)
+    >>> mca.solve()
     '''
 
     def __init__(self, *data):
@@ -152,13 +150,21 @@ class MCA(object):
 
         self._analysis['method']        = self._get_method_id()
 
+    def set_field_names(self, left='left', right='right'):
+        '''Set the name of the left and/or right field.
 
-    def set_field_names(self, left = None, right = None):
-        if left is not None:
-            self._field_names['left']   = left
-        if right is not None:
-            self._field_names['right']   = right
+        Field names will be reflected when results are plotted or saved.
 
+        Parameters
+        ----------
+        left : string
+            Name of the `left` field. (the default is 'left').
+        right : string
+            Name of the `right` field. (the default is 'right').
+
+        '''
+        self._field_names['left']   = left
+        self._field_names['right']  = right
 
     def _get_method_id(self):
         id = 'pca'
@@ -227,6 +233,21 @@ class MCA(object):
 
 
     def apply_weights(self,left=None, right=None):
+        '''Apply weights to the left and/or right field.
+
+        Parameters
+        ----------
+        left : type
+            Description of parameter `left` (the default is None).
+        right : type
+            Description of parameter `right` (the default is None).
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        '''
         '''Apply weights to data sets.
 
         Supplied weights are applied via broadcasting.
