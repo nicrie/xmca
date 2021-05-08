@@ -62,11 +62,11 @@ Create some dummy data, which should be of type `xr.DataArray`.
 import numpy as np
 import xarray as xr
 
-t = 300                 # number of time steps
+n_time = 300                 # number of time steps
 lat1, lon1 = 20, 30     # number of latitudes/longitudes of field A
 lat2, lon2 = 15, 10     # number of latitudes/longitudes of field B
-A = xr.DataArray(np.random.randn(t,lat1,lon1)) # dummy field A
-B = xr.DataArray(np.random.randn(t,lat1,lon2)) # dummy field B
+A = xr.DataArray(np.random.randn(n_time, lat1, lon1)) # dummy field A
+B = xr.DataArray(np.random.randn(n_time, lat1, lon2)) # dummy field B
 ```
 
 ### Principal Component Analysis
