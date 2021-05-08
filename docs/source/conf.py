@@ -13,9 +13,9 @@
 import os
 import sys
 
-from xmca import __version__
-
 sys.path.insert(0, os.path.abspath('../../xmca/'))
+
+from xmca import __version__
 
 
 # -- Project information -----------------------------------------------------
