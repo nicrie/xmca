@@ -13,7 +13,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('../../xmca/'))
+sys.path.insert(0, os.path.abspath('../../'))
 
 from xmca import __version__
 
