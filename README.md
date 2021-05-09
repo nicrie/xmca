@@ -111,7 +111,7 @@ The package provides a method to visually inspect the individual modes, e.g. for
 mca2.set_field_names('SST', 'Precipitation')  # add variable names, optional
 mca2.plot(mode=2)
 ```
-![example-plot1](figs/example-plot1.png)
+![example-plot1](figs/example-plot1.png "Result of default plot method after performing complex rotated MCA on SST and precipitation showing mode 2")
 
 You may want to modify the plot for some better optics:
 ```py
@@ -135,7 +135,7 @@ plot_kwargs = {
 mca2.plot(mode=2, **plot_kwargs)
 ```
 
-![example-plot2](figs/example-plot2.png)
+![example-plot2](figs/example-plot2.png "Result of plot method with improved optics after performing complex rotated MCA on SST and precipitation showing mode 2.")
 
 You can save the plot to your local disk as a `.png` file via
 ```py
