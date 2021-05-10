@@ -87,20 +87,20 @@ class xMCA(MCA):
 
         # set fields
         keys    = ['left', 'right']
-        fields  = {keys[i] : field for i,field in enumerate(data)}
+        fields  = {keys[i] : field for i, field in enumerate(data)}
 
         # store meta information of DataArrays
-        self._field_dims    = {} # dimensions of fields
-        self._field_coords  = {} # coordinates of fields
+        self._field_dims    = {}  # dimensions of fields
+        self._field_coords  = {}  # coordinates of fields
 
-        for key,field in fields.items():
+        for key, field in fields.items():
             self._field_dims[key]   = field.dims
             self._field_coords[key] = field.coords
 
         # constructor of base class for numpy.ndarray
         if len(fields) == 0:
             fields = {'left': xr.DataArray([])}
-        fields = {key : field.values for key, field in fields.items()}
+        fields = {key : field.data for key, field in fields.items()}
         super().__init__(*fields.values())
 
 

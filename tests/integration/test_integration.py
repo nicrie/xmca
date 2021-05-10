@@ -6,6 +6,12 @@ from shutil import rmtree
 
 import numpy as np
 import xarray as xr
+try:
+    import dask.array
+    dask_support = True
+except ImportError:
+    dask_support = False
+
 from numpy.testing import assert_allclose
 
 from xmca.xarray import xMCA
@@ -309,6 +315,36 @@ class TestIntegration(unittest.TestCase):
 
         rmtree(join(getcwd(), 'tests/integration/xmca/'))
 
-        @classmethod
-        def tearDownClass(self):
-            pass
+    def test_complex_mca_dask(self):
+        temp = xr.tutorial.open_dataset(
+            'air_temperature',
+            chunks={'lat': 25, 'lon': 25, 'time': -1}
+        )
+        temp = temp.coarsen({'lat': 2, 'lon': 2}, boundary='trim').mean()
+        temp = temp.air
+        n_var = np.product(temp.shape[1:])
+        svd_kwargs = {'k' : 0.5 * n_var}
+
+        mca = xMCA(temp, temp)
+        mca.set_field_names('temp', 'temp')
+        mca.solve(complexify=True, extend='exp', svd_kwargs=svd_kwargs)
+        mca.rotate(10)
+        mca.singular_values(self.modes)
+        mca.eofs(self.modes)
+        mca.pcs(self.modes)
+        mca.plot(1)
+        mca.save_analysis('./tests/integration')
+
+        path = './tests/integration/xmca/temp_temp/mca_c1_r10_p01.info'
+        mca2 = xMCA()
+        mca2.load_analysis(path)
+        mca2.singular_values(self.modes)
+        mca2.eofs(self.modes)
+        mca2.pcs(self.modes)
+        mca2.plot(1)
+
+        rmtree(join(getcwd(), 'tests/integration/xmca/'))
+
+    @classmethod
+    def tearDownClass(self):
+        pass
