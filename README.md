@@ -15,7 +15,7 @@ Orthogonal Function analysis (**EOF analysis**). While EOF analysis maximises th
 field, MCA allows to extract the dominant co-varying patterns between two different data
 fields. When the two input fields are the same, MCA reduces to standard EOF analysis.
 
-Reference: e.g. [lecture material][mca-material] from C. Bretherton
+For the mathematical understanding please have a look at e.g. the [lecture material][mca-material] from C. Bretherton.
 
 
 ## Core Features
@@ -168,6 +168,11 @@ You can save the plot to your local disk as a `.png` file via
 save_kwargs={'dpi':200, 'transparent':True}
 mca2.save_plot(mode=2, plot_kwargs=plot_kwargs, save_kwargs=save_kwargs)
 ```
+
+## Credits
+Kudos to the developers and contributors of the following Github projects which I initially used myself but had to expand to my needs for my own research:
+* [ajdawson/eofs](https://github.com/ajdawson/eofs)
+* [Yefee/xMCA](https://github.com/Yefee/xMCA)
 
 [xarray]: http://xarray.pydata.org/en/stable/
 
