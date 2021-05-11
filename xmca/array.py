@@ -297,13 +297,30 @@ class MCA(object):
 
         return forecast
 
-    def _exp_forecast(self, series):
+    def _get_reg_coefs(self, x, y):
+        assert(x.shape[0] == y.shape[0])
+        N = x.shape[0]
 
-        N = len(series)
+        xmean = np.mean(x, axis=0)
+        ymean = np.mean(y, axis=0)
+        xstd  = np.mean(x, axis=0)
+
+        # Compute covariance along time axis
+        cov   = np.sum((x - xmean) * (y - ymean), axis=0) / N
+
+        # Compute regression slope and intercept:
+        slope     = cov / (xstd**2)
+        intercept = ymean - xmean * slope
+        return intercept, slope
+
+    def _exp_forecast(self, field):
+        N = field.shape[0]
         x = np.arange(N)
-        intercept, slope = polyfit(x, series, deg=1)
-        linear_end = slope * x[-1] + intercept
-        series_end = series[-1]
+        x = np.repeat(x[:, np.newaxis], field.shape[1], axis=1)
+        intercept, slope = self._get_reg_coefs(x, field)
+
+        linear_end = slope * x[-1, :] + intercept
+        series_end = field[-1, :]
         offset      = series_end - linear_end
 
         b = 1
@@ -321,15 +338,14 @@ class MCA(object):
         # Theta extension
         if extend == 'theta':
             extended = [self._theta_forecast(col) for col in tqdm(field.T)]
+            extended = np.array(extended).T
         # Exponential extension
         elif extend == 'exp':
-            extended = [self._exp_forecast(col) for col in tqdm(field.T)]
+            extended = self._exp_forecast(field)
         else:
             error_message = '''{:} is not a valid extension. Choose either
             `exp` or `theta`.'''.format(extend)
             raise ValueError(error_message)
-
-        extended = np.array(extended).T
 
         return extended
 
