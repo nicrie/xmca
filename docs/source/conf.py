@@ -13,16 +13,10 @@
 import os
 import sys
 
-# import subprocess
+sys.path.insert(0, os.path.abspath('../../'))
 
-sys.path.insert(0, os.path.abspath('../../xmca/'))
+from xmca import __version__
 
-
-# if os.environ.get('READTHEDOCS') == 'True':
-#     # Install cartopy dependencies
-#     subprocess.check_output([
-#         'apt-get', 'install', '-y', 'libproj-dev', 'proj-data', 'proj-bin'
-#     ])
 
 # -- Project information -----------------------------------------------------
 
@@ -31,7 +25,7 @@ copyright = '2021, Niclas Rieger'
 author = 'Niclas Rieger'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.0'
+release = __version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -95,5 +89,8 @@ html_theme_options = {
 
 html_sidebars = {
     # exclude "localtoc.html"
-    '**': ['logo-text.html', 'globaltoc.html', 'localtoc.html', 'searchbox.html']
+    '**': [
+        'logo-text.html', 'globaltoc.html',
+        'localtoc.html', 'searchbox.html'
+    ]
 }

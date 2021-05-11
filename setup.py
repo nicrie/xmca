@@ -1,4 +1,6 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
+
+from xmca import __version__
 
 '''
 Run the following code in your conda environment to make the package available
@@ -37,6 +39,7 @@ setup(
     ],
     python_requires='>=3.6',
     version_config={
+        'version_callback' : __version__,
         'dev_template': '{tag}.post{ccount}',
         'dirty_template': '{tag}.post{ccount}'
     },
