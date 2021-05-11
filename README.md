@@ -1,33 +1,59 @@
 # xMCA | Maximum Covariance Analysis in Python
 
-[![version](https://img.shields.io/pypi/v/xmca?color=#2E8B57&label=PyPI)](https://pypi.org/project/xmca/)
-![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca/master)
-[![Documentation Status](https://readthedocs.org/projects/pyxmca/badge/?version=latest)](https://pyxmca.readthedocs.io/en/latest/?badge=latest)
-![Maintenance](https://img.shields.io/maintenance/yes/2021)
-[![downloads](https://img.shields.io/pypi/dm/xmca?color=#2E8B57)](https://pypi.org/project/xmca/)
+[![version](https://img.shields.io/pypi/v/xmca?color=f2cc8f&label=PyPI)](https://pypi.org/project/xmca/)
+![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca?color=81b29a)
+[![Documentation Status](https://img.shields.io/readthedocs/xmca/latest?color=81b29a)](https://pyxmca.readthedocs.io/en/latest/?badge=latest)
+![Maintenance](https://img.shields.io/maintenance/yes/2021?color=81b29a)
+[![downloads](https://img.shields.io/pypi/dm/xmca?color=f2cc8f)](https://pypi.org/project/xmca/)
 
-Maximum Covariance Analysis (MCA) maximises the temporal covariance between two different
-data fields and is closely related to Principal Component Analysis (PCA) / Empirical
-Orthogonal Function (EOF) analysis, which maximises the variance within a single data
-field. MCA allows to extract the dominant co-varying patterns between two different data
-fields.
+The aim of this package is to provide a flexible tool for the climate science community to perform Maximum Covariance Analysis (**MCA**) in a simple and consistent way. Given the huge popularity of [`xarray`][xarray] in the climate science community, the `xmca` package supports `xarray.DataArray` as well as `numpy.ndarray` as input formats.
 
-The module `xmca` works with `numpy.ndarray` and `xarray.DataArray` as input fields.
+## What is MCA?
+MCA maximises the temporal covariance between two different
+data fields and is closely related to Principal Component Analysis (**PCA**) / Empirical
+Orthogonal Function analysis (**EOF analysis**). While EOF analysis maximises the variance within a single data
+field, MCA allows to extract the dominant co-varying patterns between two different data
+fields. When the two input fields are the same, MCA reduces to standard EOF analysis.
+
+For the mathematical understanding please have a look at e.g. the [lecture material][mca-material] from C. Bretherton.
+
 
 ## Core Features
-- Standard PCA/[MCA][mca]
-- Rotated PCA/[MCA][rotated-mca]
+##### Pre-processing
+- Normalisation
+- Spatial weighting to correct for latitude bias
+##### EOF analysis (PCA)
+- [standard EOF][pca] analysis
+- [rotated EOF][rotated-pca] analysis
 	- Orthogonal [Varimax][varimax] rotation
 	- Oblique [Promax][promax] rotation
-- [Complex PCA][complex-pca]/MCA (also known as Hilbert EOF analysis)
+- [Complex EOF][complex-pca] analysis (also known as Hilbert EOF analysis)
 	- Optimised [Theta model][theta] extension
   - *New in v0.2.1:* Exponential extension
-- normalization of input data
-- latitude correction to compensate for stretched areas in higher latitutes
+##### MCA
+-  [standard MCA][mca]
+- [rotated MCA][rotated-mca]
+	- Orthogonal [Varimax][varimax] rotation
+	- Oblique [Promax][promax] rotation
+- Complex MCA (paper submitted, arXiv preprint)
+	- Optimised [Theta model][theta] extension
+  - *New in v0.2.1:* Exponential extension
 
+##### Results
+- eigenvalues / singular values
+- explained variance
+- EOFs (spatial patterns)
+- PCs (temporal evolution)
+- Heterogeneous/Homogeneous patterns
+- If rotated: rotation and PC correlation matrix
+- If complex: spatial amplitude/phase
 
-## Documentation
-Learn more about `xmca` at the official [Documentation page](https://pyxmca.readthedocs.io/en/latest/index.html).
+##### Convenience
+- plotting function
+- saving/loading performed analyses
+
+I'm currently working on a more detailed [documentation page](https://pyxmca.readthedocs.io/en/latest/index.html). Please have a look there for the entire API reference.
+
 
 ## Installation
 Installation is simply performed via
@@ -35,16 +61,16 @@ Installation is simply performed via
 pip install xmca
 ```
 
-### Known Issues
-Actually `pip` should take care of installing the correct dependencies. However, the dependencies of `cartopy` themselves are not installed via `pip` which is
-why the setup may fail in some cases. In this case, please
+##### Known Issues
+Actually `pip` should take care of installing the correct dependencies. However, the dependencies of `cartopy` itself are not installed via `pip` which is
+why the setup may fail in some cases. If so, please
 [install][cartopy] `cartopy` first before installing `xmca`. If you are using a `conda` environment, this can be achieved by
 ```
 conda install cartopy
 ```
 
 
-### Testing
+##### Testing
 After cloning the repository
 ```
 python -m unittest discover -v -s tests/
@@ -52,7 +78,7 @@ python -m unittest discover -v -s tests/
 
 
 
-## Getting started
+## Quickstart
 Import the module for `xarray` via
 ```py
 from xmca.xarray import xMCA
@@ -62,11 +88,11 @@ Create some dummy data, which should be of type `xr.DataArray`.
 import numpy as np
 import xarray as xr
 
-t = 300                 # number of time steps
+n_time = 300                 # number of time steps
 lat1, lon1 = 20, 30     # number of latitudes/longitudes of field A
 lat2, lon2 = 15, 10     # number of latitudes/longitudes of field B
-A = xr.DataArray(np.random.randn(t,lat1,lon1)) # dummy field A
-B = xr.DataArray(np.random.randn(t,lat1,lon2)) # dummy field B
+A = xr.DataArray(np.random.randn(n_time, lat1, lon1)) # dummy field A
+B = xr.DataArray(np.random.randn(n_time, lat1, lon2)) # dummy field B
 ```
 
 ### Principal Component Analysis
@@ -111,7 +137,7 @@ The package provides a method to visually inspect the individual modes, e.g. for
 mca2.set_field_names('SST', 'Precipitation')  # add variable names, optional
 mca2.plot(mode=2)
 ```
-![example-plot1](figs/example-plot1.png)
+![example-plot1](figs/example-plot1.png "Result of default plot method after performing complex rotated MCA on SST and precipitation showing mode 2")
 
 You may want to modify the plot for some better optics:
 ```py
@@ -135,7 +161,7 @@ plot_kwargs = {
 mca2.plot(mode=2, **plot_kwargs)
 ```
 
-![example-plot2](figs/example-plot2.png)
+![example-plot2](figs/example-plot2.png "Result of plot method with improved optics after performing complex rotated MCA on SST and precipitation showing mode 2.")
 
 You can save the plot to your local disk as a `.png` file via
 ```py
@@ -143,9 +169,22 @@ save_kwargs={'dpi':200, 'transparent':True}
 mca2.save_plot(mode=2, plot_kwargs=plot_kwargs, save_kwargs=save_kwargs)
 ```
 
+## Credits
+Kudos to the developers and contributors of the following Github projects which I initially used myself but had to expand to my needs for my own research:
+* [ajdawson/eofs](https://github.com/ajdawson/eofs)
+* [Yefee/xMCA](https://github.com/Yefee/xMCA)
+
+[xarray]: http://xarray.pydata.org/en/stable/
+
 [cartopy]: https://scitools.org.uk/cartopy/docs/latest/installing.html
 
+[pca]: https://en.wikipedia.org/wiki/Empirical_orthogonal_functions
+
 [mca]: ftp://eos.atmos.washington.edu/pub/breth/papers/1992/SVD-theory.pdf
+
+[mca-material]: https://atmos.washington.edu/~breth/classes/AS552/lect/lect22.pdf
+
+[rotated-pca]: https://climatedataguide.ucar.edu/climate-data-tools-and-analysis/empirical-orthogonal-function-eof-analysis-and-rotated-eof-analysis
 
 [rotated-mca]: https://journals.ametsoc.org/jcli/article/8/11/2631/35764/Orthogonal-Rotation-of-Spatial-Patterns-Derived
 
