@@ -28,7 +28,7 @@ For the mathematical understanding please have a look at e.g. the [lecture mater
 |              	| Standard 	| Rotated 	| Complex 	| Complex Rotated 	|
 |--------------	|----------	|----------	|---------	|------------------	|
 | EOF analysis 	|[:heavy_check_mark:][pca]|[:heavy_check_mark:][rotated-pca]|[:heavy_check_mark:][complex-pca]|[:heavy_check_mark:][crpca]|
-| MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|:heavy_check_mark:[xmca]|:heavy_check_mark:[xmca]|
+| MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|[:heavy_check_mark:][xmca]|[:heavy_check_mark:][xmca]|
 
 \* *click on check marks for reference* \
 \** *A paper featuring complex (rotated) MCA has been submitted and is currently under review. However, you can already check a pre-print on [arXiv][xmca].*
