@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-'''
-Complex rotated maximum covariance analysis of two numpy arrays.
-'''
+
 # =============================================================================
 # Imports
 # =============================================================================
@@ -25,37 +23,13 @@ from tqdm import tqdm
 # =============================================================================
 # MCA
 # =============================================================================
-class MCA(object):
-    '''Perform Maximum Covariance Analysis (MCA) for two `numpy.ndarray`.
+class MCA:
+    '''Perform MCA on two ``numpy.ndarray``.
 
     MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
     it is equivalent to PCA.
 
-    Parameters
-    ----------
-    left : ndarray
-        Left input data. First dimension needs to be time.
-    right : ndarray, optional
-        Right input data. First dimension needs to be time.
-        If none is provided, automatically, right field is assumed to be
-        the same as left field. In this case, MCA reducdes to normal PCA.
-        The default is None.
-
-
-    Examples
-    --------
-    Let `left` and `right` be some geophysical fields (e.g. SST and pressure).
-    To perform PCA on `left` use:
-
-    >>> from xmca.array import MCA
-    >>> mca = MCA(left)
-    >>> mca.solve()
-
-    To perform MCA on `left` and `right` use:
-
-    >>> mca = MCA(left, right)
-    >>> mca.solve()
     '''
 
     def __init__(self, *data):
@@ -70,6 +44,27 @@ class MCA(object):
             If none is provided, automatically, right field is assumed to be
             the same as left field. In this case, MCA reducdes to normal PCA.
             The default is None.
+
+
+        Examples
+        --------
+        Let `left` and `right` be some geophysical fields (e.g. SST and SLP).
+        To perform PCA on `left` use:
+
+        >>> from xmca.array import MCA
+        >>> pca = MCA(left)
+        >>> pca.solve()
+        >>> exp_var = pca.explained_variance()
+        >>> pcs = pca.pcs()
+        >>> eofs = pca.eofs()
+
+        To perform MCA on `left` and `right` use:
+
+        >>> mca = MCA(left, right)
+        >>> mca.solve()
+        >>> exp_var = mca.explained_variance()
+        >>> pcs = mca.pcs()
+        >>> eofs = mca.eofs()
 
         '''
         if len(data) == 0:
@@ -377,7 +372,10 @@ class MCA(object):
         return field
 
     def solve(self, complexify=False, extend=False, period=365):
-        '''Solve eigenvalue equation by performing SVD on covariance matrix.
+        '''Call the solver to perform EOF analysis/MCA.
+
+        Under the hood this method performs singular value decomposition on
+        the covariance matrix.
 
         Parameters
         ----------
@@ -438,8 +436,10 @@ class MCA(object):
             VLeft, singular_values, VTRight = np.linalg.svd(
                 kernel, full_matrices=False
             )
-        except LinAlgError:
-            raise LinAlgError("SVD failed. NaN entries may be the problem.")
+        except np.linalg.LinAlgError:
+            raise np.linalg.LinAlgError(
+                '''SVD failed. NaN entries may be the problem.'''
+            )
 
         self._V['left'] = VLeft
         if self._analysis['is_bivariate']:
