@@ -10,14 +10,15 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
+
 import sys
+from os.path import dirname, join, abspath
 
-sys.path.insert(0, os.path.abspath('../..'))
-sys.path.insert(0, os.path.abspath('../../xmca'))
+sys.path.insert(0, abspath('../..'))
+sys.path.insert(0, abspath('../../xmca'))
 
-here = os.path.dirname(__file__)
-version_file = open(os.path.join(here, '../../version'))
+version_path = dirname(dirname(dirname(__file__)))
+version_file = open(join(version_path, 'version'))
 version = version_file.read().rstrip('\n')
 
 # -- Project information -----------------------------------------------------
