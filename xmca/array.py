@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-'''
-Complex rotated maximum covariance analysis of two numpy arrays.
-'''
+
 # =============================================================================
 # Imports
 # =============================================================================
@@ -25,37 +23,13 @@ from tqdm import tqdm
 # =============================================================================
 # MCA
 # =============================================================================
-class MCA(object):
-    '''Perform Maximum Covariance Analysis (MCA) for two `numpy.ndarray`.
+class MCA:
+    '''Perform MCA on two ``numpy.ndarray``.
 
     MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
     it is equivalent to PCA.
 
-    Parameters
-    ----------
-    left : ndarray
-        Left input data. First dimension needs to be time.
-    right : ndarray, optional
-        Right input data. First dimension needs to be time.
-        If none is provided, automatically, right field is assumed to be
-        the same as left field. In this case, MCA reducdes to normal PCA.
-        The default is None.
-
-
-    Examples
-    --------
-    Let `left` and `right` be some geophysical fields (e.g. SST and pressure).
-    To perform PCA on `left` use:
-
-    >>> from xmca.array import MCA
-    >>> mca = MCA(left)
-    >>> mca.solve()
-
-    To perform MCA on `left` and `right` use:
-
-    >>> mca = MCA(left, right)
-    >>> mca.solve()
     '''
 
     def __init__(self, *data):
@@ -70,6 +44,27 @@ class MCA(object):
             If none is provided, automatically, right field is assumed to be
             the same as left field. In this case, MCA reducdes to normal PCA.
             The default is None.
+
+
+        Examples
+        --------
+        Let `left` and `right` be some geophysical fields (e.g. SST and SLP).
+        To perform PCA on `left` use:
+
+        >>> from xmca.array import MCA
+        >>> pca = MCA(left)
+        >>> pca.solve()
+        >>> exp_var = pca.explained_variance()
+        >>> pcs = pca.pcs()
+        >>> eofs = pca.eofs()
+
+        To perform MCA on `left` and `right` use:
+
+        >>> mca = MCA(left, right)
+        >>> mca.solve()
+        >>> exp_var = mca.explained_variance()
+        >>> pcs = mca.pcs()
+        >>> eofs = mca.eofs()
 
         '''
         if len(data) == 0:
@@ -297,13 +292,30 @@ class MCA(object):
 
         return forecast
 
-    def _exp_forecast(self, series):
+    def _get_reg_coefs(self, x, y):
+        assert(x.shape[0] == y.shape[0])
+        N = x.shape[0]
 
-        N = len(series)
+        xmean = np.mean(x, axis=0)
+        ymean = np.mean(y, axis=0)
+        xstd  = np.mean(x, axis=0)
+
+        # Compute covariance along time axis
+        cov   = np.sum((x - xmean) * (y - ymean), axis=0) / N
+
+        # Compute regression slope and intercept:
+        slope     = cov / (xstd**2)
+        intercept = ymean - xmean * slope
+        return intercept, slope
+
+    def _exp_forecast(self, field):
+        N = field.shape[0]
         x = np.arange(N)
-        intercept, slope = polyfit(x, series, deg=1)
-        linear_end = slope * x[-1] + intercept
-        series_end = series[-1]
+        x = np.repeat(x[:, np.newaxis], field.shape[1], axis=1)
+        intercept, slope = self._get_reg_coefs(x, field)
+
+        linear_end = slope * x[-1, :] + intercept
+        series_end = field[-1, :]
         offset      = series_end - linear_end
 
         b = 1
@@ -321,15 +333,14 @@ class MCA(object):
         # Theta extension
         if extend == 'theta':
             extended = [self._theta_forecast(col) for col in tqdm(field.T)]
+            extended = np.array(extended).T
         # Exponential extension
         elif extend == 'exp':
-            extended = [self._exp_forecast(col) for col in tqdm(field.T)]
+            extended = self._exp_forecast(field)
         else:
             error_message = '''{:} is not a valid extension. Choose either
             `exp` or `theta`.'''.format(extend)
             raise ValueError(error_message)
-
-        extended = np.array(extended).T
 
         return extended
 
@@ -377,7 +388,10 @@ class MCA(object):
         return field
 
     def solve(self, complexify=False, extend=False, period=365):
-        '''Solve eigenvalue equation by performing SVD on covariance matrix.
+        '''Call the solver to perform EOF analysis/MCA.
+
+        Under the hood this method performs singular value decomposition on
+        the covariance matrix.
 
         Parameters
         ----------
@@ -438,8 +452,10 @@ class MCA(object):
             VLeft, singular_values, VTRight = np.linalg.svd(
                 kernel, full_matrices=False
             )
-        except LinAlgError:
-            raise LinAlgError("SVD failed. NaN entries may be the problem.")
+        except np.linalg.LinAlgError:
+            raise np.linalg.LinAlgError(
+                '''SVD failed. NaN entries may be the problem.'''
+            )
 
         self._V['left'] = VLeft
         if self._analysis['is_bivariate']:
