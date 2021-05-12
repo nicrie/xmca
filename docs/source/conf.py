@@ -12,14 +12,13 @@
 #
 
 import sys
-from os.path import dirname, join, abspath
+import os
 
-sys.path.insert(0, abspath('../..'))
-sys.path.insert(0, abspath('../../xmca'))
+sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('../../xmca'))
 
-version_path = dirname(dirname(dirname(__file__)))
-version_file = open(join(version_path, 'version'))
-version = version_file.read().rstrip('\n')
+vfile = {}
+exec(open('../../xmca/version.py').read(), vfile)
 
 # -- Project information -----------------------------------------------------
 
@@ -28,7 +27,7 @@ copyright = '2021, Niclas Rieger'
 author = 'Niclas Rieger'
 
 # The full version, including alpha/beta/rc tags
-release = version
+release = vfile['__version__']
 
 
 # -- General configuration ---------------------------------------------------

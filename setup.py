@@ -6,6 +6,9 @@ Run the following code in your conda environment to make the package available
 in development mode
 $ python setup.py develop
 '''
+# Get version file
+vfile = {}
+exec(open('xmca/version.py').read(), vfile)
 
 with open('README.md', 'r') as fh:
     long_description = fh.read()
@@ -19,10 +22,6 @@ requirements = ['numpy >= 1.19.2',
                 'statsmodels >= 0.12.2',
                 'tqdm',
                 'cartopy >= 0.18.0']
-
-# Get version file
-here = os.path.dirname(__file__)
-version_file = os.path.join(here, 'version')
 
 setup(
     name='xmca',
@@ -42,7 +41,7 @@ setup(
     ],
     python_requires='>=3.6',
     version_config={
-        'vesion_file' : version_file,
+        'version_callback' : vfile['__version__'],
         'dev_template': '{tag}.post{ccount}',
         'dirty_template': '{tag}.post{ccount}'
     },
