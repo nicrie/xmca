@@ -1,15 +1,15 @@
+import os
+
 from setuptools import find_packages, setup
-
-from xmca import __version__
-
 '''
 Run the following code in your conda environment to make the package available
+in development mode
 $ python setup.py develop
 '''
 
-
 with open('README.md', 'r') as fh:
     long_description = fh.read()
+
 with open('requirements.txt', 'r') as fh:
     install_requires = fh.read()
 
@@ -20,11 +20,14 @@ requirements = ['numpy >= 1.19.2',
                 'tqdm',
                 'cartopy >= 0.18.0']
 
+# Get version file
+here = os.path.dirname(__file__)
+version_file = os.path.join(here, 'version')
 
 setup(
     name='xmca',
     include_package_data=True,
-    keywords='mca',
+    keywords='eof, analysis, mca, pca',
     author='Niclas Rieger',
     author_email='niclasrieger@gmail.com',
     description='Maximum Covariance Analysis in Python',
@@ -39,7 +42,7 @@ setup(
     ],
     python_requires='>=3.6',
     version_config={
-        'version_callback' : __version__,
+        'vesion_file' : version_file,
         'dev_template': '{tag}.post{ccount}',
         'dirty_template': '{tag}.post{ccount}'
     },
