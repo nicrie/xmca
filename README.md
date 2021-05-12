@@ -28,10 +28,10 @@ For the mathematical understanding please have a look at e.g. the [lecture mater
 |              	| Standard 	| Rotated 	| Complex 	| Complex Rotated 	|
 |--------------	|----------	|----------	|---------	|------------------	|
 | EOF analysis 	|[:heavy_check_mark:][pca]|[:heavy_check_mark:][rotated-pca]|[:heavy_check_mark:][complex-pca]|[:heavy_check_mark:][crpca]|
-| MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|:heavy_check_mark:|:heavy_check_mark:|
+| MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|:heavy_check_mark:[xmca]|:heavy_check_mark:[xmca]|
 
 \* *click on check marks for reference* \
-\** *A paper featuring complex (rotated) MCA has been submitted and is currently under review*
+\** *A paper featuring complex (rotated) MCA has been submitted and is currently under review. However, you can already check a pre-print on [arXiv][xmca].*
 
 
 ## Installation \& Quickstart
@@ -72,3 +72,5 @@ Kudos to the developers and contributors of the following Github projects which 
 [crpca]: https://rmets.onlinelibrary.wiley.com/doi/abs/10.1002/joc.3370140706
 
 [theta]: https://linkinghub.elsevier.com/retrieve/pii/S0169207016300243
+
+[xmca]: https://arxiv.org/abs/2105.04618
