@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-'''
-Complex rotated maximum covariance analysis of two xarray DataArrays.
-'''
-
 # =============================================================================
 # Imports
 # =============================================================================
@@ -25,38 +21,11 @@ from xmca.tools.xarray import calc_temporal_corr, get_extent
 
 
 class xMCA(MCA):
-    '''Perform Maximum Covariance Analysis (MCA) for two `xarray.DataArray`.
+    '''Perform MCA on two ``xarray.DataArray``.
 
     MCA is a more general form of Principal Component Analysis (PCA)
     for two input fields (left, right). If both data fields are the same,
     it is equivalent to PCA.
-
-    Parameters
-    ----------
-    left : ndarray
-        Left input data. First dimension needs to be time.
-    right : ndarray, optional
-        Right input data. First dimension needs to be time.
-        If none is provided, automatically, right field is assumed to be
-        the same as left field. In this case, MCA reducdes to normal PCA.
-        The default is None.
-
-
-    Examples
-    --------
-    Let `data1` and `data2` be some geophysical fields (e.g. SST and pressure).
-    To perform PCA use:
-
-    >>> pca = MCA(data1)
-    >>> pca.solve()
-    >>> pcs = pca.pcs()
-    >>> pcs['left'].sel(mode=1).plot()
-
-    To perform MCA use:
-
-    >>> mca = MCA(data1, data2)
-    >>> mca.solve()
-    >>> pcsData1, pcsData2 = mca.pcs()
     '''
 
     def __init__(self, *data):
@@ -73,10 +42,25 @@ class xMCA(MCA):
             the same as left field. In this case, MCA reducdes to normal PCA.
             The default is None.
 
-        Returns
-        -------
-        None.
+        Examples
+        --------
+        Let `left` and `right` be some geophysical fields (e.g. SST and SLP).
+        To perform PCA on `left` use:
 
+        >>> from xmca.array import MCA
+        >>> pca = MCA(left)
+        >>> pca.solve()
+        >>> exp_var = pca.explained_variance()
+        >>> pcs = pca.pcs()
+        >>> eofs = pca.eofs()
+
+        To perform MCA on `left` and `right` use:
+
+        >>> mca = MCA(left, right)
+        >>> mca.solve()
+        >>> exp_var = mca.explained_variance()
+        >>> pcs = mca.pcs()
+        >>> eofs = mca.eofs()
         '''
         if len(data) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
@@ -87,13 +71,13 @@ class xMCA(MCA):
 
         # set fields
         keys    = ['left', 'right']
-        fields  = {keys[i] : field for i,field in enumerate(data)}
+        fields  = {keys[i] : field for i, field in enumerate(data)}
 
         # store meta information of DataArrays
-        self._field_dims    = {} # dimensions of fields
-        self._field_coords  = {} # coordinates of fields
+        self._field_dims    = {}  # dimensions of fields
+        self._field_coords  = {}  # coordinates of fields
 
-        for key,field in fields.items():
+        for key, field in fields.items():
             self._field_dims[key]   = field.dims
             self._field_coords[key] = field.coords
 
@@ -102,7 +86,6 @@ class xMCA(MCA):
             fields = {'left': xr.DataArray([])}
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
-
 
     def _get_fields(self, original_scale=False):
         dims        = self._field_dims
@@ -113,16 +96,14 @@ class xMCA(MCA):
         for key in fields.keys():
             fields[key] = xr.DataArray(
                 fields[key],
-                dims = dims[key],
-                coords = coords[key],
-                name = field_names[key])
+                dims=dims[key],
+                coords=coords[key],
+                name=field_names[key])
 
             if (original_scale & self._analysis['is_coslat_corrected']):
                 fields[key] /= np.cos(np.deg2rad(coords[key]['lat']))
 
         return fields
-
-
 
     def apply_weights(self, **weights):
         fields = self._get_fields()
@@ -131,13 +112,11 @@ class xMCA(MCA):
             for key, weight in weights.items():
                 self._fields[key]  = (fields[key] * weight).data
         except KeyError:
-            raise KeyError("Keys not found. Choose `left` or `right`")
-
+            raise KeyError('Keys not found. Choose `left` or `right`')
 
     def apply_coslat(self):
-        '''Apply area correction to higher latitudes.
+        '''Apply area correction to higher latitudes.'''
 
-        '''
         coords  = self._field_coords
         weights = {}
         for key, coord in coords.items():
@@ -147,24 +126,21 @@ class xMCA(MCA):
             self.apply_weights(**weights)
             self._analysis['is_coslat_corrected'] = True
         else:
-            print("Coslat correction already applied. Nothing was done.")
-
+            print('Coslat correction already applied. Nothing was done.')
 
     def singular_values(self, n=None):
-        '''Return first `n` singular_values of the PCA.
+        '''Return first `n` singular values of the SVD.
 
         Parameters
         ----------
         n : int, optional
-            Number of singular_values to return. If none, then all singular_values are returned.
-            The default is None.
+            Number of singular values to return. If None, then all singular
+            values are returned. The default is None.
 
         Returns
         -------
         DataArray
-            singular_values of PCA.
-        DataArray
-            Uncertainty of singular_values according to North's rule of thumb.
+            Singular values of the SVD.
 
         '''
         # for n=Nonr, all singular_values are returned
@@ -174,23 +150,17 @@ class xMCA(MCA):
         if n is None:
             n = values.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
-        values = xr.DataArray(values,
-            dims 	= ['mode'],
-            coords 	= {'mode' : modes},
-            name 	= 'singular values',
-            attrs   = attrs)
-
-        # error = xr.DataArray(error,
-        #     dims 	= ['mode'],
-        #     coords 	= {'mode' : modes},
-        #     name 	= 'error eigenvalues',
-        #     attrs   = attrs)
+        values = xr.DataArray(
+            values,
+            dims=['mode'],
+            coords={'mode' : modes},
+            name='singular values',
+            attrs=attrs)
 
         return values
-
 
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
@@ -210,26 +180,21 @@ class xMCA(MCA):
             Fraction of described covariance of each mode.
 
         '''
-        variance 	= super().explained_variance(n)
+        variance = super().explained_variance(n)
 
         # if n is not provided, take all singular_values
         if n is None:
             n = variance.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
-        variance = xr.DataArray(variance,
-            dims 	= ['mode'],
-            coords 	= {'mode' : modes},
-            name 	= 'covariance fraction',
-            attrs   = attrs)
-
-        # error = xr.DataArray(error,
-        #     dims 	= ['mode'],
-        #     coords 	= {'mode' : modes},
-        #     name 	= 'error explained variance',
-        #     attrs   = attrs)
+        variance = xr.DataArray(
+            variance,
+            dims=['mode'],
+            coords={'mode' : modes},
+            name='covariance fraction',
+            attrs=attrs)
 
         return variance
 
@@ -238,8 +203,7 @@ class xMCA(MCA):
 
         The squared covariance fraction (SCF) is a measure of
         importance of each mode. It is calculated as the squared singular
-        values divided by the sum of squared singular values. In contrast to CF,
-        SCF is invariant under CCA.
+        values divided by the sum of squared singular values.
 
         Parameters
         ----------
@@ -252,29 +216,23 @@ class xMCA(MCA):
             Fraction of described squared covariance of each mode.
 
         '''
-        variance 	= super().scf(n)
+        variance = super().scf(n)
 
         # if n is not provided, take all singular_values
         if n is None:
             n = variance.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
-        variance = xr.DataArray(variance,
-            dims 	= ['mode'],
-            coords 	= {'mode' : modes},
-            name 	= 'squared covariance fraction',
-            attrs   = attrs)
-
-        # error = xr.DataArray(error,
-        #     dims 	= ['mode'],
-        #     coords 	= {'mode' : modes},
-        #     name 	= 'error explained variance',
-        #     attrs   = attrs)
+        variance = xr.DataArray(
+            variance,
+            dims=['mode'],
+            coords={'mode' : modes},
+            name='squared covariance fraction',
+            attrs=attrs)
 
         return variance
-
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
         '''Return first `n` PCs.
@@ -287,13 +245,13 @@ class xMCA(MCA):
         scaling : {None, 'eigen', 'max', 'std'}, optional
             Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the PCs. Default is 0.
 
         Returns
         -------
-        DataArray
-            PCs of left input field.
-        DataArray
-            PCs of right input field.
+        dict[DataArray, DataArray]
+            PCs associated to left and right input field.
 
         '''
         pcs = super().pcs(n, scaling, phase_shift)
@@ -301,21 +259,20 @@ class xMCA(MCA):
         if n is None:
             n = self._singular_values.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         coords      = self._field_coords
         field_names = self._field_names
         for key, pc in pcs.items():
             pcs[key] = xr.DataArray(
-                data        = pc,
-                dims        = ['time','mode'],
-                coords      = {'time' : coords[key]['time'], 'mode' : modes},
-                name        = ' '.join([field_names[key],'pcs']),
-                attrs       = attrs)
+                data=pc,
+                dims=['time', 'mode'],
+                coords={'time' : coords[key]['time'], 'mode' : modes},
+                name=' '.join([field_names[key], 'pcs']),
+                attrs=attrs)
 
         return pcs
-
 
     def eofs(self, n=None, scaling=None, phase_shift=0):
         '''Return the first `n` EOFs.
@@ -328,39 +285,37 @@ class xMCA(MCA):
         scaling : {None, 'eigen', 'max', 'std'}, optional
             Scale by singular_values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the EOFs. Default is 0.
 
         Returns
         -------
-        DataArray
-            EOFs of left input field.
-        DataArray
-            EOFs of right input field.
-
+        dict[DataArray, DataArray]
+            EOFs associated to left and right input field.
         '''
         eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
             n = self._singular_values.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         coords      = self._field_coords
         field_names = self._field_names
         for key, eof in eofs.items():
             eofs[key] = xr.DataArray(
-                data    = eof,
-                dims    = ['lat','lon','mode'],
-                coords  = {
+                data=eof,
+                dims=['lat', 'lon', 'mode'],
+                coords={
                     'lon' : coords[key]['lon'],
                     'lat' : coords[key]['lat'],
                     'mode' : modes},
-                name    = ' '.join([field_names[key],'eofs']),
-                attrs   = attrs
-                )
+                name=' '.join([field_names[key], 'eofs']),
+                attrs=attrs
+            )
 
         return eofs
-
 
     def spatial_amplitude(self, n=None, scaling=None):
         '''Return the spatial amplitude fields for the first `n` EOFs.
@@ -368,43 +323,40 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of amplitude fields to return. If none, all fields are returned.
-            The default is None.
+            Number of amplitude fields to return. If none, all fields are
+            returned. The default is None.
         scaling : {None, 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
         -------
-        DataArray
-            Fields of left input field.
-        DataArray
-            Fields of right input field.
-
+        dict[DataArray, DataArray]
+            Spatial amplitudes associated to left and right input field.
         '''
         amplitudes = super().spatial_amplitude(n, scaling)
 
         if n is None:
             n = self._singular_values.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         coords      = self._field_coords
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
             amplitudes[key] = xr.DataArray(
-                data    = amp,
-                dims    = ['lat','lon','mode'],
-                coords  = {
-                'lon' : coords[key]['lon'],
-                'lat' : coords[key]['lat'],
-                'mode' : modes},
-                name    = ' '.join([field_names[key],'spatial amplitude']),
-                attrs   = attrs
-                )
+                data=amp,
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon'   : coords[key]['lon'],
+                    'lat'   : coords[key]['lat'],
+                    'mode'  : modes
+                },
+                name=' '.join([field_names[key], 'spatial amplitude']),
+                attrs=attrs
+            )
 
         return amplitudes
-
 
     def spatial_phase(self, n=None, phase_shift=0):
         '''Return the spatial phase fields for the first `n` EOFs.
@@ -417,13 +369,14 @@ class xMCA(MCA):
         scaling : {None, 'max', 'std'}, optional
             Scale by maximum value ('max') or
             standard deviation ('std'). The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the spatial phases.
+            Default is 0.
 
         Returns
         -------
-        DataArray
-            Fields of left input field.
-        DataArray
-            Fields of right input field.
+        dict[DataArray, DataArray]
+            Spatial phases associated to left and right input field.
 
         '''
         eofs = self.eofs(n, phase_shift=phase_shift)
@@ -432,12 +385,11 @@ class xMCA(MCA):
         field_names = self._field_names
         phases = {}
         for key, eof in eofs.items():
-            phases[key]         = np.arctan2(eof.imag,eof.real).real
-            phases[key].name    = ' '.join([field_names[key],'spatial phase'])
+            phases[key]         = np.arctan2(eof.imag, eof.real).real
+            phases[key].name    = ' '.join([field_names[key], 'spatial phase'])
             phases[key].attrs   = attrs
 
         return phases
-
 
     def temporal_amplitude(self, n=None, scaling=None):
         '''Return the temporal amplitude functions for the first `n` PCs.
@@ -445,40 +397,36 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of amplitude functions to return. If none, all functions are returned.
-            The default is None.
+            Number of amplitude functions to return. If none, all functions are
+            returned. The default is None.
         scaling : {None, 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
         -------
-        DataArray
-            Temporal amplitude function of left input field.
-        DataArray
-            Temporal amplitude function of right input field.
-
+        dict[DataArray, DataArray]
+            PCs associated to left and right input field.
         '''
         amplitudes = super().temporal_amplitude(n, scaling)
 
         if n is None:
             n = self._singular_values.size
 
-        modes = list(range(1,n+1))
+        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         coords      = self._field_coords
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
             amplitudes[key] = xr.DataArray(
-                data    = amp,
-                dims    = ['time','mode'],
-                coords  = {'time' : coords[key]['time'], 'mode' : modes},
-                name    = ' '.join([field_names[key],'temporal amplitude']),
-                attrs   = attrs
-                )
+                data=amp,
+                dims=['time', 'mode'],
+                coords={'time' : coords[key]['time'], 'mode' : modes},
+                name=' '.join([field_names[key], 'temporal amplitude']),
+                attrs=attrs
+            )
 
         return amplitudes
-
 
     def temporal_phase(self, n=None, phase_shift=0):
         '''Return the temporal phase function for the first `n` PCs.
@@ -486,16 +434,16 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of phase functions to return. If none, all functions are returned.
-            The default is None.
+            Number of phase functions to return. If none, all functions are
+            returned. The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the temporal phases.
+            Default is 0.
 
         Returns
         -------
-        DataArray
-            Temporal phase function of left input field.
-        DataArray
-            Temporal phase function of right input field.
-
+        dict[DataArray, DataArray]
+            Temporal phases associated to left and right input field.
         '''
         pcs = self.pcs(n, phase_shift=phase_shift)
 
@@ -503,14 +451,13 @@ class xMCA(MCA):
         field_names = self._field_names
 
         phases = {}
-        for key,pc in pcs.items():
-            phases[key] = np.arctan2(pc.imag,pc.real).real
-            name = ' '.join([field_names[key],'temporal phase'])
+        for key, pc in pcs.items():
+            phases[key] = np.arctan2(pc.imag, pc.real).real
+            name = ' '.join([field_names[key], 'temporal phase'])
             phases[key].name  = name
             phases[key].attrs = attrs
 
         return phases
-
 
     def homogeneous_patterns(self, n=None, phase_shift=0):
         '''
@@ -519,15 +466,16 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of patterns (modes) to be returned. If None then all patterns
-            are returned. The default is None.
+            Number of patterns (modes) to be returned. If None then all
+            patterns are returned. The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the homogeneous patterns.
+            Default is 0.
 
         Returns
         -------
-        xr.DataArray
-            Left homogeneous correlation maps.
-        xr.DataArray
-            Right homogeneous correlation maps.
+        dict[DataArray, DataArray]
+            Homogeneous patterns associated to left and right input field.
 
         '''
 
@@ -538,13 +486,12 @@ class xMCA(MCA):
         attrs = {k: str(v) for k, v in self._analysis.items()}
         hom_patterns = {}
         for key, field in fields.items():
-            hom_patterns[key] = calc_temporal_corr(fields[key],pcs[key].real)
-            name = ' '.join([field_names[key],'homogeneous patterns'])
+            hom_patterns[key] = calc_temporal_corr(fields[key], pcs[key].real)
+            name = ' '.join([field_names[key], 'homogeneous patterns'])
             hom_patterns[key].name  = name
             hom_patterns[key].attrs = attrs
 
         return hom_patterns
-
 
     def heterogeneous_patterns(self, n=None, phase_shift=0):
         '''
@@ -553,15 +500,16 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of patterns (modes) to be returned. If None then all patterns
-            are returned. The default is None.
+            Number of patterns (modes) to be returned. If None then all
+            patterns are returned. The default is None.
+        phase_shift : float, optional
+            If complex, apply a phase shift to the heterogeneous patterns.
+            Default is 0.
 
         Returns
         -------
-        xr.DataArray
-            Left heterogeneous correlation maps.
-        xr.DataArray
-            Right heterogeneous correlation maps.
+        dict[DataArray, DataArray]
+            Heterogeneous patterns associated to left and right input field.
 
         '''
         fields  = self._get_fields()
@@ -573,17 +521,33 @@ class xMCA(MCA):
         reverse = {'left' : 'right', 'right' : 'left'}
         for key, field in fields.items():
             try:
-                het_patterns[key] = calc_temporal_corr(fields[key],pcs[reverse[key]].real)
+                het_patterns[key] = calc_temporal_corr(
+                    fields[key], pcs[reverse[key]].real
+                )
             except KeyError:
-                raise KeyError("Key not found. Two fields needed for heterogenous maps.")
-            name = ' '.join([field_names[key],'heterogenous patterns'])
+                err = 'Key not found. Two fields needed for heterogenous maps.'
+                raise KeyError(err)
+            name = ' '.join([field_names[key], 'heterogenous patterns'])
             het_patterns[key].name  = name
             het_patterns[key].attrs = attrs
 
         return het_patterns
 
+    def reconstructed_fields(self, mode=slice(1, None)):
+        '''Reconstruct original input fields based on specified `mode`s.
 
-    def reconstructed_fields(self, mode=slice(1,None)):
+        Parameters
+        ----------
+        mode : int, slice
+            Modes to be considered for reconstructing the original fields.
+            The default is `slice(1, None)` which returns the original fields
+            based on *all* modes.
+
+        Returns
+        -------
+        dict[DataArray, DataArray]
+            Left and right reconstructed fields.
+        '''
         eofs    = self.eofs(scaling=None)
         pcs     = self.pcs(scaling='eigen')
         coords  = self._field_coords
@@ -594,11 +558,14 @@ class xMCA(MCA):
         for key in self._fields.keys():
             eofs[key]   = eofs[key].sel(mode=mode)
             pcs[key]    = pcs[key].sel(mode=mode)
-            rec_fields[key] = xr.dot(pcs[key],eofs[key].conjugate(),dims=['mode'])
+            rec_fields[key] = xr.dot(
+                pcs[key], eofs[key].conjugate(), dims=['mode']
+            )
             rec_fields[key] = rec_fields[key].real
 
             if self._analysis['is_coslat_corrected']:
-                rec_fields[key] /= np.sqrt(np.cos(np.deg2rad(coords[key]['lat'])))
+                coslat = np.cos(np.deg2rad(coords[key]['lat']))
+                rec_fields[key] /= np.sqrt(coslat)
 
             if self._analysis['is_normalized']:
                 rec_fields[key] *= std[key]
@@ -608,13 +575,16 @@ class xMCA(MCA):
 
         return rec_fields
 
-
-    def _create_gridspec(self, figsize=None, orientation='horizontal', projection=None):
+    def _create_gridspec(
+            self,
+            figsize=None,
+            orientation='horizontal',
+            projection=None):
         is_bivariate    = self._analysis['is_bivariate']
         is_complex      = self._analysis['is_complex']
 
-        n_rows =  2 if is_bivariate else 1
-        n_cols =  3 if is_complex else 2
+        n_rows = 2 if is_bivariate else 1
+        n_cols = 3 if is_complex else 2
         height_ratios   = [1] * n_rows
         width_ratios    = [1] * n_cols
         # add additional row for colorbar
@@ -626,47 +596,47 @@ class xMCA(MCA):
             grid = {
                 'pc'   : {'left': [0, 0]},
                 'eof'  : {'left': [0, 1]}
-                }
+            }
 
             # position for phase
             if is_complex:
-                grid['phase'] = {'left':[0,2]}
+                grid['phase'] = {'left': [0, 2]}
 
             # positions for right field
             if is_bivariate:
                 for k, panel in grid.items():
                     yx = panel.get('left')
-                    grid[k]['right'] = [yx[0]+1,yx[1]]
+                    grid[k]['right'] = [yx[0] + 1, yx[1]]
 
             # positions for colorbars
             for k, panel in grid.items():
-                if k in ['eof','phase']:
+                if k in ['eof', 'phase']:
                     row_cb = len(panel)
                     col_cb = panel.get('left')[1]
-                    grid[k]['cb'] = [row_cb,col_cb]
+                    grid[k]['cb'] = [row_cb, col_cb]
 
         # vertical layout
         if orientation == 'vertical':
             grid = {
                 'pc'   : {'left': [-1, 1]},
                 'eof'  : {'left': [0, 1]}
-                }
+            }
 
             # position for phase
             if is_complex:
-                grid['phase'] = {'left':[1,1]}
+                grid['phase'] = {'left': [1, 1]}
 
             # positions for right field
             if is_bivariate:
                 for k, panel in grid.items():
                     yx = panel.get('left')
-                    grid[k]['right'] = [yx[0], yx[1]+1]
+                    grid[k]['right'] = [yx[0], yx[1] + 1]
 
             # positions for colorbars
             for k, panel in grid.items():
-                if k in ['eof','phase']:
+                if k in ['eof', 'phase']:
                     row, col = panel.get('left')
-                    grid[k]['cb'] = [row,col-1]
+                    grid[k]['cb'] = [row, col - 1]
 
             n_rows, n_cols = n_cols, n_rows
             height_ratios = n_rows * [1]
@@ -687,22 +657,24 @@ class xMCA(MCA):
         gs = fig.add_gridspec(
             n_rows, n_cols,
             height_ratios=height_ratios, width_ratios=width_ratios
-            )
+        )
         axes = {}
-        for key_data,data in grid.items():
+        for key_data, data in grid.items():
             axes[key_data] = {}
-            for key_pos,pos in data.items():
-                row,col = pos
-                axes[key_data][key_pos] = fig.add_subplot(gs[row,col], projection=map_projs[key_data][key_pos])
-
+            for key_pos, pos in data.items():
+                row, col = pos
+                axes[key_data][key_pos] = fig.add_subplot(
+                    gs[row, col],
+                    projection=map_projs[key_data][key_pos]
+                )
 
         return fig, axes
 
-
     def plot(
-        self, mode, threshold=0, phase_shift=0,
-        cmap_eof=None, cmap_phase=None, figsize=(8.3,5.0), resolution='110m',
-        projection=None, c_lon=None, orientation='horizontal', land=True):
+            self, mode, threshold=0, phase_shift=0,
+            cmap_eof=None, cmap_phase=None, figsize=(8.3, 5.0),
+            resolution='110m', projection=None, orientation='horizontal',
+            land=True):
         '''
         Plot results for `mode`.
 
@@ -719,26 +691,36 @@ class xMCA(MCA):
         cmap_phase : str or Colormap
             The colormap used to map the spatial phase function.
             The default is `twilight`.
+        figsize : tuple
+            Size of figure. Default is (8.3, 5.0).
         resolution : {None, '110m', '50m', '10m'}
             A named resolution to use from the Natural Earth dataset.
             Currently can be one of `110m`, `50m`, and `10m`. If None, no
             coastlines will be drawn. Default is `110m`.
+        projection : cartopy.crs projection,
+                     dict of {str : cartopy.crs projection}
+            Projection can be either a valid cartopy projection (cartopy.crs)
+            or a dictionary of different projections with keys 'left' and
+            'right'. The default is cartopy.crs.PlateCaree.
         orientation : {'horizontal', 'vertical'}
             Orientation of the plot. Default is horizontal.
+        land : boolean
+            Turn coloring of land surface on/off.
 
         Returns
         -------
-        fig :
+        matplotlib.figure.Figure :
             Figure instance.
-        axes :
-            Dictionary of axes containing `pcs`, `eofs` and `phase`, if complex.
+        dict of matplotlib.axes._subplots.AxesSubplot :
+            Dictionary of axes for `left` (and `right`) field containing
+            `pcs`, `eofs` and, if complex, `phase`.
 
         '''
         complex     = self._analysis['is_complex']
         bivariate   = self._analysis['is_bivariate']
 
         # Get data
-        var 		= self.explained_variance(mode).sel(mode=mode).values
+        var         = self.explained_variance(mode).sel(mode=mode).values
         pcs         = self.pcs(mode, scaling='max', phase_shift=phase_shift)
         eofs        = self.eofs(mode, scaling='max')
         phases      = self.spatial_phase(mode, phase_shift=phase_shift)
@@ -748,13 +730,13 @@ class xMCA(MCA):
         # ticks
         ticks = {
             'pc'       : [-1, 0, 1],
-            'eof'      : [0, 1] if complex else [-1,0,1],
+            'eof'      : [0, 1] if complex else [-1, 0, 1],
             'phase'    : [-np.pi, 0, np.pi]
         }
 
         # tick labels
         tick_labels = {
-            'phase' : [r'-$\pi$','0',r'$\pi$']
+            'phase' : [r'-$\pi$', '0', r'$\pi$']
         }
 
         # colormaps
@@ -763,9 +745,9 @@ class xMCA(MCA):
             'phase'    : 'twilight'
         }
 
-        if not cmap_eof is None:
+        if cmap_eof is not None:
             cmaps['eof'] = cmap_eof
-        if not cmap_phase is None:
+        if cmap_phase is not None:
             cmaps['phase'] = cmap_phase
 
         # titles
@@ -773,24 +755,22 @@ class xMCA(MCA):
             'pc'        : 'PC',
             'eof'       : 'Amplitude' if complex else 'EOF',
             'phase'     : 'Phase',
-            'mode'      : 'Mode {:d} ({:.1f} \%)'.format(mode,var)
+            'mode'      : 'Mode {:d} ({:.1f} \%)'.format(mode, var)
         }
 
         for key, name in self._field_names.items():
             titles[key] = name
 
-        titles.update({k: v.replace('_',' ') for k, v in titles.items()})
+        titles.update({k: v.replace('_', ' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
 
         # map projections and boundaries
         map = {
-            # center longitude of maps
-            'c_lon'     : {'left' : c_lon, 'right' : c_lon},
             # projections pf maps
             'projection' : {
-                'left':ccrs.PlateCarree(),
-                'right':ccrs.PlateCarree()
-                },
+                'left'  : ccrs.PlateCarree(),
+                'right' : ccrs.PlateCarree()
+            },
             # west, east, south, north limit of maps
             'boundaries' : {'left': None, 'right' : None}
         }
@@ -798,7 +778,9 @@ class xMCA(MCA):
             try:
                 map['projection'].update(projection)
             except TypeError:
-                map['projection'] = {k: projection for k in map['projection'].keys()}
+                map['projection'] = {
+                    k: projection for k in map['projection'].keys()
+                }
         data_projection  = ccrs.PlateCarree()
 
         # pre-process data and maps
@@ -815,15 +797,19 @@ class xMCA(MCA):
             c_lon = map['projection'][key].proj4_params['lon_0']
             map['boundaries'][key] = get_extent(eofs[key], c_lon)
 
-
-        fig, axes = self._create_gridspec(figsize=figsize, orientation=orientation, projection=map['projection'])
+        # create figure panel
+        fig, axes = self._create_gridspec(
+            figsize=figsize,
+            orientation=orientation,
+            projection=map['projection']
+        )
 
         # plot PCs, EOFs, and Phase
         for i, key in enumerate(pcs.keys()):
             # plot PCs
             pcs[key].plot(ax=axes['pc'][key])
-            axes['pc'][key].set_ylim(-1.2,1.2)
-            axes['pc'][key].set_yticks([-1,0,1])
+            axes['pc'][key].set_ylim(-1.2, 1.2)
+            axes['pc'][key].set_yticks([-1, 0, 1])
             axes['pc'][key].set_ylabel(titles[key], fontweight='bold')
             axes['pc'][key].set_xlabel('')
             axes['pc'][key].set_title('')
@@ -834,14 +820,21 @@ class xMCA(MCA):
             cb_eof = eofs[key].plot(
                 ax=axes['eof'][key], transform=data_projection,
                 vmin=ticks['eof'][0], vmax=ticks['eof'][-1], cmap=cmaps['eof'],
-                add_colorbar = False)
-            axes['eof'][key].set_extent(map['boundaries'][key], crs=data_projection)
+                add_colorbar=False)
+            axes['eof'][key].set_extent(
+                map['boundaries'][key],
+                crs=data_projection
+            )
             axes['eof'][key].set_title('')
 
-            if resolution in ['110m','50m','10m']:
-                axes['eof'][key].coastlines(lw = .4, resolution = resolution)
+            if resolution in ['110m', '50m', '10m']:
+                axes['eof'][key].coastlines(lw=.4, resolution=resolution)
             if land:
-                axes['eof'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
+                axes['eof'][key].add_feature(
+                    cfeature.LAND,
+                    color='#808080',
+                    zorder=0
+                )
             axes['eof'][key].set_aspect('auto')
 
             plt.colorbar(cb_eof, axes['eof']['cb'], orientation=orientation)
@@ -855,25 +848,37 @@ class xMCA(MCA):
                 cb_phase = phases[key].plot(
                     ax=axes['phase'][key], transform=data_projection,
                     vmin=ticks['phase'][0], vmax=ticks['phase'][-1],
-                    cmap=cmaps['phase'], add_colorbar = False)
-                axes['phase'][key].set_extent(map['boundaries'][key], crs=data_projection)
+                    cmap=cmaps['phase'], add_colorbar=False)
+                axes['phase'][key].set_extent(
+                    map['boundaries'][key],
+                    crs=data_projection
+                )
                 axes['phase'][key].set_title('')
 
-                plt.colorbar(cb_phase, axes['phase']['cb'], orientation=orientation)
-                if orientation=='horizontal':
+                plt.colorbar(
+                    cb_phase, axes['phase']['cb'],
+                    orientation=orientation
+                )
+                if orientation == 'horizontal':
                     axes['phase']['cb'].xaxis.set_ticks(ticks['phase'])
                     axes['phase']['cb'].set_xticklabels(tick_labels['phase'])
                 elif orientation == 'vertical':
                     axes['phase']['cb'].yaxis.set_ticks(ticks['phase'])
                     axes['phase']['cb'].set_yticklabels(tick_labels['phase'])
 
-                if resolution in ['110m','50m','10m']:
-                    axes['phase'][key].coastlines(lw = .4, resolution = resolution)
+                if resolution in ['110m', '50m', '10m']:
+                    axes['phase'][key].coastlines(lw=.4, resolution=resolution)
                 if land:
-                    axes['phase'][key].add_feature(cfeature.LAND, color='#808080', zorder=0)
+                    axes['phase'][key].add_feature(
+                        cfeature.LAND,
+                        color='#808080',
+                        zorder=0
+                    )
                 axes['phase'][key].set_aspect('auto')
-                axes['phase']['left'].set_title(titles['phase'], fontweight='bold')
-
+                axes['phase']['left'].set_title(
+                    titles['phase'],
+                    fontweight='bold'
+                )
 
         # special tweaking of axes according to orientation
         if orientation == 'horizontal':
@@ -896,29 +901,32 @@ class xMCA(MCA):
             if bivariate:
                 axes['pc']['right'].yaxis.set_visible(False)
                 axes['pc']['right'].spines['left'].set_visible(False)
-                axes['eof']['right'].set_title(titles['right'], fontweight='bold')
+                axes['eof']['right'].set_title(
+                    titles['right'],
+                    fontweight='bold'
+                )
 
             if complex:
-                axes['phase']['cb'].set_ylabel(titles['phase'], fontweight='bold')
+                axes['phase']['cb'].set_ylabel(
+                    titles['phase'],
+                    fontweight='bold'
+                )
                 axes['phase']['left'].set_title('')
                 axes['phase']['cb'].yaxis.set_label_position('left')
                 axes['phase']['cb'].yaxis.set_ticks_position('left')
-
-
 
         fig.subplots_adjust(wspace=.1)
         fig.suptitle(titles['mode'], horizontalalignment='left')
 
         return fig, axes
 
-
     def _save_data(self, data_array, path, engine='h5netcdf', *args, **kwargs):
         analysis_path   = path
         analysis_name   = self._get_analysis_id()
-        var_name        = secure_str('.'.join([data_array.name,'nc']))
+        var_name        = secure_str('.'.join([data_array.name, 'nc']))
 
         file_name   = '_'.join([analysis_name, var_name])
-        output_path = os.path.join(analysis_path,file_name)
+        output_path = os.path.join(analysis_path, file_name)
 
         invalid_netcdf = True
         if engine != 'h5netcdf':
@@ -926,15 +934,26 @@ class xMCA(MCA):
         data_array.to_netcdf(
             path=output_path,
             engine=engine, invalid_netcdf=invalid_netcdf, *args, **kwargs
-            )
-
+        )
 
     def save_analysis(self, path=None, engine='h5netcdf'):
+        '''Save analysis including netcdf data and meta information.
+
+        Parameters
+        ----------
+        path : str, optional
+            Path to storage location. If none is provided, the analysis is
+            saved into `./xmca/<left_name>(_<right_name>)/`.
+        engine : str
+            h5netcdf is needed for complex values. Otherwise standard netcdf
+            works as well (the default is 'h5netcdf').
+
+        '''
         analysis_path = self._get_analysis_path(path)
 
         self._create_info_file(analysis_path)
 
-        fields      = self._get_fields(original_scale = True)
+        fields      = self._get_fields(original_scale=True)
         eofs        = self.eofs()
         pcs         = self.pcs()
         singular_values = self.singular_values()
@@ -945,28 +964,31 @@ class xMCA(MCA):
             self._save_data(eofs[key], analysis_path, engine)
             self._save_data(pcs[key], analysis_path, engine)
 
-
-
     def load_analysis(self, path, engine='h5netcdf'):
         self._set_info_from_file(path)
-        path_folder,_ = os.path.split(path)
+        path_folder, _ = os.path.split(path)
         file_names = self._get_file_names(format='nc')
 
-        path_eigen   = os.path.join(path_folder,file_names['singular'])
-        singular_values = xr.open_dataarray(path_eigen, engine = engine).data
+        path_eigen   = os.path.join(path_folder, file_names['singular'])
+        singular_values = xr.open_dataarray(path_eigen, engine=engine).data
 
         fields  = {}
         pcs     = {}
         eofs    = {}
         for key in self._field_names.keys():
-            path_fields   = os.path.join(path_folder,file_names['fields'][key])
-            path_pcs   = os.path.join(path_folder,file_names['pcs'][key])
-            path_eofs   = os.path.join(path_folder,file_names['eofs'][key])
+            path_fields   = os.path.join(
+                path_folder, file_names['fields'][key]
+            )
+            path_pcs   = os.path.join(
+                path_folder, file_names['pcs'][key]
+            )
+            path_eofs   = os.path.join(
+                path_folder, file_names['eofs'][key]
+            )
 
-            fields[key] = xr.open_dataarray(path_fields, engine = engine)
-            pcs[key]    = xr.open_dataarray(path_pcs, engine = engine)
-            eofs[key]   = xr.open_dataarray(path_eofs, engine = engine)
-
+            fields[key] = xr.open_dataarray(path_fields, engine=engine)
+            pcs[key]    = xr.open_dataarray(path_pcs, engine=engine)
+            eofs[key]   = xr.open_dataarray(path_eofs, engine=engine)
 
         self._field_coords = {}
         for key, field in fields.items():
@@ -977,13 +999,12 @@ class xMCA(MCA):
             eofs[key]       = eofs[key].data
             pcs[key]        = pcs[key].data
 
-
         super().load_analysis(
-            path = path,
-            fields = fields,
-            eofs = eofs,
-            pcs  = pcs,
-            singular_values = singular_values)
+            path=path,
+            fields=fields,
+            eofs=eofs,
+            pcs=pcs,
+            singular_values=singular_values)
 
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
