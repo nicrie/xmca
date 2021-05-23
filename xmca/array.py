@@ -871,6 +871,38 @@ class MCA:
 
         return phases
 
+    def transform(self, left=None, right=None):
+        '''Apply dimensionality reduction to left and right.
+
+        left and right are projected on the first left (right) singular
+        vectors previously extracted from some input data.
+
+        Parameters
+        ----------
+        left : type
+            Description of parameter `left`.
+        right : type
+            Description of parameter `right`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        '''
+        mean = self._field_means
+        std = self._field_stds
+
+        # add "time" axis
+        new_left = left[np.newaxis, ...]
+        new_right = right[np.newaxis, ...]
+
+        new_left -= mean['left']
+        new_left /= std['left']
+
+
+
+
     def plot(
         self, mode, threshold=0, phase_shift=0,
         cmap_eof=None, cmap_phase=None, figsize=(8.3, 5.0)
