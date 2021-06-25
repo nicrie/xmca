@@ -7,9 +7,11 @@
 [![downloads](https://img.shields.io/pypi/dm/xmca?color=f2cc8f)](https://pypi.org/project/xmca/)
 [![DOI](https://zenodo.org/badge/278134135.svg?color=f2cc8f)](https://zenodo.org/badge/latestdoi/278134135)
 
-
-
 The aim of this package is to provide a flexible tool for the climate science community to perform Maximum Covariance Analysis (**MCA**) in a simple and consistent way. Given the huge popularity of [`xarray`][xarray] in the climate science community, the `xmca` package supports `xarray.DataArray` as well as `numpy.ndarray` as input formats.
+
+![Example Figure](figs/example-plot2.png)
+*<sub>Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.</sub>*
+
 
 ## What is MCA?
 MCA maximises the temporal covariance between two different
@@ -20,6 +22,8 @@ fields. When the two input fields are the same, MCA reduces to standard EOF anal
 
 For the mathematical understanding please have a look at e.g. the [lecture material][mca-material] written by C. Bretherton.
 
+## New in release 0.3.4
+- correct and consistent use of definition of loadings
 
 ## Core Features
 
