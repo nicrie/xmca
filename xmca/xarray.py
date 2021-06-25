@@ -243,7 +243,7 @@ class xMCA(MCA):
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
+            Scale by square root of singular values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
@@ -283,7 +283,7 @@ class xMCA(MCA):
             Number of EOFs to return If none, all EOFs are returned.
             The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
+            Scale by square root of singular values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
@@ -553,6 +553,7 @@ class xMCA(MCA):
         coords  = self._field_coords
         std     = self._field_stds
         mean    = self._field_means
+        n_obs   = self._n_observations['left']
 
         rec_fields = {}
         for key in self._fields.keys():
@@ -561,6 +562,7 @@ class xMCA(MCA):
             rec_fields[key] = xr.dot(
                 pcs[key], eofs[key].conjugate(), dims=['mode']
             )
+            rec_fields[key] *= np.sqrt(n_obs)
             rec_fields[key] = rec_fields[key].real
 
             if self._analysis['is_coslat_corrected']:

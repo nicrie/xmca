@@ -417,13 +417,14 @@ class MCA:
         self._analysis['extend']        = extend
         self._analysis['theta_period']  = period
 
-        n_observations  = self._n_observations
+        n_observations  = self._n_observations['left']
         n_variables     = self._n_variables
+        dof = n_observations - 1
 
         field_2d = {}
         for key, field in self._fields.items():
             # create 2D matrix in order to perform SVD
-            field = field.reshape(n_observations[key], n_variables[key])
+            field = field.reshape(n_observations, n_variables[key])
 
             # remove NaNs columns in data fields
             field, no_nan_index   = remove_nan_cols(field)
@@ -441,7 +442,7 @@ class MCA:
             kernel = field_2d['left'].conjugate().T @ field_2d['right']
         else:
             kernel = field_2d['left'].conjugate().T @ field_2d['left']
-        kernel = kernel / n_observations['left']
+        kernel = kernel / dof
 
         self._V = {}  # singular vectors (EOFs)
         self._L = {}  # "loaded" singular vectors
@@ -464,16 +465,16 @@ class MCA:
         del(VLeft)
         del(VTRight)
 
-        S = np.sqrt(np.diag(singular_values) * n_observations['left'])
-        Si = np.diag(1. / np.diag(S))
+        A = np.diag(singular_values)
+        A_inv = np.diag(1. / singular_values)
 
         self._singular_values = singular_values
 
         for key, V in self._V.items():
             # "loaded" EOFs
-            self._L[key] = V @ S
+            self._L[key] = V @ np.sqrt(A)
             # get PC scores by projecting fields on loaded EOFs
-            self._U[key] = field_2d[key] @ V @ Si
+            self._U[key] = field_2d[key] @ V @ np.sqrt(A_inv / dof)
 
         self._analysis['total_covariance'] = singular_values.sum()
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
@@ -515,7 +516,7 @@ class MCA:
         if(power < 1):
             raise ValueError('`power` must be >=1')
 
-        n_observations = self._n_observations['left']
+        dof = self._n_observations['left'] - 1
 
         truncated_L = {}
         for key, L in self._L.items():
@@ -542,10 +543,11 @@ class MCA:
             weights[key] = w
 
         if self._analysis['is_bivariate']:
-            variance = weights['left'] * weights['right'] / n_observations
+            variance = weights['left'] * weights['right']
         else:
-            variance = weights['left'] * weights['left'] / n_observations
+            variance = weights['left'] * weights['left']
         var_idx = np.argsort(variance)[::-1]
+        self._var_idx = var_idx
 
         # rotate PC scores
         # If rotation is orthogonal: R.T = R
@@ -678,7 +680,7 @@ class MCA:
         n : int, optional
             Number of PCs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale PCs by singular_values ('eigen'), maximum value ('max') or
+            Scale PCs by square root of singular values ('eigen'), maximum value ('max') or
             standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
@@ -689,7 +691,6 @@ class MCA:
             PCs associated to left and right input field.
 
         '''
-        n_obs       = self._n_observations['left']
         singular_values = self._singular_values
 
         if n is None:
@@ -703,13 +704,13 @@ class MCA:
                 pcs[key] *= cmath.rect(1, phase_shift)
             # scale PCs by singular_values
             if scaling == 'eigen':
-                pcs[key] *= np.sqrt(n_obs * singular_values[:n])
+                pcs[key] *= np.sqrt(singular_values[:n])
             # scale PCs by maximum value
             if scaling == 'max':
                 pcs[key] /= np.nanmax(abs(pcs[key].real), axis=0)
             # scale PCs by standard deviation
             if scaling == 'std':
-                pcs[key] /= np.nanstd(abs(pcs[key].real), axis=0)
+                pcs[key] /= np.nanstd(pcs[key].real, axis=0)
 
         return pcs
 
@@ -721,7 +722,7 @@ class MCA:
         n : int, optional
             Number of EOFs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
+            Scale by square root of singular values ('eigen'), maximum value ('max') or
             standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
@@ -732,7 +733,6 @@ class MCA:
             EOFs associated to left and right input field.
 
         '''
-        n_obs       = self._n_observations['left']
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
@@ -751,13 +751,13 @@ class MCA:
             eofs[key]   = eofs[key].reshape(field_shape[key] + (n,))
             # scale EOFs with their singular_values
             if scaling == 'eigen':
-                eofs[key] *= np.sqrt(n_obs * singular_values[:n])
+                eofs[key] *= np.sqrt(singular_values[:n])
             # scale EOFs by maximum value
             if scaling == 'max':
                 eofs[key] /= np.nanmax(abs(eofs[key].real), axis=(0, 1))
             # scale EOFs by standard deviation
             if scaling == 'std':
-                eofs[key] /= np.nanstd(abs(eofs[key].real), axis=(0, 1))
+                eofs[key] /= np.nanstd(eofs[key].real, axis=(0, 1))
             # apply phase shift
             if self._analysis['is_complex']:
                 eofs[key] *= cmath.rect(1, phase_shift)
@@ -772,7 +772,7 @@ class MCA:
         n : int, optional
             Number of amplitude fields to be returned. If None, return all
             fields. The default is None.
-        scaling : {None, 'max', 'std'}, optional
+        scaling : {None, 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
@@ -872,9 +872,8 @@ class MCA:
         return phases
 
     def plot(
-        self, mode, threshold=0, phase_shift=0,
-        cmap_eof=None, cmap_phase=None, figsize=(8.3, 5.0)
-    ):
+            self, mode, threshold=0, phase_shift=0,
+            cmap_eof=None, cmap_phase=None, figsize=(8.3, 5.0)):
         '''
         Plot results for `mode`.
 
@@ -1017,8 +1016,7 @@ class MCA:
 
     def save_plot(
             self, mode, path=None, format='png',
-            plot_kwargs={}, save_kwargs={}
-    ):
+            plot_kwargs={}, save_kwargs={}):
         '''Create and save a plot to local disk.
 
         Parameters
@@ -1164,8 +1162,7 @@ class MCA:
 
     def load_analysis(
             self, path,
-            fields=None, eofs=None, pcs=None, singular_values=None
-    ):
+            fields=None, eofs=None, pcs=None, singular_values=None):
         '''Load a model.
 
         This method allows to load a models which was saved by
