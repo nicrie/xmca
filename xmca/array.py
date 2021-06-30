@@ -235,6 +235,23 @@ class MCA:
 
         return new_fields
 
+    def _get_fields2d(self):
+        n_observations  = self._n_observations['left']
+        n_variables     = self._n_variables
+
+        fields_2d = {}
+        self._no_nan_index = {}
+        for key, field in self._fields.items():
+            # create 2D matrix in order to perform SVD
+            field = field.reshape(n_observations, n_variables[key])
+
+            # remove NaNs columns in data fields
+            field, no_nan_idx       = remove_nan_cols(field)
+            fields_2d[key]          = field
+            self._no_nan_index[key] = no_nan_idx
+
+        return fields_2d
+
     def apply_weights(self, left=None, right=None):
         '''Apply weights to the left and/or right field.
 
@@ -422,30 +439,19 @@ class MCA:
         self._analysis['theta_period']  = period
 
         n_observations  = self._n_observations['left']
-        n_variables     = self._n_variables
         dof = n_observations - 1
 
-        field_2d = {}
-        for key, field in self._fields.items():
-            # create 2D matrix in order to perform SVD
-            field = field.reshape(n_observations, n_variables[key])
+        fields_2d = self._get_fields2d()
 
-            # remove NaNs columns in data fields
-            field, no_nan_index   = remove_nan_cols(field)
-
+        if self._analysis['is_complex']:
             # complexify input data via Hilbert transform
-            if self._analysis['is_complex']:
-                field = self._complexify(field)
-
-            field_2d[key]           = field
-            # save index of real variables for recontruction of original field
-            self._no_nan_index[key] = no_nan_index
+            fields_2d = {k: self._complexify(f) for k, f in fields_2d.items()}
 
         # create covariance matrix
         if self._analysis['is_bivariate']:
-            kernel = field_2d['left'].conjugate().T @ field_2d['right']
+            kernel = fields_2d['left'].conjugate().T @ fields_2d['right']
         else:
-            kernel = field_2d['left'].conjugate().T @ field_2d['left']
+            kernel = fields_2d['left'].conjugate().T @ fields_2d['left']
         kernel = kernel / dof
 
         self._V = {}  # singular vectors (EOFs)
@@ -469,16 +475,18 @@ class MCA:
         del(VTRight)
 
         self._singular_values = singular_values
+        self._variance = singular_values
         self._var_idx = np.argsort(singular_values)[::-1]
         self._norm = {k: np.sqrt(singular_values) for k in self._keys}
 
         # get PC scores by projecting fields on loaded EOFs
         for key, V in self._V.items():
-            self._U[key] = field_2d[key] @ V / np.sqrt(singular_values * dof)
+            self._U[key] = fields_2d[key] @ V / np.sqrt(singular_values * dof)
 
         self._analysis['total_covariance'] = singular_values.sum()
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
         self._analysis['rank'] = singular_values.size
+        self._analysis['rotations'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
     def _get_norm(self):
@@ -490,7 +498,7 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
-    def rotate(self, n_rot, power=1, tol=1e-5):
+    def rotate(self, n_rot, power=1, tol=1e-8):
         '''Perform Promax rotation on the first `n` EOFs.
 
         Promax rotation (Hendrickson & White 1964) is an oblique rotation which
@@ -505,7 +513,7 @@ class MCA:
         n_rot : int
             Number of EOFs to rotate.
         power : int, optional
-            Power of Promax rotation. The default is 1.
+            Power of Promax rotation. The default is 1 (= Varimax).
         tol : float, optional
             Tolerance of rotation process. The default is 1e-5.
 
@@ -545,7 +553,7 @@ class MCA:
         var_idx = np.argsort(variance)[::-1]
 
         self._norm = norm
-        self._rotated_variance = variance
+        self._variance = variance
         self._var_idx = var_idx
 
         # rotate PC scores
@@ -652,8 +660,8 @@ class MCA:
             Fraction of described squared covariance of each mode.
 
         '''
-        values  = self.singular_values(n)
-        scf = values**2 / self._analysis['total_squared_covariance'] * 100
+        variance  = self._variance[self._var_idx][:n]
+        scf = variance**2 / self._analysis['total_squared_covariance'] * 100
         return scf
 
     def explained_variance(self, n=None):
@@ -674,8 +682,8 @@ class MCA:
             Fraction of described covariance of each mode.
 
         '''
-        values  = self.singular_values(n)
-        exp_var = values / self._analysis['total_covariance'] * 100
+        variance  = self._variance[self._var_idx][:n]
+        exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
     def pcs(self, n=None, scaling=None, phase_shift=0):
@@ -701,19 +709,26 @@ class MCA:
         svals = self.singular_values()
         sqrt_svals = np.sqrt(svals)
         dof = self._n_observations['left'] - 1
+        R       = self.rotation_matrix()
 
         if n is None:
-            n = svals.size
+            n = R.shape[0]
 
         V       = self._V
         norm    = self._norm
-        fields  = self._fields
-        R       = self.rotation_matrix()
+        fields  = self._get_fields2d()
+        n_rot   = self._analysis['rotations']
+        var_idx = self._var_idx
 
         pcs = {}
         for k in self._keys:
-            pcs[k] = fields[k] @ V[k] / sqrt_svals @ R  / np.sqrt(dof)
+            pcs[k] = fields[k] @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
+            pcs[k] = pcs[k] @ R  / np.sqrt(dof)
+            # reorder according to variance
+            pcs[k] = pcs[k][:, var_idx]
+            # take first n PCs only
             pcs[k] = pcs[k][:, :n]
+
             # apply phase shift
             if self._analysis['is_complex']:
                 pcs[k] *= cmath.rect(1, phase_shift)
@@ -752,23 +767,26 @@ class MCA:
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
         svals = self.singular_values()
-        dof = self._n_observations['left'] - 1
-
-        if n is None:
-            n = svals.size
-
+        sqrt_svals = np.sqrt(svals)
         V       = self._V
         norm    = self._norm
-        fields  = self._fields
         R       = self.rotation_matrix()
+        n_rot   = self._analysis['rotations']
+        var_idx = self._var_idx
+
+        if n is None:
+            n = R.shape[0]
 
         eofs = {}
         for k in self._keys:
             # create data fields with original NaNs
+            V_temp = V[k][:, :n_rot] * sqrt_svals[:n_rot] @ R / norm[k][:n_rot]
+            # reorder according to variance
+            V_temp = V_temp[:, var_idx]
+            # reshape eofs to have original input shape
             dtype       = V[k].dtype
             eofs[k]   = np.zeros([n_var[k], n], dtype=dtype) * np.nan
-            eofs[k][no_nan_idx[k], :] = V[k][:, :n]
-            # reshape data fields to have original input shape
+            eofs[k][no_nan_idx[k], :] = V_temp[:, :n]
             eofs[k]   = eofs[k].reshape(field_shape[k] + (n,))
             # apply phase shift
             if self._analysis['is_complex']:
