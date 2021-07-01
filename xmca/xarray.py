@@ -242,7 +242,7 @@ class xMCA(MCA):
         n : int, optional
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
-        scaling : {None, 'eigen', 'max', 'std'}, optional
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
             Scale by square root of singular values ('eigen'), maximum value ('max') or
             standard deviation ('std'). The default is None.
         phase_shift : float, optional
@@ -325,7 +325,7 @@ class xMCA(MCA):
         n : int, optional
             Number of amplitude fields to return. If none, all fields are
             returned. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
@@ -399,7 +399,7 @@ class xMCA(MCA):
         n : int, optional
             Number of amplitude functions to return. If none, all functions are
             returned. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns

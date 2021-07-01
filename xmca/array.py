@@ -694,7 +694,7 @@ class MCA:
         ----------
         n : int, optional
             Number of PCs to be returned. The default is None.
-        scaling : {None, 'eigen', 'max', 'std'}, optional
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
             Scale PCs by square root of eigenvalues ('eigen'), maximum value
             ('max') or standard deviation ('std').
         phase_shift : float, optional
@@ -761,7 +761,7 @@ class MCA:
         ----------
         n : int, optional
             Number of EOFs to be returned. The default is None.
-        scaling : {None, 'eigen', 'max', 'std'}, optional
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
             Scale by square root of eigenvalues ('eigen'), maximum value
             ('max') or standard deviation ('std').
         phase_shift : float, optional
@@ -831,7 +831,7 @@ class MCA:
         n : int, optional
             Number of amplitude fields to be returned. If None, return all
             fields. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
@@ -840,7 +840,7 @@ class MCA:
             Spatial amplitude fields associated to left and right field.
 
         '''
-        eofs = self.eofs(n, scaling=None)
+        eofs = self.eofs(n, scaling='None')
 
         amplitudes = {}
         for key, eof in eofs.items():
@@ -884,7 +884,7 @@ class MCA:
         n : int, optional
             Number of amplitude series to be returned. If None, return all
             series. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
 
         Returns
@@ -893,7 +893,7 @@ class MCA:
             Temporal ampliude series associated to left and right field.
 
         '''
-        pcs = self.pcs(n, scaling=None)
+        pcs = self.pcs(n, scaling='None')
 
         amplitudes = {}
         for key, pc in pcs.items():
