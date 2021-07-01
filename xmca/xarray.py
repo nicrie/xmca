@@ -234,7 +234,7 @@ class xMCA(MCA):
 
         return variance
 
-    def pcs(self, n=None, scaling=None, phase_shift=0):
+    def pcs(self, n=None, scaling='None', phase_shift=0):
         '''Return first `n` PCs.
 
         Parameters
@@ -317,7 +317,7 @@ class xMCA(MCA):
 
         return eofs
 
-    def spatial_amplitude(self, n=None, scaling=None):
+    def spatial_amplitude(self, n=None, scaling='None'):
         '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -391,7 +391,7 @@ class xMCA(MCA):
 
         return phases
 
-    def temporal_amplitude(self, n=None, scaling=None):
+    def temporal_amplitude(self, n=None, scaling='None'):
         '''Return the temporal amplitude functions for the first `n` PCs.
 
         Parameters

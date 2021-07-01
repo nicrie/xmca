@@ -686,7 +686,7 @@ class MCA:
         exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
-    def pcs(self, n=None, scaling=None, phase_shift=0):
+    def pcs(self, n=None, scaling='None', phase_shift=0):
         '''Return the first `n` PCs.
 
 
@@ -695,8 +695,8 @@ class MCA:
         n : int, optional
             Number of PCs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale PCs by square root of eigenvalues ('eigen'), maximum value ('max') or
-            standard deviation ('std').
+            Scale PCs by square root of eigenvalues ('eigen'), maximum value
+            ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
 
@@ -715,7 +715,7 @@ class MCA:
             n = R.shape[0]
 
         V       = self._V
-        norm    = self._norm
+        norm    = self._get_norm()
         fields  = self._get_fields2d()
         n_rot   = self._analysis['rotations']
         var_idx = self._var_idx
@@ -732,19 +732,29 @@ class MCA:
             # apply phase shift
             if self._analysis['is_complex']:
                 pcs[k] *= cmath.rect(1, phase_shift)
-            # scale PCs by singular_values
-            if scaling == 'eigen':
+            # scaling
+            if scaling == 'None':
+                pass
+            # by eigenvalues
+            elif scaling == 'eigen':
                 pcs[k] *= sqrt_svals[:n] * norm[k][:n]
-            # scale PCs by maximum value
-            if scaling == 'max':
+            # by maximum value
+            elif scaling == 'max':
                 pcs[k] /= np.nanmax(abs(pcs[k].real), axis=0)
-            # scale PCs by standard deviation
-            if scaling == 'std':
+            # by standard deviation
+            elif scaling == 'std':
                 pcs[k] /= np.nanstd(pcs[k].real, axis=0)
+            else:
+                msg = (
+                    'The scaling option {:} is not valid. Please choose one '
+                    'of the following: None, eigen, std, max'
+                )
+                msg = msg.format(scaling)
+                raise ValueError(msg)
 
         return pcs
 
-    def eofs(self, n=None, scaling=None, phase_shift=0):
+    def eofs(self, n=None, scaling='None', phase_shift=0):
         '''Return the first `n` EOFs.
 
         Parameters
@@ -752,8 +762,8 @@ class MCA:
         n : int, optional
             Number of EOFs to be returned. The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by square root of eigenvalues ('eigen'), maximum value ('max') or
-            standard deviation ('std').
+            Scale by square root of eigenvalues ('eigen'), maximum value
+            ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
 
@@ -791,19 +801,29 @@ class MCA:
             # apply phase shift
             if self._analysis['is_complex']:
                 eofs[k] *= cmath.rect(1, phase_shift)
-            # scale EOFs with their singular_values
-            if scaling == 'eigen':
+            # scaling
+            if scaling == 'None':
+                pass
+            # by eigenvalues (field units)
+            elif scaling == 'eigen':
                 eofs[k] *= np.sqrt(svals[:n])
-            # scale EOFs by maximum value
-            if scaling == 'max':
+            # by maximum value
+            elif scaling == 'max':
                 eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))
-            # scale EOFs by standard deviation
-            if scaling == 'std':
+            # by standard deviation
+            elif scaling == 'std':
                 eofs[k] /= np.nanstd(eofs[k].real, axis=(0, 1))
+            else:
+                msg = (
+                    'The scaling option {:} is not valid. Please choose one '
+                    'of the following: None, eigen, std, max'
+                )
+                msg = msg.format(scaling)
+                raise ValueError(msg)
 
         return eofs
 
-    def spatial_amplitude(self, n=None, scaling=None):
+    def spatial_amplitude(self, n=None, scaling='None'):
         '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -856,7 +876,7 @@ class MCA:
 
         return phases
 
-    def temporal_amplitude(self, n=None, scaling=None):
+    def temporal_amplitude(self, n=None, scaling='None'):
         '''Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
@@ -910,7 +930,9 @@ class MCA:
 
         return phases
 
-    def transform(self, left=None, right=None):
+    def predict(
+            self, left=None, right=None,
+            n=None, scaling='None', phase_shift=0):
         '''Apply dimensionality reduction to left and right.
 
         left and right are projected on the first left (right) singular
@@ -929,46 +951,95 @@ class MCA:
             Description of returned object.
 
         '''
-        left = left.copy() if left is not None else None
-        right = right.copy() if right is not None else None
-        data = [left, right]
-        # TODO: assure correct input dimensions of left/right
-        # valid dims have time, y, x
         keys = self._keys
+        data = [left, right]
+        data_new = {k: d.copy() for k, d in zip(keys, data) if d is not None}
 
         n_obs = self._n_observations['left']
         dof = n_obs - 1
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
-        field_mean = self._field_means
-        field_std = self._field_stds
+        V = self._V
+        fields = self._fields
+        fields_mean = self._field_means
+        fields_std = self._field_stds
 
         singular_values = self.singular_values()
-        sqrtA_inv = np.diag(1. / np.sqrt(singular_values))
+        sqrt_svals = np.sqrt(singular_values)
+        norm = self._get_norm()
 
-        n_rotated = len(singular_values) #elf._analysis['rotations']
         R = self.rotation_matrix()
-        variance_idx = self._var_idx
+        n_rot = R.shape[0]
+        var_idx = self._var_idx
 
+        if n is None:
+            n = R.shape[0]
 
-        V = self._V
+        pcs_new = {}
+        for k, x_new in data_new.items():
+            try:
+                x_new -= fields_mean[k]
+            except ValueError as err:
+                msg = (
+                    'Error in {:} field. '
+                    'Spatial dimensions of new data {:} and the original '
+                    'field {:} do not match.'
+                )
+                msg = msg.format(k, x_new.shape[1:], fields_mean[k].shape)
+                raise ValueError(msg) from err
 
-        U_predicted = {}
-        for k, x_new in zip(keys, data):
-            if x_new is not None:
-                x_new -= field_mean[k]
-                if self._analysis['is_normalized']:
-                    x_new /= field_std[k]
+            if self._analysis['is_normalized']:
+                x_new /= fields_std[k]
+
+            try:
                 x_new = x_new.reshape(x_new.shape[0], n_vars[k])
-                x_new = x_new[:, no_nan_idx[k]]
+            except ValueError as err:
+                msg = (
+                    'Error in {:} field. '
+                    'Dimension of new data ({:}) and the original field '
+                    '({:}) do not match. Did you forget the time dimension?'
+                )
+                msg = msg.format(k, len(x_new.shape), len(fields[k].shape))
+                raise ValueError(msg) from err
 
-                U_new = x_new @ V[k][:, :n_rotated] @ sqrtA_inv @ R / np.sqrt(dof)
-                U_new = U_new[:, variance_idx]
+            x_new = x_new[:, no_nan_idx[k]]
 
-                U_predicted[k] = U_new
+            pcs = x_new @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
+            pcs = pcs @ R / np.sqrt(dof)
+            # reorder according to variance
+            pcs = pcs[:, var_idx]
+            # take first n PCs only
+            pcs = pcs[:, :n]
 
-        return U_predicted
+            # apply phase shift
+            if self._analysis['is_complex']:
+                pcs *= cmath.rect(1, phase_shift)
+            # apply scaling
+            # by eigenvalues (field units)
+            if scaling == 'None':
+                pass
+            elif scaling == 'eigen':
+                pcs *= sqrt_svals[:n] * norm[k][:n]
+            # by maximum value
+            elif scaling == 'max':
+                original_pcs = self.pcs(n, 'None', phase_shift)
+                pcs /= np.nanmax(abs(original_pcs[k].real), axis=0)
+            # by standard deviation
+            elif scaling == 'std':
+                original_pcs = self.pcs(n, 'None', phase_shift)
+                pcs /= np.nanstd(original_pcs[k].real, axis=0)
+            else:
+                msg = (
+                    'The scaling option {:} is not valid. Please choose one '
+                    'of the following: None, eigen, std, max'
+                )
+                msg = msg.format(scaling)
+                raise ValueError(msg)
+
+            pcs_new[k] = pcs
+
+        return pcs_new
 
     def plot(
             self, mode, threshold=0, phase_shift=0,
