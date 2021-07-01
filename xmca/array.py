@@ -187,7 +187,7 @@ class MCA:
         return 'c{:}'.format(id)
 
     def _get_rotation_id(self):
-        id = self._analysis['rotations']
+        id = self._analysis['n_rots']
         return 'r{:02}'.format(id)
 
     def _get_power_id(self):
@@ -411,7 +411,7 @@ class MCA:
     def solve(self, complexify=False, extend=False, period=365):
         '''Call the solver to perform EOF analysis/MCA.
 
-        Under the hood this method performs singular value decomposition on
+        Under the hood the method performs singular value decomposition on
         the covariance matrix.
 
         Parameters
@@ -421,13 +421,15 @@ class MCA:
             in order to perform complex PCA/MCA. Default is false.
         extend : ['exp', 'theta', False], optional
             If specified, time series are extended by fore/backcasting based on
-            either an exponential or a Theta model. New time series will have
-            3 * original length. Only used for complex time series i.e. when
-            complexify=True. Default is False.
+            either an exponential or a Theta model. Artificially extending
+            the time series sometimes helps to reduce spectral leakage inherent
+            to the Hilbert transform when time series are not stationary.
+            Only used for complex time series i.e. when omplexify=True.
+            Default is False.
         period : int, optional
-            Seasonal period used for Theta model. Default is 365, representing
-            a yearly cycle for daily data. If Theta model is not selected
-            this parameter has no effect.
+            Only applies if a Theta model is selected as time series extension.
+            Default is 365, representing a yearly cycle for daily data.
+            If Theta model is not selected this parameter has no effect.
         '''
         if any([np.isnan(field).all() for field in self._fields.values()]):
             raise RuntimeError('''
@@ -454,9 +456,6 @@ class MCA:
             kernel = fields_2d['left'].conjugate().T @ fields_2d['left']
         kernel = kernel / dof
 
-        self._V = {}  # singular vectors (EOFs)
-        self._U = {}  # projections // (PCs)
-
         # perform singular value decomposition
         try:
             VLeft, singular_values, VTRight = np.linalg.svd(
@@ -467,7 +466,8 @@ class MCA:
                 '''SVD failed. NaN entries may be the problem.'''
             )
 
-        self._V['left'] = VLeft
+        # singular vectors (EOFs) = V
+        self._V = {'left' : VLeft}
         if self._analysis['is_bivariate']:
             self._V['right'] = VTRight.conjugate().T
         # free up some space
@@ -479,20 +479,81 @@ class MCA:
         self._var_idx = np.argsort(singular_values)[::-1]
         self._norm = {k: np.sqrt(singular_values) for k in self._keys}
 
-        # get PC scores by projecting fields on loaded EOFs
-        for key, V in self._V.items():
-            self._U[key] = fields_2d[key] @ V / np.sqrt(singular_values * dof)
-
         self._analysis['total_covariance'] = singular_values.sum()
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
         self._analysis['rank'] = singular_values.size
-        self._analysis['rotations'] = singular_values.size
+        self._analysis['n_rots'] = singular_values.size
         self._analysis['is_truncated_at'] = singular_values.size
 
-    def _get_norm(self):
+    def _get_V(self, n=None):
         try:
-            return self._norm
-        except NameError:
+            return {k: V[:, :n] for k, V in self._V.items()}
+        except AttributeError:
+            raise RuntimeError(
+                'Cannot retrieve singular vectors. '
+                'Please call the method `solve` first.'
+            )
+
+    def _get_eofs(self, n=None):
+        n_rot   = self._analysis['n_rots']
+
+        if n is None:
+            n = n_rot
+
+        sqrt_svals = np.sqrt(self._get_svals(n_rot))
+
+        V       = self._get_V(n_rot)
+        norm    = self._get_norm(n_rot)
+        R       = self.rotation_matrix()
+        var_idx = self._var_idx
+        eofs = {}
+
+        for k in self._keys:
+            # create data fields with original NaNs
+            eofs[k] = V[k] * sqrt_svals @ R / norm[k]
+            # reorder according to variance
+            eofs[k] = eofs[k][:, var_idx]
+
+        return eofs
+
+    def _get_svals(self, n=None):
+        try:
+            return self._singular_values[:n]
+        except AttributeError:
+            raise RuntimeError(
+                'Cannot retrieve singular values. '
+                'Please call the method `solve` first.'
+            )
+
+    def _get_pcs(self, n=None):
+        n_rot   = self._analysis['n_rots']
+
+        if n is None:
+            n = n_rot
+
+        R = self.rotation_matrix(inverse_transpose=True)
+        sqrt_svals = np.sqrt(self._get_svals(n_rot))
+        dof = self._n_observations['left'] - 1
+
+        V       = self._get_V(n_rot)
+        fields  = self._get_fields2d()
+        var_idx = self._var_idx
+
+        U = {}
+        for k in self._keys:
+            U[k] = fields[k] @ V[k] / sqrt_svals
+            U[k] = U[k] @ R  / np.sqrt(dof)
+            # reorder according to variance
+            U[k] = U[k][:, var_idx]
+            # take first n PCs only
+            U[k] = U[k][:, :n]
+
+        return U
+
+    def _get_norm(self, n=None):
+        try:
+            return {k: norm[:n] for k, norm in self._norm.items()}
+        except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve field norms. '
                 'Please call the method `solve` first.'
@@ -533,12 +594,12 @@ class MCA:
         if(power < 1):
             raise ValueError('`power` must be >=1')
 
-        singular_values = self.singular_values(n_rot)
+        singular_values = self._get_svals(n_rot)
         sqrt_svals = np.sqrt(singular_values)
         n_vars_left = self._V['left'].shape[0]
 
         # rotate loadings (Cheng and Dunkerton 1995)
-        L = np.concatenate([V[:, :n_rot] for V in self._V.values()])
+        L = np.concatenate(list(self._get_V(n_rot).values()))
         L = L * sqrt_svals
         L_rot, R, Phi = promax(L, power, maxIter=1000, tol=tol)
 
@@ -556,48 +617,44 @@ class MCA:
         self._variance = variance
         self._var_idx = var_idx
 
-        # rotate PC scores
-        # If rotation is orthogonal: R = R^(-1).T
-        # If rotation is oblique (p>1): R != R^(-1).T
-        """
-        for key, U in self._U.items():
-            if(power > 1):
-                R = np.linalg.pinv(R).conjugate().T
-            U_rot[key] = U[:, :n_rot] * norm[key]  / sqrt_svals @ R
-        """
-        # store rotated pcs, eofs and "singular_values"
-        # and sort according to described variance
-        """
-        # self._singular_values   = variance[var_idx]
-        # for key in L_rot.keys():
-        #     self._V[key] = V_rot[key][:, var_idx]   # Standardized EOFs
-        #     self._L[key] = L_rot[key][:, var_idx]   # Loaded EOFs
-        #     self._U[key] = U_rot[key][:, var_idx]   # Standardized PC scores
-        """
         # store rotation and correlation matrix of PCs + meta information
         self._rotation_matrix           = R
         self._correlation_matrix        = Phi
         self._analysis['is_rotated']    = True
-        self._analysis['rotations']     = n_rot
+        self._analysis['n_rots']     = n_rot
         self._analysis['power']         = power
 
-    def rotation_matrix(self):
-        '''
-        Return the rotation matrix used for rotation.
+    def rotation_matrix(self, inverse_transpose=False):
+        '''Return the rotation matrix used for rotation.
 
         For non-rotated solutions the rotation matrix equals the unit matrix.
+
+        Parameters
+        ----------
+        inverse_transpose : boolean
+            If True, return the inverse transposed of the rotation matrix.
+            For orthogonal rotations (Varimax) it is the same as the rotation
+            matrix. The default is False.
 
         Returns
         -------
         ndarray
-            Rotation matrix.
+            Rotation matrix
 
         '''
         try:
-            return self._rotation_matrix
+            R = self._rotation_matrix
         except AttributeError:
             n = len(self.singular_values())
-            return np.eye(n)
+            R = np.eye(n)
+
+        # only for oblique rotations
+        # If rotation is orthogonal: R = R^(-1).T
+        # If rotation is oblique (p>1): R != R^(-1).T
+        if inverse_transpose and self._analysis['power'] > 1:
+            R = np.linalg.pinv(R).conjugate().T
+
+        return R
 
     def correlation_matrix(self):
         '''
@@ -633,13 +690,7 @@ class MCA:
             Singular values of the obtained solution.
 
         '''
-        try:
-            return self._singular_values[:n]
-        except AttributeError:
-            raise RuntimeError(
-                'There are no singular values. '
-                'Please call the method `solve` first.'
-            )
+        return self._get_svals(n)
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
@@ -706,29 +757,17 @@ class MCA:
             PCs associated to left and right input field.
 
         '''
-        svals = self.singular_values()
-        sqrt_svals = np.sqrt(svals)
-        dof = self._n_observations['left'] - 1
-        R       = self.rotation_matrix()
+        n_rot   = self._analysis['n_rots']
 
         if n is None:
-            n = R.shape[0]
+            n = n_rot
 
-        V       = self._V
-        norm    = self._get_norm()
-        fields  = self._get_fields2d()
-        n_rot   = self._analysis['rotations']
-        var_idx = self._var_idx
+        svals = self._get_svals(n)
+        sqrt_svals = np.sqrt(svals)
+        norm    = self._get_norm(n)
+        pcs = self._get_pcs(n)
 
-        pcs = {}
         for k in self._keys:
-            pcs[k] = fields[k] @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
-            pcs[k] = pcs[k] @ R  / np.sqrt(dof)
-            # reorder according to variance
-            pcs[k] = pcs[k][:, var_idx]
-            # take first n PCs only
-            pcs[k] = pcs[k][:, :n]
-
             # apply phase shift
             if self._analysis['is_complex']:
                 pcs[k] *= cmath.rect(1, phase_shift)
@@ -773,30 +812,24 @@ class MCA:
             EOFs associated to left and right input field.
 
         '''
+        n_rot   = self._analysis['n_rots']
+
+        if n is None:
+            n = n_rot
+
+        sqrt_svals  = np.sqrt(self._get_svals(n))
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
-        svals = self.singular_values()
-        sqrt_svals = np.sqrt(svals)
-        V       = self._V
-        norm    = self._norm
-        R       = self.rotation_matrix()
-        n_rot   = self._analysis['rotations']
-        var_idx = self._var_idx
 
-        if n is None:
-            n = R.shape[0]
-
+        eofs_2d = self._get_eofs(n)
         eofs = {}
         for k in self._keys:
             # create data fields with original NaNs
-            V_temp = V[k][:, :n_rot] * sqrt_svals[:n_rot] @ R / norm[k][:n_rot]
-            # reorder according to variance
-            V_temp = V_temp[:, var_idx]
-            # reshape eofs to have original input shape
-            dtype       = V[k].dtype
+            dtype       = eofs_2d[k].dtype
             eofs[k]   = np.zeros([n_var[k], n], dtype=dtype) * np.nan
-            eofs[k][no_nan_idx[k], :] = V_temp[:, :n]
+            eofs[k][no_nan_idx[k], :] = eofs_2d[k][:, :n]
+            # reshape eofs to have original input shape
             eofs[k]   = eofs[k].reshape(field_shape[k] + (n,))
             # apply phase shift
             if self._analysis['is_complex']:
@@ -806,7 +839,7 @@ class MCA:
                 pass
             # by eigenvalues (field units)
             elif scaling == 'eigen':
-                eofs[k] *= np.sqrt(svals[:n])
+                eofs[k] *= sqrt_svals
             # by maximum value
             elif scaling == 'max':
                 eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))

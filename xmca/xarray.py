@@ -128,6 +128,62 @@ class xMCA(MCA):
         else:
             print('Coslat correction already applied. Nothing was done.')
 
+    def solve(self, complexify=False, extend=False, period=365):
+        '''Call the solver to perform EOF analysis/MCA.
+
+        Under the hood the method performs singular value decomposition on
+        the covariance matrix.
+
+        Parameters
+        ----------
+        complexify : boolean, optional
+            Use Hilbert transform to complexify the input data fields
+            in order to perform complex PCA/MCA. Default is false.
+        extend : ['exp', 'theta', False], optional
+            If specified, time series are extended by fore/backcasting based on
+            either an exponential or a Theta model. Artificially extending
+            the time series sometimes helps to reduce spectral leakage inherent
+            to the Hilbert transform when time series are not stationary.
+            Only used for complex time series i.e. when omplexify=True.
+            Default is False.
+        period : int, optional
+            Only applies if a Theta model is selected as time series extension.
+            Default is 365, representing a yearly cycle for daily data.
+            If Theta model is not selected this parameter has no effect.
+        '''
+        super().solve(complexify, extend, period)
+
+    def rotate(self, n_rot, power=1, tol=1e-8):
+        '''Perform Promax rotation on the first `n` EOFs.
+
+        Promax rotation (Hendrickson & White 1964) is an oblique rotation which
+        seeks to find `simple structures` in the EOFs. It transforms the EOFs
+        via an orthogonal Varimax rotation (Kaiser 1958) followed by the Promax
+        equation. If `power=1`, Promax reduces to Varimax rotation. In general,
+        a Promax transformation breaks the orthogonality of EOFs and introduces
+        some correlation between PCs.
+
+        Parameters
+        ----------
+        n_rot : int
+            Number of EOFs to rotate.
+        power : int, optional
+            Power of Promax rotation. The default is 1 (= Varimax).
+        tol : float, optional
+            Tolerance of rotation process. The default is 1e-5.
+
+        Raises
+        ------
+        ValueError
+            If number of rotations are <2.
+
+        Returns
+        -------
+        None.
+
+        '''
+        super().rotate(n_rot, power, tol)
+
     def singular_values(self, n=None):
         '''Return first `n` singular values of the SVD.
 
@@ -243,8 +299,8 @@ class xMCA(MCA):
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
         scaling : {'None', 'eigen', 'max', 'std'}, optional
-            Scale by square root of singular values ('eigen'), maximum value ('max') or
-            standard deviation ('std'). The default is None.
+            Scale by square root of singular values ('eigen'), maximum value
+            ('max') or standard deviation ('std'). The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
 
@@ -274,7 +330,7 @@ class xMCA(MCA):
 
         return pcs
 
-    def eofs(self, n=None, scaling=None, phase_shift=0):
+    def eofs(self, n=None, scaling='None', phase_shift=0):
         '''Return the first `n` EOFs.
 
         Parameters
