@@ -313,7 +313,7 @@ class xMCA(MCA):
         pcs = super().pcs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._singular_values.size
+            n = self._analysis['n_rots']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -352,7 +352,7 @@ class xMCA(MCA):
         eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._singular_values.size
+            n = self._analysis['n_rots']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -392,7 +392,7 @@ class xMCA(MCA):
         amplitudes = super().spatial_amplitude(n, scaling)
 
         if n is None:
-            n = self._singular_values.size
+            n = self._analysis['n_rots']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -466,7 +466,7 @@ class xMCA(MCA):
         amplitudes = super().temporal_amplitude(n, scaling)
 
         if n is None:
-            n = self._singular_values.size
+            n = self._analysis['n_rots']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -632,6 +632,54 @@ class xMCA(MCA):
             rec_fields[key]  += mean[key]
 
         return rec_fields
+
+    def predict(
+            self, left=None, right=None,
+            n=None, scaling='None', phase_shift=0):
+        '''Predict PCs of new data.
+
+        left and right are projected on the left and right singular
+        vectors. If rotation was performed, the predicted PCs will be rotated
+        as well.
+
+        Parameters
+        ----------
+        left : ndarray
+            Description of parameter `left`.
+        right : ndarray
+            Description of parameter `right`.
+        n : int
+            Number of PC modes to return. If None, return all modes.
+            The default is None.
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
+            Scale PCs by square root of eigenvalues ('eigen'), maximum value
+            ('max') or standard deviation ('std').
+        phase_shift : float, optional
+            If complex, apply a phase shift to the temporal phase.
+            Default is 0.
+
+        Returns
+        -------
+        dict[ndarray, ndarray]
+            Predicted PCs associated to left and right input field.
+
+        '''
+        keys = self._keys
+        data = [left, right]
+
+        pcs_new = super().predict(
+            left.values, right.values, n, scaling, phase_shift
+        )
+
+        coords = {
+            k: {
+                'time' : d.coords['time'],
+                'mode' : range(1, pcs_new[k].shape[1] + 1)
+            } for k, d in zip(keys, data) if d is not None
+        }
+        dims = ('time', 'mode')
+        new = {k: xr.DataArray(pcs_new[k], dims=dims, coords=coords[k]) for k in keys}
+        return new
 
     def _create_gridspec(
             self,
