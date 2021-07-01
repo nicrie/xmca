@@ -187,7 +187,10 @@ class MCA:
         return 'c{:}'.format(id)
 
     def _get_rotation_id(self):
-        id = self._analysis['n_rots']
+        if self._analysis['is_rotated']:
+            id = self._analysis['n_rots']
+        else:
+            id = 0
         return 'r{:02}'.format(id)
 
     def _get_power_id(self):
@@ -481,9 +484,13 @@ class MCA:
 
         self._analysis['total_covariance'] = singular_values.sum()
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
-        self._analysis['rank'] = singular_values.size
-        self._analysis['n_rots'] = singular_values.size
-        self._analysis['is_truncated_at'] = singular_values.size
+        self._analysis['rank'] = len(singular_values)
+        self._analysis['is_rotated']    = False
+        self._analysis['n_rots'] = len(singular_values)
+        self._analysis['power']         = 0
+        self._rotation_matrix           = np.eye(len(singular_values))
+        self._correlation_matrix        = np.eye(len(singular_values))
+        self._analysis['is_truncated_at'] = len(singular_values)
 
     def _get_V(self, n=None):
         try:
@@ -494,7 +501,7 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
-    def _get_eofs(self, n=None):
+    def _get_eofs(self, n=None, scaling='None', phase_shift=0):
         n_rot   = self._analysis['n_rots']
 
         if n is None:
@@ -506,13 +513,44 @@ class MCA:
         norm    = self._get_norm(n_rot)
         R       = self.rotation_matrix()
         var_idx = self._var_idx
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
         eofs = {}
 
         for k in self._keys:
             # create data fields with original NaNs
-            eofs[k] = V[k] * sqrt_svals @ R / norm[k]
+            V2d = V[k] * sqrt_svals @ R / norm[k]
             # reorder according to variance
-            eofs[k] = eofs[k][:, var_idx]
+            V2d = V2d[:, var_idx]
+            # create data fields with original NaNs
+            dtype       = V2d.dtype
+            eofs[k]   = np.zeros([n_var[k], n], dtype=dtype) * np.nan
+            eofs[k][no_nan_idx[k], :] = V2d[:, :n]
+            # reshape eofs to have original input shape
+            eofs[k]   = eofs[k].reshape(field_shape[k] + (n,))
+            # apply phase shift
+            if self._analysis['is_complex']:
+                eofs[k] *= cmath.rect(1, phase_shift)
+            # scaling
+            if scaling == 'None':
+                pass
+            # by eigenvalues (field units)
+            elif scaling == 'eigen':
+                eofs[k] *= sqrt_svals
+            # by maximum value
+            elif scaling == 'max':
+                eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))
+            # by standard deviation
+            elif scaling == 'std':
+                eofs[k] /= np.nanstd(eofs[k].real, axis=(0, 1))
+            else:
+                msg = (
+                    'The scaling option {:} is not valid. Please choose one '
+                    'of the following: None, eigen, std, max'
+                )
+                msg = msg.format(scaling)
+                raise ValueError(msg)
 
         return eofs
 
@@ -525,7 +563,7 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
-    def _get_pcs(self, n=None):
+    def _get_pcs(self, n=None, scaling='None', phase_shift=0):
         n_rot   = self._analysis['n_rots']
 
         if n is None:
@@ -538,6 +576,7 @@ class MCA:
         V       = self._get_V(n_rot)
         fields  = self._get_fields2d()
         var_idx = self._var_idx
+        norm    = self._get_norm(n)
 
         U = {}
         for k in self._keys:
@@ -547,6 +586,28 @@ class MCA:
             U[k] = U[k][:, var_idx]
             # take first n PCs only
             U[k] = U[k][:, :n]
+            # apply phase shift
+            if self._analysis['is_complex']:
+                U[k] *= cmath.rect(1, phase_shift)
+            # scaling
+            if scaling == 'None':
+                pass
+            # by eigenvalues
+            elif scaling == 'eigen':
+                U[k] *= sqrt_svals[:n] * norm[k][:n]
+            # by maximum value
+            elif scaling == 'max':
+                U[k] /= np.nanmax(abs(U[k].real), axis=0)
+            # by standard deviation
+            elif scaling == 'std':
+                U[k] /= np.nanstd(U[k].real, axis=0)
+            else:
+                msg = (
+                    'The scaling option {:} is not valid. Please choose one '
+                    'of the following: None, eigen, std, max'
+                )
+                msg = msg.format(scaling)
+                raise ValueError(msg)
 
         return U
 
@@ -744,7 +805,7 @@ class MCA:
         Parameters
         ----------
         n : int, optional
-            Number of PCs to be returned. The default is None.
+            Number of PCs to be returned. By default return all.
         scaling : {'None', 'eigen', 'max', 'std'}, optional
             Scale PCs by square root of eigenvalues ('eigen'), maximum value
             ('max') or standard deviation ('std').
@@ -757,41 +818,7 @@ class MCA:
             PCs associated to left and right input field.
 
         '''
-        n_rot   = self._analysis['n_rots']
-
-        if n is None:
-            n = n_rot
-
-        svals = self._get_svals(n)
-        sqrt_svals = np.sqrt(svals)
-        norm    = self._get_norm(n)
-        pcs = self._get_pcs(n)
-
-        for k in self._keys:
-            # apply phase shift
-            if self._analysis['is_complex']:
-                pcs[k] *= cmath.rect(1, phase_shift)
-            # scaling
-            if scaling == 'None':
-                pass
-            # by eigenvalues
-            elif scaling == 'eigen':
-                pcs[k] *= sqrt_svals[:n] * norm[k][:n]
-            # by maximum value
-            elif scaling == 'max':
-                pcs[k] /= np.nanmax(abs(pcs[k].real), axis=0)
-            # by standard deviation
-            elif scaling == 'std':
-                pcs[k] /= np.nanstd(pcs[k].real, axis=0)
-            else:
-                msg = (
-                    'The scaling option {:} is not valid. Please choose one '
-                    'of the following: None, eigen, std, max'
-                )
-                msg = msg.format(scaling)
-                raise ValueError(msg)
-
-        return pcs
+        return self._get_pcs(n, scaling, phase_shift)
 
     def eofs(self, n=None, scaling='None', phase_shift=0):
         '''Return the first `n` EOFs.
@@ -812,49 +839,7 @@ class MCA:
             EOFs associated to left and right input field.
 
         '''
-        n_rot   = self._analysis['n_rots']
-
-        if n is None:
-            n = n_rot
-
-        sqrt_svals  = np.sqrt(self._get_svals(n))
-        n_var       = self._n_variables
-        no_nan_idx  = self._no_nan_index
-        field_shape = self._fields_spatial_shape
-
-        eofs_2d = self._get_eofs(n)
-        eofs = {}
-        for k in self._keys:
-            # create data fields with original NaNs
-            dtype       = eofs_2d[k].dtype
-            eofs[k]   = np.zeros([n_var[k], n], dtype=dtype) * np.nan
-            eofs[k][no_nan_idx[k], :] = eofs_2d[k][:, :n]
-            # reshape eofs to have original input shape
-            eofs[k]   = eofs[k].reshape(field_shape[k] + (n,))
-            # apply phase shift
-            if self._analysis['is_complex']:
-                eofs[k] *= cmath.rect(1, phase_shift)
-            # scaling
-            if scaling == 'None':
-                pass
-            # by eigenvalues (field units)
-            elif scaling == 'eigen':
-                eofs[k] *= sqrt_svals
-            # by maximum value
-            elif scaling == 'max':
-                eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))
-            # by standard deviation
-            elif scaling == 'std':
-                eofs[k] /= np.nanstd(eofs[k].real, axis=(0, 1))
-            else:
-                msg = (
-                    'The scaling option {:} is not valid. Please choose one '
-                    'of the following: None, eigen, std, max'
-                )
-                msg = msg.format(scaling)
-                raise ValueError(msg)
-
-        return eofs
+        return self._get_eofs(n, scaling, phase_shift)
 
     def spatial_amplitude(self, n=None, scaling='None'):
         '''Return the spatial amplitude fields for the first `n` EOFs.
@@ -966,22 +951,32 @@ class MCA:
     def predict(
             self, left=None, right=None,
             n=None, scaling='None', phase_shift=0):
-        '''Apply dimensionality reduction to left and right.
+        '''Predict PCs of new data.
 
-        left and right are projected on the first left (right) singular
-        vectors previously extracted from some input data.
+        left and right are projected on the left and right singular
+        vectors. If rotation was performed, the predicted PCs will be rotated
+        as well.
 
         Parameters
         ----------
-        left : type
+        left : ndarray
             Description of parameter `left`.
-        right : type
+        right : ndarray
             Description of parameter `right`.
+        n : int
+            Number of PC modes to return. If None, return all modes.
+            The default is None.
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
+            Scale PCs by square root of eigenvalues ('eigen'), maximum value
+            ('max') or standard deviation ('std').
+        phase_shift : float, optional
+            If complex, apply a phase shift to the temporal phase.
+            Default is 0.
 
         Returns
         -------
-        type
-            Description of returned object.
+        dict[ndarray, ndarray]
+            Predicted PCs associated to left and right input field.
 
         '''
         keys = self._keys
@@ -993,16 +988,15 @@ class MCA:
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
-        V = self._V
+        V = self._get_V()
         fields = self._fields
         fields_mean = self._field_means
         fields_std = self._field_stds
 
-        singular_values = self.singular_values()
-        sqrt_svals = np.sqrt(singular_values)
+        sqrt_svals = np.sqrt(self._get_svals())
         norm = self._get_norm()
 
-        R = self.rotation_matrix()
+        R = self.rotation_matrix(inverse_transpose=True)
         n_rot = R.shape[0]
         var_idx = self._var_idx
 
@@ -1056,11 +1050,11 @@ class MCA:
                 pcs *= sqrt_svals[:n] * norm[k][:n]
             # by maximum value
             elif scaling == 'max':
-                original_pcs = self.pcs(n, 'None', phase_shift)
+                original_pcs = self._get_pcs(n, 'None', phase_shift)
                 pcs /= np.nanmax(abs(original_pcs[k].real), axis=0)
             # by standard deviation
             elif scaling == 'std':
-                original_pcs = self.pcs(n, 'None', phase_shift)
+                original_pcs = self._get_pcs(n, 'None', phase_shift)
                 pcs /= np.nanstd(original_pcs[k].real, axis=0)
             else:
                 msg = (
