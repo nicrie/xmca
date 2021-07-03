@@ -230,7 +230,7 @@ class MCA:
 
         new_fields = {}
         for key, field in fields.items():
-            new_fields[key] = field
+            new_fields[key] = field.copy()
             if original_scale:
                 if self._analysis['is_normalized']:
                     new_fields[key] *= std[key]
