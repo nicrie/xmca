@@ -1061,14 +1061,12 @@ class xMCA(MCA):
 
         fields      = self._get_fields(original_scale=True)
         eofs        = self.eofs()
-        pcs         = self.pcs()
         singular_values = self.singular_values()
 
         self._save_data(singular_values, analysis_path, engine)
-        for key in pcs.keys():
+        for key in self._keys:
             self._save_data(fields[key], analysis_path, engine)
             self._save_data(eofs[key], analysis_path, engine)
-            self._save_data(pcs[key], analysis_path, engine)
 
     def load_analysis(self, path, engine='h5netcdf'):
         self._set_info_from_file(path)
@@ -1079,21 +1077,16 @@ class xMCA(MCA):
         singular_values = xr.open_dataarray(path_eigen, engine=engine).data
 
         fields  = {}
-        pcs     = {}
         eofs    = {}
         for key in self._field_names.keys():
             path_fields   = os.path.join(
                 path_folder, file_names['fields'][key]
-            )
-            path_pcs   = os.path.join(
-                path_folder, file_names['pcs'][key]
             )
             path_eofs   = os.path.join(
                 path_folder, file_names['eofs'][key]
             )
 
             fields[key] = xr.open_dataarray(path_fields, engine=engine)
-            pcs[key]    = xr.open_dataarray(path_pcs, engine=engine)
             eofs[key]   = xr.open_dataarray(path_eofs, engine=engine)
 
         self._field_coords = {}
@@ -1103,13 +1096,11 @@ class xMCA(MCA):
 
             fields[key]     = fields[key].data
             eofs[key]       = eofs[key].data
-            pcs[key]        = pcs[key].data
 
         super().load_analysis(
             path=path,
             fields=fields,
             eofs=eofs,
-            pcs=pcs,
             singular_values=singular_values)
 
         if self._analysis['is_coslat_corrected']:

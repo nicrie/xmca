@@ -1359,7 +1359,7 @@ class MCA:
 
     def load_analysis(
             self, path,
-            fields=None, eofs=None, pcs=None, singular_values=None):
+            fields=None, eofs=None, singular_values=None):
         '''Load a model.
 
         This method allows to load a models which was saved by
@@ -1373,8 +1373,6 @@ class MCA:
             The original input fields.
         eofs : ndarray
             The obtained EOFs.
-        pcs : ndarray
-            The obtained PCs.
         singular_values : ndarray
             The obtained singular values.
 
@@ -1382,27 +1380,21 @@ class MCA:
         self._set_info_from_file(path)
 
         self._V                     = {}
-        self._L                     = {}
-        self._U                     = {}
         self._singular_values           = singular_values
         for key in eofs.keys():
-            self._n_observations[key]       = pcs[key].shape[0]
+            self._field_means[key]  = fields[key].mean(axis=0)
+            self._field_stds[key]   = fields[key].std(axis=0)
+            self._fields[key]       = fields[key] - fields[key].mean(axis=0)
+
+            self._n_observations[key]       = fields[key].shape[0]
             self._fields_spatial_shape[key] = eofs[key].shape[:-1]
             self._n_variables[key]          = np.product(eofs[key].shape[:-1])
             n_modes                         = eofs[key].shape[-1]
-            S   = np.sqrt(np.diag(singular_values) * self._n_observations[key])
 
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
             VT, self._no_nan_index[key]   = remove_nan_cols(eofs[key].T)
 
             self._V[key]    = VT.T
-            self._L[key]    = self._V[key] @ S
-            self._U[key]    = pcs[key]
-
-            self._field_means[key]  = fields[key].mean(axis=0)
-            self._field_stds[key]   = fields[key].std(axis=0)
-
-            self._fields[key]       = fields[key] - fields[key].mean(axis=0)
 
         if self._analysis['is_normalized']:
             self.normalize()
