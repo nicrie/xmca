@@ -1064,10 +1064,8 @@ class xMCA(MCA):
 
     def _save_data(self, data, path, engine='h5netcdf', *args, **kwargs):
         analysis_path   = path
-        analysis_name   = self._get_analysis_id()
-        var_name        = secure_str('.'.join([data.name, 'nc']))
+        file_name        = secure_str('.'.join([data.name, 'nc']))
 
-        file_name   = '_'.join([analysis_name, var_name])
         output_path = os.path.join(analysis_path, file_name)
 
         invalid_netcdf = True
@@ -1138,3 +1136,9 @@ class xMCA(MCA):
 
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
+
+    def summmary(self):
+        '''Return meta information of the performed analysis.
+
+        '''
+        super().summary()

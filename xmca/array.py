@@ -11,6 +11,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 from numpy.polynomial.polynomial import polyfit
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
@@ -1290,8 +1291,8 @@ class MCA:
             'This file contains information neccessary to load stored analysis'
             'data from xmca module.')
 
-        path_output   = os.path.join(path, self._get_analysis_id())
-        path_output = '.'.join([path_output, 'info'])
+        # path_output   = os.path.join(path, self._get_analysis_id())
+        path_output = os.path.join(path, 'info.xmca')
 
         file = open(path_output, 'w+')
         file.write(wrap_str(file_header))
@@ -1316,7 +1317,7 @@ class MCA:
         file.close()
 
     def _get_file_names(self, format):
-        base_name = self._get_analysis_id()
+        # base_name = self._get_analysis_id()
 
         fields  = {}
         eofs    = {}
@@ -1324,13 +1325,13 @@ class MCA:
         norm    = {}
         for key, variable in self._field_names.items():
             variable    = secure_str(variable)
-            field_name  = '_'.join([base_name, variable])
-            eof_name    = '_'.join([base_name, variable, 'eofs'])
+            field_name  = variable
+            eof_name    = '_'.join([variable, 'eofs'])
 
             fields[key] = '.'.join([field_name, format])
             eofs[key]   = '.'.join([eof_name, format])
 
-        singular_values = '_'.join([base_name, 'singular_values'])
+        singular_values = 'singular_values'
         singular_values = '.'.join([singular_values, format])
 
         file_names = {
@@ -1428,3 +1429,15 @@ class MCA:
             n_rot = self._analysis['n_rot']
             power = self._analysis['power']
             self.rotate(n_rot, power)
+
+    def summary(self):
+        '''Return meta information of the performed analysis.
+
+        '''
+        analysis = self._analysis
+        strings_only = {k: str(v) for k, v in analysis.items()}
+        print(yaml.dump(
+            strings_only,
+            sort_keys=False,
+            default_flow_style=False
+        ))
