@@ -202,21 +202,17 @@ class MCA:
         return analysis
 
     def _get_analysis_path(self, path=None):
-        base_path   = path
-        if base_path is None:
-            base_path = os.getcwd()
+        if path is None:
+            name_folder = '_'.join(self._field_names.values())
+            name_folder = secure_str(name_folder)
+            path = os.path.join(os.getcwd(), 'xmca', name_folder)
+        elif not os.path.isabs(path):
+            path = os.path.abspath(path)
 
-        base_folder = 'xmca'
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-        analysis_folder = '_'.join(self._field_names.values())
-        analysis_folder = secure_str(analysis_folder)
-
-        analysis_path   = os.path.join(base_path, base_folder, analysis_folder)
-
-        if not os.path.exists(analysis_path):
-            os.makedirs(analysis_path)
-
-        return analysis_path
+        return path
 
     def _get_fields(self, original_scale=False):
         std     = self._field_stds
