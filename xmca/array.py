@@ -18,6 +18,7 @@ from xmca.tools.array import has_nan_time_steps, remove_mean, remove_nan_cols
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
 from tqdm import tqdm
+from xmca import __version__
 
 
 # =============================================================================
@@ -137,6 +138,7 @@ class MCA:
 
         # set meta information
         self._analysis = {
+            'version'               : __version__,
             'is_bivariate'          : True if len(self._fields) > 1 else False,
             # pre-processing
             'is_normalized'         : False,
