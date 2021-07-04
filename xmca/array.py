@@ -148,7 +148,7 @@ class MCA:
             'theta_period'          : 365,
             # Rotated solution
             'is_rotated'            : False,
-            'rotations'             : 0,
+            'n_rot'                : 0,
             'power'                 : 0,
             # Truncated solution
             'is_truncated'          : False,
@@ -188,7 +188,7 @@ class MCA:
 
     def _get_rotation_id(self):
         if self._analysis['is_rotated']:
-            id = self._analysis['n_rots']
+            id = self._analysis['n_rot']
         else:
             id = 0
         return 'r{:02}'.format(id)
@@ -486,7 +486,7 @@ class MCA:
         self._analysis['total_squared_covariance'] = (singular_values**2).sum()
         self._analysis['rank'] = len(singular_values)
         self._analysis['is_rotated']    = False
-        self._analysis['n_rots'] = len(singular_values)
+        self._analysis['n_rot'] = len(singular_values)
         self._analysis['power']         = 0
         self._rotation_matrix           = np.eye(len(singular_values))
         self._correlation_matrix        = np.eye(len(singular_values))
@@ -502,7 +502,7 @@ class MCA:
             )
 
     def _get_eofs(self, n=None, scaling='None', phase_shift=0):
-        n_rot   = self._analysis['n_rots']
+        n_rot   = self._analysis['n_rot']
 
         if n is None:
             n = n_rot
@@ -564,7 +564,7 @@ class MCA:
             )
 
     def _get_pcs(self, n=None, scaling='None', phase_shift=0):
-        n_rot   = self._analysis['n_rots']
+        n_rot   = self._analysis['n_rot']
 
         if n is None:
             n = n_rot
@@ -682,7 +682,7 @@ class MCA:
         self._rotation_matrix           = R
         self._correlation_matrix        = Phi
         self._analysis['is_rotated']    = True
-        self._analysis['n_rots']     = n_rot
+        self._analysis['n_rot']     = n_rot
         self._analysis['power']         = power
 
     def rotation_matrix(self, inverse_transpose=False):
@@ -752,6 +752,22 @@ class MCA:
 
         '''
         return self._get_svals(n)
+
+    def norm(self, n=None):
+        '''Return L2 norm of first `n` loaded singular vectors.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default will return all modes.
+
+        Returns
+        -------
+        DataArray
+            L2 norm associated to each mode and vector.
+
+        '''
+        return self._get_norm(n)
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
@@ -1307,15 +1323,14 @@ class MCA:
         fields  = {}
         eofs    = {}
         pcs     = {}
+        norm    = {}
         for key, variable in self._field_names.items():
             variable    = secure_str(variable)
             field_name  = '_'.join([base_name, variable])
             eof_name    = '_'.join([base_name, variable, 'eofs'])
-            pc_name     = '_'.join([base_name, variable, 'pcs'])
 
             fields[key] = '.'.join([field_name, format])
             eofs[key]   = '.'.join([eof_name, format])
-            pcs[key]    = '.'.join([pc_name, format])
 
         singular_values = '_'.join([base_name, 'singular_values'])
         singular_values = '.'.join([singular_values, format])
@@ -1324,7 +1339,8 @@ class MCA:
             'fields'    : fields,
             'eofs'      : eofs,
             'pcs'       : pcs,
-            'singular'  : singular_values
+            'singular'  : singular_values,
+            'norm'      : norm
         }
         return file_names
 
@@ -1379,9 +1395,20 @@ class MCA:
         '''
         self._set_info_from_file(path)
 
-        self._V                     = {}
+        if self._analysis['is_bivariate']:
+            self._keys = ['left', 'right']
+        else:
+            self._keys = ['left']
+
+        self._V = {}
+        self._norm = {}
         self._singular_values           = singular_values
-        for key in eofs.keys():
+        self._variance = singular_values
+        self._var_idx = np.argsort(singular_values)[::-1]
+
+        for key in self._keys:
+            self._norm[key] = np.sqrt(singular_values)
+
             self._field_means[key]  = fields[key].mean(axis=0)
             self._field_stds[key]   = fields[key].std(axis=0)
             self._fields[key]       = fields[key] - fields[key].mean(axis=0)
@@ -1398,3 +1425,8 @@ class MCA:
 
         if self._analysis['is_normalized']:
             self.normalize()
+
+        if self._analysis['is_rotated']:
+            n_rot = self._analysis['n_rot']
+            power = self._analysis['power']
+            self.rotate(n_rot, power)

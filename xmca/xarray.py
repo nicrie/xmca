@@ -218,6 +218,40 @@ class xMCA(MCA):
 
         return values
 
+    def norm(self, n=None):
+        '''Return L2 norm of first `n` loaded singular vectors.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default will return all modes.
+
+        Returns
+        -------
+        DataArray
+            L2 norm associated to each mode and vector.
+
+        '''
+        norm = super().norm(n)
+
+        # if n is not provided, take all modes
+        if n is None:
+            n = self._analysis['n_rot']
+
+        modes = list(range(1, n + 1))
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+        field_names = self._field_names
+
+        for k, data in norm.items():
+            norm[k] = xr.DataArray(
+                data,
+                dims=['mode'],
+                coords={'mode' : modes},
+                name=' '.join([field_names[k], 'norm']),
+                attrs=attrs)
+
+        return norm
+
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
 
@@ -313,7 +347,7 @@ class xMCA(MCA):
         pcs = super().pcs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._analysis['n_rots']
+            n = self._analysis['n_rot']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -352,7 +386,7 @@ class xMCA(MCA):
         eofs = super().eofs(n, scaling, phase_shift)
 
         if n is None:
-            n = self._analysis['n_rots']
+            n = self._analysis['n_rot']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -392,7 +426,7 @@ class xMCA(MCA):
         amplitudes = super().spatial_amplitude(n, scaling)
 
         if n is None:
-            n = self._analysis['n_rots']
+            n = self._analysis['n_rot']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -466,7 +500,7 @@ class xMCA(MCA):
         amplitudes = super().temporal_amplitude(n, scaling)
 
         if n is None:
-            n = self._analysis['n_rots']
+            n = self._analysis['n_rot']
 
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -666,9 +700,10 @@ class xMCA(MCA):
         '''
         keys = self._keys
         data = [left, right]
+        values = {k: d if d is None else d.values for k, d in zip(keys, data)}
 
         pcs_new = super().predict(
-            left.values, right.values, n, scaling, phase_shift
+            values['left'], values['right'], n, scaling, phase_shift
         )
 
         coords = {
@@ -678,8 +713,9 @@ class xMCA(MCA):
             } for k, d in zip(keys, data) if d is not None
         }
         dims = ('time', 'mode')
-        new = {k: xr.DataArray(pcs_new[k], dims=dims, coords=coords[k]) for k in keys}
-        return new
+        for k, pc in pcs_new.items():
+            pcs_new[k] = xr.DataArray(pcs_new[k], dims=dims, coords=coords[k])
+        return pcs_new
 
     def _create_gridspec(
             self,
@@ -1026,10 +1062,10 @@ class xMCA(MCA):
 
         return fig, axes
 
-    def _save_data(self, data_array, path, engine='h5netcdf', *args, **kwargs):
+    def _save_data(self, data, path, engine='h5netcdf', *args, **kwargs):
         analysis_path   = path
         analysis_name   = self._get_analysis_id()
-        var_name        = secure_str('.'.join([data_array.name, 'nc']))
+        var_name        = secure_str('.'.join([data.name, 'nc']))
 
         file_name   = '_'.join([analysis_name, var_name])
         output_path = os.path.join(analysis_path, file_name)
@@ -1037,7 +1073,7 @@ class xMCA(MCA):
         invalid_netcdf = True
         if engine != 'h5netcdf':
             invalid_netcdf = False
-        data_array.to_netcdf(
+        data.to_netcdf(
             path=output_path,
             engine=engine, invalid_netcdf=invalid_netcdf, *args, **kwargs
         )
@@ -1078,6 +1114,8 @@ class xMCA(MCA):
 
         fields  = {}
         eofs    = {}
+        self._field_coords = {}
+
         for key in self._field_names.keys():
             path_fields   = os.path.join(
                 path_folder, file_names['fields'][key]
@@ -1086,16 +1124,11 @@ class xMCA(MCA):
                 path_folder, file_names['eofs'][key]
             )
 
+            eofs[key]   = xr.open_dataarray(path_eofs, engine=engine).data
             fields[key] = xr.open_dataarray(path_fields, engine=engine)
-            eofs[key]   = xr.open_dataarray(path_eofs, engine=engine)
-
-        self._field_coords = {}
-        for key, field in fields.items():
-            self._field_coords[key] = field.coords
-            self._field_dims[key]   = field.dims
-
-            fields[key]     = fields[key].data
-            eofs[key]       = eofs[key].data
+            self._field_coords[key] = fields[key].coords
+            self._field_dims[key]   = fields[key].dims
+            fields[key] = fields[key].data
 
         super().load_analysis(
             path=path,
