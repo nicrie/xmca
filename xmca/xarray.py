@@ -1101,13 +1101,12 @@ class xMCA(MCA):
         self._create_info_file(analysis_path)
 
         fields      = self._get_fields(original_scale=True)
-        eofs        = self.eofs()
+        eofs        = self.eofs(original=True)
         singular_values = self.singular_values()
 
         self._save_data(singular_values, analysis_path, engine)
         for key in self._keys:
             self._save_data(fields[key], analysis_path, engine)
-            # TODO: do not save rotated eofs but non-rotated EOFs
             self._save_data(eofs[key], analysis_path, engine)
 
     def load_analysis(self, path, engine='h5netcdf'):
