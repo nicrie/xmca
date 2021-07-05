@@ -651,7 +651,7 @@ class MCA:
         Parameters
         ----------
         n_rot : int
-            Number of EOFs to rotate.
+            Number of EOFs to rotate. For values below 2, nothing is done.
         power : int, optional
             Power of Promax rotation. The default is 1 (= Varimax).
         tol : float, optional
@@ -668,7 +668,6 @@ class MCA:
 
         '''
         if(n_rot < 2):
-            print('`n_rot` must be >=2. Solution not rotated.')
             return None
         if(power < 1):
             raise ValueError('`power` must be >=1')
