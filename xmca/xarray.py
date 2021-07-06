@@ -657,21 +657,37 @@ class xMCA(MCA):
         dict[DataArray, DataArray]
             Left and right reconstructed fields.
         '''
-        eofs    = self.eofs(scaling=None)
+        # TODO: move the computation to a private function;
+        # requires extra work: array has to deal with cool slice(n, m) feature
+        # which already exists for xarray
+        eofs    = self.eofs(scaling='None')
         pcs     = self.pcs(scaling='eigen')
+        dof       = (self._n_observations['left'] - 1)
         coords  = self._field_coords
+        # TODO: remove this super ugly structure
+        n_vars = self._n_variables
+        no_nan_idx = self._no_nan_index
+        fshape = self._fields_spatial_shape
         std     = self._field_stds
         mean    = self._field_means
-        n_obs   = self._n_observations['left']
+        std_with_nan = {}
+        mean_with_nan = {}
+        for k in self._keys:
+            std_with_nan[k] = np.zeros(n_vars[k]) * np.nan
+            mean_with_nan[k] = np.zeros(n_vars[k]) * np.nan
+            std_with_nan[k][no_nan_idx[k]] = std[k]
+            mean_with_nan[k][no_nan_idx[k]] = mean[k]
+            std_with_nan[k] = std_with_nan[k].reshape(fshape[k])
+            mean_with_nan[k] = mean_with_nan[k].reshape(fshape[k])
 
         rec_fields = {}
-        for key in self._fields.keys():
+        for key in self._keys:
             eofs[key]   = eofs[key].sel(mode=mode)
             pcs[key]    = pcs[key].sel(mode=mode)
             rec_fields[key] = xr.dot(
                 pcs[key], eofs[key].conjugate(), dims=['mode']
             )
-            rec_fields[key] *= np.sqrt(n_obs)
+            rec_fields[key] *= np.sqrt(dof)
             rec_fields[key] = rec_fields[key].real
 
             if self._analysis['is_coslat_corrected']:
@@ -679,10 +695,10 @@ class xMCA(MCA):
                 rec_fields[key] /= np.sqrt(coslat)
 
             if self._analysis['is_normalized']:
-                rec_fields[key] *= std[key]
+                rec_fields[key] *= std_with_nan[key]
 
             # add mean fields
-            rec_fields[key]  += mean[key]
+            rec_fields[key]  += mean_with_nan[key]
 
         return rec_fields
 
@@ -1118,8 +1134,10 @@ class xMCA(MCA):
 
         self._save_data(singular_values, analysis_path, engine)
         for key in self._keys:
-            self._save_data(fields[key], analysis_path, engine)
             self._save_data(eofs[key], analysis_path, engine)
+            # save storage and save only real part of fields
+            # complex part can be cheaply reconstructed when loaded
+            self._save_data(fields[key].real, analysis_path, engine)
 
     def load_analysis(self, path, engine='h5netcdf'):
         self._set_info_from_file(path)
