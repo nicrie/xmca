@@ -27,7 +27,7 @@ class TestIntegration(unittest.TestCase):
         # how many modes to compare
         self.modes = 100
         # acceptable tolerance for comparison
-        self.tols = {'atol': 1e-5, 'rtol': 1e-5}
+        self.tols = {'atol': 1e-3, 'rtol': 1e-3}
 
         self.files = {
             'svalues' : 'singular_values.nc',
