@@ -366,7 +366,7 @@ class MCA:
 
         return extended
 
-    def _complexify(self, field):
+    def _complexify(self):
         '''Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -391,23 +391,26 @@ class MCA:
 
         '''
         n_observations = self._n_observations['left']
+        fields = self._fields
 
-        if self._analysis['extend']:
-            post    = self._extend(field)
-            pre     = self._extend(field[::-1])[::-1]
+        for k in self._keys:
+            fields[k] = fields[k].real
+            if self._analysis['extend']:
+                post    = self._extend(fields[k])
+                pre     = self._extend(fields[k][::-1])[::-1]
 
-            field = np.concatenate([pre, field, post])
+                fields[k] = np.concatenate([pre, fields[k], post])
 
-        # perform actual Hilbert transform of (extended) time series
-        field = hilbert(field, axis=0)
+            # perform actual Hilbert transform of (extended) time series
+            fields[k] = hilbert(fields[k], axis=0)
 
-        if self._analysis['extend']:
-            # cut out the first and last third of Hilbert transform
-            # which belong to the forecast/backcast
-            field = field[n_observations:(2 * n_observations)]
-            field = remove_mean(field)
+            if self._analysis['extend']:
+                # cut out the first and last third of Hilbert transform
+                # which belong to the forecast/backcast
+                fields[k] = fields[k][n_observations:(2 * n_observations)]
+                fields[k] = remove_mean(fields[k])
 
-        return field
+        return None
 
     def solve(self, complexify=False, extend=False, period=365):
         '''Call the solver to perform EOF analysis/MCA.
@@ -444,17 +447,17 @@ class MCA:
         n_observations  = self._n_observations['left']
         dof = n_observations - 1
 
-        fields_2d = self._get_X()
-
+        # complexify input data via Hilbert transform
         if self._analysis['is_complex']:
-            # complexify input data via Hilbert transform
-            fields_2d = {k: self._complexify(f) for k, f in fields_2d.items()}
+            self._complexify()
+
+        X = self._get_X()
 
         # create covariance matrix
         if self._analysis['is_bivariate']:
-            kernel = fields_2d['left'].conjugate().T @ fields_2d['right']
+            kernel = X['left'].conjugate().T @ X['right']
         else:
-            kernel = fields_2d['left'].conjugate().T @ fields_2d['left']
+            kernel = X['left'].conjugate().T @ X['left']
         kernel = kernel / dof
 
         # perform singular value decomposition
