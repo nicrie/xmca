@@ -591,7 +591,6 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, original=False):
 
         U = self._get_U(n, original=original)
-        norm    = self._get_norm(n)
         sqrt_svals = np.sqrt(self._get_svals(n))
 
         for k in self._keys:
@@ -603,7 +602,7 @@ class MCA:
                 pass
             # by eigenvalues
             elif scaling == 'eigen':
-                U[k] *= sqrt_svals[:n] * norm[k]
+                U[k] *= sqrt_svals
             # by maximum value
             elif scaling == 'max':
                 U[k] /= np.nanmax(abs(U[k].real), axis=0)
@@ -1453,6 +1452,10 @@ class MCA:
             self._keys = ['left']
 
         self._set_field_meta(list(fields.values()))
+        if self._analysis['is_normalized']:
+            self.normalize()
+        if self._analysis['is_complex']:
+            self._complexify()
 
         self._V = {}
         self._norm = {}
@@ -1467,9 +1470,6 @@ class MCA:
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
             VT, _   = remove_nan_cols(eofs[key].T)
             self._V[key]    = VT.T
-
-        if self._analysis['is_normalized']:
-            self.normalize()
 
         if self._analysis['is_rotated']:
             n_rot = self._analysis['n_rot']
