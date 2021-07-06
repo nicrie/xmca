@@ -82,8 +82,6 @@ class xMCA(MCA):
             self._field_coords[key] = field.coords
 
         # constructor of base class for numpy.ndarray
-        if len(fields) == 0:
-            fields = {'left': xr.DataArray([])}
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
 
