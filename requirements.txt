@@ -7,3 +7,4 @@ parameterized>=0.8.1
 netcdf4
 h5netcdf
 tqdm
+PyYAML
