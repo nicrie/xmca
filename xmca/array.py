@@ -291,12 +291,12 @@ class MCA:
         '''Normalize each time series by its standard deviation.
 
         '''
-        keys        = self._fields.keys()
-        fields      = self._fields.values()
-        fields_std  = self._field_stds.values()
+        keys        = self._keys
+        fields      = self._fields
+        std  = self._field_stds
 
-        for key, field, std in zip(keys, fields, fields_std):
-            self._fields[key] = field / std
+        for k in keys:
+            self._fields[k] = fields[k] / std[k]
 
         self._analysis['is_normalized'] = True
         self._analysis['is_coslat_corrected'] = False
