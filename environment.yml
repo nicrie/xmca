@@ -9,6 +9,7 @@ dependencies:
   - cartopy
   - statsmodels
   - tqdm
+  - yaml
   - pip:
     - git+https://github.com/bashtage/sphinx-material.git
     - xmca
