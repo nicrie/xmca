@@ -548,7 +548,8 @@ class MCA:
             scaling='None', phase_shift=0, original=False):
 
         V = self._get_V(n, original=original)
-        sqrt_svals = np.sqrt(self._get_svals(n))
+        n_max_mode = V['left'].shape[1]
+        sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
@@ -570,7 +571,7 @@ class MCA:
                 pass
             # by eigenvalues (field units)
             elif scaling == 'eigen':
-                eofs[k] *= sqrt_svals
+                eofs[k] *= sqrt_svals[:n_max_mode]
             # by maximum value
             elif scaling == 'max':
                 eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))
@@ -591,7 +592,8 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, original=False):
 
         U = self._get_U(n, original=original)
-        sqrt_svals = np.sqrt(self._get_svals(n))
+        n_max_mode = U['left'].shape[1]
+        sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
 
         for k in self._keys:
             # apply phase shift
