@@ -34,7 +34,7 @@ class MCA:
 
     '''
 
-    def __init__(self, *data):
+    def __init__(self, *fields):
         '''Load data fields and store information about data size/shape.
 
         Parameters
@@ -69,25 +69,26 @@ class MCA:
         >>> eofs = mca.eofs()
 
         '''
-        if len(data) == 0:
-            data = np.array([])
+        if len(fields) == 0:
+            fields = np.array([])
 
-        if len(data) > 2:
+        if len(fields) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
-        if len(data) == 2:
-            if data[0].shape[0] != data[1].shape[0]:
+        if len(fields) == 2:
+            if fields[0].shape[0] != fields[1].shape[0]:
                 raise ValueError('''Time dimensions of given fields are different.
                 Time series should have same time lengths.''')
 
-        if not all(isinstance(d, np.ndarray) for d in data):
+        if not all(isinstance(f, np.ndarray) for f in fields):
             raise TypeError('''One or more fields are not `numpy.ndarray`.
             Please provide `numpy.ndarray` only.''')
 
-        if any(has_nan_time_steps(d) for d in data):
+        if any(has_nan_time_steps(f) for f in fields):
             raise ValueError('''One or more fields contain NaN time steps.
             Please remove these prior to analysis.''')
 
+        # field meta information
         self._keys                  = ['left', 'right']
         self._fields                = {}  # input fields
         self._field_names           = {}  # names of input fields
@@ -99,43 +100,10 @@ class MCA:
         self._n_observations        = {}  # number of observations/samples
 
         # set fields
-        if len(data) == 1:
+        if len(fields) == 1:
             self._keys.pop()
 
-        for k, field in zip(self._keys, data):
-            spatial_shape = field.shape[1:]
-            n_variables          = np.product(field.shape[1:])
-            n_observations       = field.shape[0]
-
-            field = field.reshape(n_observations, n_variables)
-            field, no_nan_idx       = remove_nan_cols(field)
-
-            self._field_means[k]          = field.mean(axis=0)
-            self._field_stds[k]           = field.std(axis=0)
-
-            # center input data
-            self._fields[k]  = remove_mean(field)
-
-            self._fields_spatial_shape[k] = spatial_shape
-            self._n_variables[k] = n_variables
-            self._n_observations[k] = n_observations
-            self._no_nan_index[k] = no_nan_idx
-            self._field_names[k] = k
-
-            # with warnings.catch_warnings():
-            #     warnings.filterwarnings('ignore', r'Mean of empty slice.')
-            #     warnings.filterwarnings(
-            #         'ignore',
-            #         r'invalid value encountered in double_scalars'
-            #     )
-            #     warnings.filterwarnings(
-            #         'ignore',
-            #         r'Degrees of freedom <= 0 for slice'
-            #     )
-            #     warnings.filterwarnings(
-            #         'ignore',
-            #         r'invalid value encountered in true_divide'
-            #     )
+        self._set_field_meta(fields)
 
         # set meta information
         self._analysis = {
@@ -178,6 +146,27 @@ class MCA:
         '''
         self._field_names['left']   = left
         self._field_names['right']  = right
+
+    def _set_field_meta(self, fields):
+        for k, field in zip(self._keys, fields):
+            spatial_shape = field.shape[1:]
+            n_variables          = np.product(field.shape[1:])
+            n_observations       = field.shape[0]
+
+            field = field.reshape(n_observations, n_variables)
+            field, no_nan_idx       = remove_nan_cols(field)
+
+            self._field_means[k]          = field.mean(axis=0)
+            self._field_stds[k]           = field.std(axis=0)
+
+            # center input data
+            self._fields[k]  = remove_mean(field)
+            self._field_names[k] = k
+
+            self._fields_spatial_shape[k] = spatial_shape
+            self._n_variables[k] = n_variables
+            self._n_observations[k] = n_observations
+            self._no_nan_index[k] = no_nan_idx
 
     def _get_method_id(self):
         id = 'pca'
@@ -670,16 +659,17 @@ class MCA:
 
         '''
         if(n_rot < 2):
-            return None
+            raise ValueError('`n_rot` must be > 1')
         if(power < 1):
             raise ValueError('`power` must be >=1')
 
         singular_values = self._get_svals(n_rot)
         sqrt_svals = np.sqrt(singular_values)
-        n_vars_left = self._V['left'].shape[0]
+        V = self._get_V(n_rot, original=True)
+        n_vars_left = V['left'].shape[0]
 
         # rotate loadings (Cheng and Dunkerton 1995)
-        L = np.concatenate(list(self._get_V(n_rot).values()))
+        L = np.concatenate(list(V.values()))
         L = L * sqrt_svals
         L_rot, R, Phi = promax(L, power, maxIter=1000, tol=tol)
 
@@ -1462,27 +1452,20 @@ class MCA:
         else:
             self._keys = ['left']
 
+        self._set_field_meta(list(fields.values()))
+
         self._V = {}
         self._norm = {}
-        self._singular_values           = singular_values
+        self._singular_values = singular_values
         self._variance = singular_values
         self._var_idx = np.argsort(singular_values)[::-1]
 
         for key in self._keys:
             self._norm[key] = np.sqrt(singular_values)
 
-            self._field_means[key]  = fields[key].mean(axis=0)
-            self._field_stds[key]   = fields[key].std(axis=0)
-            self._fields[key]       = fields[key] - fields[key].mean(axis=0)
-
-            self._n_observations[key]       = fields[key].shape[0]
-            self._fields_spatial_shape[key] = eofs[key].shape[:-1]
-            self._n_variables[key]          = np.product(eofs[key].shape[:-1])
             n_modes                         = eofs[key].shape[-1]
-
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
-            VT, self._no_nan_index[key]   = remove_nan_cols(eofs[key].T)
-
+            VT, _   = remove_nan_cols(eofs[key].T)
             self._V[key]    = VT.T
 
         if self._analysis['is_normalized']:
