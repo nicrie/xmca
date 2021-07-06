@@ -14,6 +14,10 @@ well as ``numpy.ndarray`` as input formats.
 
 .. _`xarray`: <http://xarray.pydata.org/en/stable/>`
 
+.. figure:: ../../figs/example-plot2.png
+   :alt: Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.
+Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.
+
 What is MCA?
 ------------
 

@@ -7,25 +7,24 @@ Import the module for ``xarray`` via
 
     from xmca.xarray import xMCA
 
-Create some dummy data, which should be of type ``xr.DataArray``.
+As an example, we take North American surface temperatures shipped with
+``xarray``. *Note: only works with``xr.DataArray``, not ``xr.Dataset``*.
 
 .. code:: py
 
-    import numpy as np
-    import xarray as xr
+    import xarray as xr  # only needed to obtain test data
 
-    n_time = 300                 # number of time steps
-    lat1, lon1 = 20, 30     # number of latitudes/longitudes of field A
-    lat2, lon2 = 15, 10     # number of latitudes/longitudes of field B
-    A = xr.DataArray(np.random.randn(n_time, lat1, lon1)) # dummy field A
-    B = xr.DataArray(np.random.randn(n_time, lat1, lon2)) # dummy field B
+    # split data arbitrarily into west and east coast
+    data = xr.tutorial.open_dataset('air_temperature').air
+    west = data.sel(lon=slice(200, 260))
+    east = data.sel(lon=slice(260, 360))
 
 Principal Component Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: py
 
-    pca = xMCA(A)                       # PCA on field A
+    pca = xMCA(west)                    # PCA of west coast
     pca.solve(complexfify=False)        # True for complex PCA
     #pca.rotate(10)                     # optional; Varimax rotated solution
                                         # using 10 first EOFs
@@ -38,7 +37,7 @@ Maximum Covariance Analysis
 
 .. code:: py
 
-    mca = xMCA(A,B)                     # MCA of field A and B
+    mca = xMCA(west, east)                     # MCA of field A and B
     mca.solve(complexfify=False)        # True for complex MCA
     #mca.rotate(10)                     # optional; Varimax rotated solution
                                         # using 10 first EOFs
@@ -51,64 +50,57 @@ Save/load an analysis
 
 .. code:: py
 
-    mca.save_analysis()                 # this will save the data and a respective
+    mca.save_analysis('my_analysis')    # this will save the data and a respective
                                         # info file. The files will be stored in a
                                         # special directory
     mca2 = xMCA()                       # create a new, empty instance
-    mca2.load_analysis('./mca/left_right/mca_c0_r00_p00.info') # analysis can be
+    mca2.load_analysis('my_analysis/info.xmca') # analysis can be
                                         # loaded via specifying the path to the
                                         # info file created earlier
-    mca2.plot(mode=1)
+
 
 Plot your results
 ~~~~~~~~~~~~~~~~~
 
-The package provides a method to visually inspect the individual modes,
-e.g. for mode 2.
+The package provides a method to visually inspect the individual modes.
 
-*Note: The following plots use real data (ERA5 SST & precipitation)
-instead of the toy data shown at the beginning of the tutorial. Apart
-from that the figures show exactly what is produced by calling the
-convenience plotting method.*
 
 .. code:: py
 
-    mca2.set_field_names('SST', 'Precipitation')  # add variable names, optional
-    mca2.plot(mode=2)
+    mca2.set_field_names('West', 'East')
+    pkwargs = {'orientation' : 'vertical'}
+    mca2.plot(mode=1, **pkwargs)
 
-.. figure:: ../../figs/example-plot1.png
-   :alt: Result of default plot method after performing complex rotated MCA on SST and precipitation showing mode 2
+.. figure:: ../../figs/xmca-example-mode1.png
+   :alt: Result of default plot method after performing MCA on T2m of North American west and east coast showing mode 1.
 
 
 You may want to modify the plot for some better optics:
 
 .. code:: py
 
-    import cartopy.crs as ccrs  # for different map projections
+    from cartopy.crs import EqualEarth  # for different map projections
 
     # map projections for "left" and "right" field
     projections = {
-        'left': ccrs.EqualEarth(central_longitude=200),
-        'right': ccrs.EqualEarth(central_longitude=160)
+        'left': EqualEarth(),
+        'right': EqualEarth()
     }
 
-    plot_kwargs = {
+    pkwargs = {
         "figsize"     : (8, 5),
-        "threshold"   : 0.25,       # mask out values < 0.25 max-normalised amplitude
         "orientation" : 'vertical',
-        'cmap_eof'    : 'viridis',  # colormap amplitude
-        'cmap_phase'  : 'twilight', # colormap phase
-        "phase_shift" : 2.2,        # apply phase shift to PCs
+        'cmap_eof'    : 'BrBG',  # colormap amplitude
         "projection"  : projections,
     }
-    mca2.plot(mode=2, **plot_kwargs)
+    mca2.plot(mode=3, **pkwargs)
 
-.. figure:: ../../figs/example-plot2.png
-   :alt: Result of plot method with improved optics after performing complex rotated MCA on SST and precipitation showing mode 2.
+.. figure:: ../../figs/xmca-example-mode3.png
+   :alt: Result of plot method with improved optics after performing MCA on T2mof North American west and east coast showing mode 3.
 
 You can save the plot to your local disk as a ``.png`` file via
 
 .. code:: py
 
-    save_kwargs={'dpi':200, 'transparent':True}
-    mca2.save_plot(mode=2, plot_kwargs=plot_kwargs, save_kwargs=save_kwargs)
+    skwargs={'dpi':200, 'transparent':True}
+    mca2.save_plot(mode=3, plot_kwargs=pkwargs, save_kwargs=skwargs)
