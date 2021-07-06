@@ -184,6 +184,29 @@ class xMCA(MCA):
         '''
         super().rotate(n_rot, power, tol)
 
+    def fields(self, original_scale=False):
+        '''Return `left` (and `right`) input field.
+
+        Parameters
+        ----------
+        original_scale : boolean, optional
+            If True, decenter and denormalize (if normalized) the input fields
+            to obtain the original unit scale. Default is False.
+
+        Returns
+        -------
+        dict[ndarray, ndarray]
+            Fields associated to left and right input field.
+
+        '''
+        dims = self._field_dims
+        coords = self._field_coords
+        fields = super().fields(original_scale)
+
+        for k in self._keys:
+            fields[k] = xr.DataArray(fields[k], dims=dims[k], coords=coords[k])
+        return fields
+
     def singular_values(self, n=None):
         '''Return first `n` singular values of the SVD.
 

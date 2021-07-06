@@ -88,6 +88,7 @@ class MCA:
             raise ValueError('''One or more fields contain NaN time steps.
             Please remove these prior to analysis.''')
 
+        self._keys                  = ['left', 'right']
         self._fields                = {}  # input fields
         self._field_names           = {}  # names of input fields
         self._field_means           = {}  # mean of fields
@@ -98,44 +99,43 @@ class MCA:
         self._n_observations        = {}  # number of observations/samples
 
         # set fields
-        keys = ['left', 'right']
         if len(data) == 1:
-            keys.pop()
-        self._keys    = keys
-        self._fields  = {key : field for key, field in zip(self._keys, data)}
+            self._keys.pop()
 
-        # set fields
-        # self._fields = {
-        # 'left'  : np.array([]) if left is None else left.copy()
-        # }
-        # if right is not None:
-        #    self._fields['right'] = right.copy()
+        for k, field in zip(self._keys, data):
+            spatial_shape = field.shape[1:]
+            n_variables          = np.product(field.shape[1:])
+            n_observations       = field.shape[0]
 
-        # set class variables
-        for key, field in self._fields.items():
-            self._field_names[key]          = key
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', r'Mean of empty slice.')
-                warnings.filterwarnings(
-                    'ignore',
-                    r'invalid value encountered in double_scalars'
-                )
-                warnings.filterwarnings(
-                    'ignore',
-                    r'Degrees of freedom <= 0 for slice'
-                )
-                warnings.filterwarnings(
-                    'ignore',
-                    r'invalid value encountered in true_divide'
-                )
-                self._field_means[key]          = field.mean(axis=0)
-                self._field_stds[key]           = field.std(axis=0)
-            self._fields_spatial_shape[key] = field.shape[1:]
-            self._n_variables[key]          = np.product(field.shape[1:])
-            self._n_observations[key]       = field.shape[0]
+            field = field.reshape(n_observations, n_variables)
+            field, no_nan_idx       = remove_nan_cols(field)
 
-            # center input data to zero mean (remove mean)
-            self._fields[key]       = remove_mean(field)
+            self._field_means[k]          = field.mean(axis=0)
+            self._field_stds[k]           = field.std(axis=0)
+
+            # center input data
+            self._fields[k]  = remove_mean(field)
+
+            self._fields_spatial_shape[k] = spatial_shape
+            self._n_variables[k] = n_variables
+            self._n_observations[k] = n_observations
+            self._no_nan_index[k] = no_nan_idx
+            self._field_names[k] = k
+
+            # with warnings.catch_warnings():
+            #     warnings.filterwarnings('ignore', r'Mean of empty slice.')
+            #     warnings.filterwarnings(
+            #         'ignore',
+            #         r'invalid value encountered in double_scalars'
+            #     )
+            #     warnings.filterwarnings(
+            #         'ignore',
+            #         r'Degrees of freedom <= 0 for slice'
+            #     )
+            #     warnings.filterwarnings(
+            #         'ignore',
+            #         r'invalid value encountered in true_divide'
+            #     )
 
         # set meta information
         self._analysis = {
@@ -222,37 +222,36 @@ class MCA:
 
         return path
 
-    def _get_fields(self, original_scale=False):
+    def _get_X(self, original_scale=False):
         std     = self._field_stds
         mean    = self._field_means
         fields  = self._fields
 
-        new_fields = {}
-        for key, field in fields.items():
-            new_fields[key] = field.copy()
+        X = {}
+        for k, field in fields.items():
+            X[k] = field.copy()
             if original_scale:
                 if self._analysis['is_normalized']:
-                    new_fields[key] *= std[key]
-                new_fields[key] += mean[key]
+                    X[k] *= std[k]
+                X[k] += mean[k]
+        return X
 
-        return new_fields
+    def _get_fields(self, original_scale=False):
+        n_obs  = self._n_observations['left']
+        n_var     = self._n_variables
+        fshape = self._fields_spatial_shape
+        no_nan_idx = self._no_nan_index
+        fields_2d = self._get_X(original_scale=original_scale)
 
-    def _get_fields2d(self):
-        n_observations  = self._n_observations['left']
-        n_variables     = self._n_variables
+        fields = {}
+        for k, X in fields_2d.items():
+            dtype       = X.dtype
+            fields[k]   = np.zeros([n_obs, n_var[k]], dtype=dtype) * np.nan
+            fields[k][:, no_nan_idx[k]] = X
+            # reshape eofs to have original input shape
+            fields[k]   = fields[k].reshape((n_obs,) + fshape[k])
 
-        fields_2d = {}
-        self._no_nan_index = {}
-        for key, field in self._fields.items():
-            # create 2D matrix in order to perform SVD
-            field = field.reshape(n_observations, n_variables[key])
-
-            # remove NaNs columns in data fields
-            field, no_nan_idx       = remove_nan_cols(field)
-            fields_2d[key]          = field
-            self._no_nan_index[key] = no_nan_idx
-
-        return fields_2d
+        return fields
 
     def apply_weights(self, left=None, right=None):
         '''Apply weights to the left and/or right field.
@@ -445,7 +444,7 @@ class MCA:
         n_observations  = self._n_observations['left']
         dof = n_observations - 1
 
-        fields_2d = self._get_fields2d()
+        fields_2d = self._get_X()
 
         if self._analysis['is_complex']:
             # complexify input data via Hilbert transform
@@ -534,7 +533,7 @@ class MCA:
         else:
             n_modes = self._analysis['n_rot']
 
-        fields  = self._get_fields2d()
+        fields  = self._get_X()
         V = self._get_V(n_modes, original=True)
         sqrt_svals = np.sqrt(self._get_svals(n_modes))
         R       = self.rotation_matrix(inverse_transpose=True)
@@ -754,6 +753,23 @@ class MCA:
             n = len(self.singular_values())
             return np.eye(n)
 
+    def fields(self, original_scale=False):
+        '''Return `left` (and `right`) input field.
+
+        Parameters
+        ----------
+        original_scale : boolean, optional
+            If True, decenter and denormalize (if normalized) the input fields
+            to obtain the original unit scale. Default is False.
+
+        Returns
+        -------
+        dict[ndarray, ndarray]
+            Fields associated to left and right input field.
+
+        '''
+        return self._get_fields(original_scale)
+
     def singular_values(self, n=None):
         '''Return the first `n` singular_values.
 
@@ -764,7 +780,7 @@ class MCA:
 
         Returns
         -------
-        values : ndarray
+        ndarray
             Singular values of the obtained solution.
 
         '''
