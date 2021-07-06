@@ -28,7 +28,7 @@ class xMCA(MCA):
     it is equivalent to PCA.
     '''
 
-    def __init__(self, *data):
+    def __init__(self, *fields):
         '''Load data fields and store information about data size/shape.
 
         Parameters
@@ -62,16 +62,16 @@ class xMCA(MCA):
         >>> pcs = mca.pcs()
         >>> eofs = mca.eofs()
         '''
-        if len(data) > 2:
+        if len(fields) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
-        if not all(isinstance(d, xr.DataArray) for d in data):
+        if not all(isinstance(f, xr.DataArray) for f in fields):
             raise TypeError('''One or more fields are not `xarray.DataArray`.
             Please provide `xarray.DataArray` only.''')
 
         # set fields
         keys    = ['left', 'right']
-        fields  = {keys[i] : field for i, field in enumerate(data)}
+        fields  = {keys[i] : field for i, field in enumerate(fields)}
 
         # store meta information of DataArrays
         self._field_dims    = {}  # dimensions of fields
