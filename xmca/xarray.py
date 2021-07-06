@@ -485,7 +485,7 @@ class xMCA(MCA):
             Spatial phases associated to left and right input field.
 
         '''
-        eofs = self.eofs(n, phase_shift, original)
+        eofs = self.eofs(n, phase_shift=phase_shift, original=original)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names

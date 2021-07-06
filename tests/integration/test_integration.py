@@ -187,6 +187,65 @@ class TestIntegration(unittest.TestCase):
         else:
             assert_allclose(result, expected, **self.tols)
 
+    def name_func_get(testcase_func, param_num, param):
+        return "{:}_{:s}".format(
+            testcase_func.__name__,
+            parameterized.to_safe_name('_'.join([str(a) for a in param.args])),
+        )
+
+    @parameterized.expand([
+        ('std', None, 'None', 0, False),
+        ('cplx', None, 'None', 0, False),
+        ('varmx', None, 'None', 0, False),
+        ('std', 100, 'None', 0, False),
+        ('cplx', 100, 'None', 0, False),
+        ('varmx', 100, 'None', 0, False),
+        ('std', None, 'max', 0, False),
+        ('cplx', None, 'std', 0, False),
+        ('varmx', None, 'eigen', 0, False),
+        ('std', 100, 'eigen', 0, False),
+        ('cplx', 100, 'std', 0, False),
+        ('varmx', 100, 'max', 0, False),
+        ('cplx', 100, 'std', 1.234, False),
+        ('varmx', 100, 'max', 3, False),
+        ('std', 100, 'eigen', -2, True),
+        ('cplx', 100, 'std', 1.234, True),
+        ('varmx', 100, 'max', 3, True),
+    ], name_func=name_func_get)
+    def test_getter(self, analysis, n, scaling, phase_shift, original):
+        cplx = False,
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=cplx)
+        if n_rot > 1:
+            model.rotate(n_rot)
+        model.pcs(n, scaling, phase_shift, original)
+        model.eofs(n, scaling, phase_shift, original)
+        model.spatial_amplitude(n, scaling, original)
+        model.spatial_phase(n, phase_shift, original)
+
+    @parameterized.expand([
+        ('std', 1),
+        ('cplx', 2),
+        ('varmx', 3),
+    ], name_func=name_func_get)
+    def test_plot(self, analysis, n):
+        cplx = False,
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=cplx)
+        if n_rot > 1:
+            model.rotate(n_rot)
+        model.plot(n)
+
         @classmethod
         def tearDownClass(self):
             pass
