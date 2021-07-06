@@ -1,4 +1,4 @@
-# This file contains information neccessary to load stored analysis data from xmca
+# This file contains information neccessary to load stored analysisdata from xmca
 # module.
 # To load this analysis use:
 # from xmca.xarray import xMCA
@@ -7,11 +7,12 @@
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-created              : 2021-03-20 01:38:09                                      
+created              : 2021-07-06 14:22:18                                      
 #-------------------------------------------------------------------------------
 left                 : sst                                                      
 right                : prcp                                                     
 #-------------------------------------------------------------------------------
+version              : 0.3.3                                                    
 #-------------------------------------------------------------------------------
 is_bivariate         : True                                                     
 is_normalized        : False                                                    
@@ -19,15 +20,15 @@ is_coslat_corrected  : False
 method               : mca                                                      
 #-------------------------------------------------------------------------------
 is_complex           : True                                                     
-theta                : True                                                     
-theta_period         : 12                                                       
+extend               : False                                                    
+theta_period         : 365                                                      
 #-------------------------------------------------------------------------------
-is_rotated           : True                                                     
-rotations            : 10                                                       
-power                : 1                                                        
+is_rotated           : False                                                    
+n_rot                : 155                                                      
+power                : 0                                                        
 #-------------------------------------------------------------------------------
 is_truncated         : False                                                    
 is_truncated_at      : 155                                                      
 rank                 : 155                                                      
-total_covariance     : 273.06931642971                                          
-total_squared_covariance : 55514.52453555446                                        
+total_covariance     : 272.4936169203269                                        
+total_squared_covariance : 55813.69179539729                                        

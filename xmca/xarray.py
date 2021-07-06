@@ -28,7 +28,7 @@ class xMCA(MCA):
     it is equivalent to PCA.
     '''
 
-    def __init__(self, *data):
+    def __init__(self, *fields):
         '''Load data fields and store information about data size/shape.
 
         Parameters
@@ -62,16 +62,16 @@ class xMCA(MCA):
         >>> pcs = mca.pcs()
         >>> eofs = mca.eofs()
         '''
-        if len(data) > 2:
+        if len(fields) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
-        if not all(isinstance(d, xr.DataArray) for d in data):
+        if not all(isinstance(f, xr.DataArray) for f in fields):
             raise TypeError('''One or more fields are not `xarray.DataArray`.
             Please provide `xarray.DataArray` only.''')
 
         # set fields
         keys    = ['left', 'right']
-        fields  = {keys[i] : field for i, field in enumerate(data)}
+        fields  = {keys[i] : field for i, field in enumerate(fields)}
 
         # store meta information of DataArrays
         self._field_dims    = {}  # dimensions of fields
@@ -82,28 +82,8 @@ class xMCA(MCA):
             self._field_coords[key] = field.coords
 
         # constructor of base class for numpy.ndarray
-        if len(fields) == 0:
-            fields = {'left': xr.DataArray([])}
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
-
-    def _get_fields(self, original_scale=False):
-        dims        = self._field_dims
-        coords      = self._field_coords
-        field_names = self._field_names
-        fields      = super()._get_fields(original_scale=original_scale)
-
-        for key in fields.keys():
-            fields[key] = xr.DataArray(
-                fields[key],
-                dims=dims[key],
-                coords=coords[key],
-                name=field_names[key])
-
-            if (original_scale & self._analysis['is_coslat_corrected']):
-                fields[key] /= np.cos(np.deg2rad(coords[key]['lat']))
-
-        return fields
 
     def apply_weights(self, **weights):
         fields = self._get_fields()
@@ -127,6 +107,94 @@ class xMCA(MCA):
             self._analysis['is_coslat_corrected'] = True
         else:
             print('Coslat correction already applied. Nothing was done.')
+
+    def solve(self, complexify=False, extend=False, period=365):
+        '''Call the solver to perform EOF analysis/MCA.
+
+        Under the hood the method performs singular value decomposition on
+        the covariance matrix.
+
+        Parameters
+        ----------
+        complexify : boolean, optional
+            Use Hilbert transform to complexify the input data fields
+            in order to perform complex PCA/MCA. Default is false.
+        extend : ['exp', 'theta', False], optional
+            If specified, time series are extended by fore/backcasting based on
+            either an exponential or a Theta model. Artificially extending
+            the time series sometimes helps to reduce spectral leakage inherent
+            to the Hilbert transform when time series are not stationary.
+            Only used for complex time series i.e. when omplexify=True.
+            Default is False.
+        period : int, optional
+            Only applies if a Theta model is selected as time series extension.
+            Default is 365, representing a yearly cycle for daily data.
+            If Theta model is not selected this parameter has no effect.
+        '''
+        super().solve(complexify, extend, period)
+
+    def rotate(self, n_rot, power=1, tol=1e-8):
+        '''Perform Promax rotation on the first `n` EOFs.
+
+        Promax rotation (Hendrickson & White 1964) is an oblique rotation which
+        seeks to find `simple structures` in the EOFs. It transforms the EOFs
+        via an orthogonal Varimax rotation (Kaiser 1958) followed by the Promax
+        equation. If `power=1`, Promax reduces to Varimax rotation. In general,
+        a Promax transformation breaks the orthogonality of EOFs and introduces
+        some correlation between PCs.
+
+        Parameters
+        ----------
+        n_rot : int
+            Number of EOFs to rotate.
+        power : int, optional
+            Power of Promax rotation. The default is 1 (= Varimax).
+        tol : float, optional
+            Tolerance of rotation process. The default is 1e-5.
+
+        Raises
+        ------
+        ValueError
+            If number of rotations are <2.
+
+        Returns
+        -------
+        None.
+
+        '''
+        super().rotate(n_rot, power, tol)
+
+    def fields(self, original_scale=False):
+        '''Return `left` (and `right`) input field.
+
+        Parameters
+        ----------
+        original_scale : boolean, optional
+            If True, decenter and denormalize (if normalized) the input fields
+            to obtain the original unit scale. Default is False.
+
+        Returns
+        -------
+        dict[ndarray, ndarray]
+            Fields associated to left and right input field.
+
+        '''
+        dims = self._field_dims
+        coords = self._field_coords
+        names = self._field_names
+        fields = super().fields(original_scale)
+
+        for k in self._keys:
+            fields[k] = xr.DataArray(
+                fields[k],
+                dims=dims[k],
+                coords=coords[k],
+                name=names[k]
+            )
+            if (original_scale & self._analysis['is_coslat_corrected']):
+                fields[k] /= np.cos(np.deg2rad(coords[k]['lat']))
+
+        return fields
 
     def singular_values(self, n=None):
         '''Return first `n` singular values of the SVD.
@@ -161,6 +229,40 @@ class xMCA(MCA):
             attrs=attrs)
 
         return values
+
+    def norm(self, n=None):
+        '''Return L2 norm of first `n` loaded singular vectors.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default will return all modes.
+
+        Returns
+        -------
+        DataArray
+            L2 norm associated to each mode and vector.
+
+        '''
+        norm = super().norm(n)
+
+        # if n is not provided, take all modes
+        if n is None:
+            n = self._analysis['n_rot']
+
+        modes = list(range(1, n + 1))
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+        field_names = self._field_names
+
+        for k, data in norm.items():
+            norm[k] = xr.DataArray(
+                data,
+                dims=['mode'],
+                coords={'mode' : modes},
+                name=' '.join([field_names[k], 'norm']),
+                attrs=attrs)
+
+        return norm
 
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
@@ -234,7 +336,7 @@ class xMCA(MCA):
 
         return variance
 
-    def pcs(self, n=None, scaling=None, phase_shift=0):
+    def pcs(self, n=None, scaling='None', phase_shift=0, original=False):
         '''Return first `n` PCs.
 
         Parameters
@@ -242,11 +344,14 @@ class xMCA(MCA):
         n : int, optional
             Number of PCs to return. If none, then all PCs are returned.
         The default is None.
-        scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
-            standard deviation ('std'). The default is None.
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
+            Scale by square root of singular values ('eigen'), maximum value
+            ('max') or standard deviation ('std'). The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
+        original: boolean, optional
+            If True, return unrotated (original) PCs even if rotation was
+            applied.
 
         Returns
         -------
@@ -254,17 +359,14 @@ class xMCA(MCA):
             PCs associated to left and right input field.
 
         '''
-        pcs = super().pcs(n, scaling, phase_shift)
+        pcs = super().pcs(n, scaling, phase_shift, original)
 
-        if n is None:
-            n = self._singular_values.size
-
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         coords      = self._field_coords
         field_names = self._field_names
         for key, pc in pcs.items():
+            modes = list(range(1, pc.shape[-1] + 1))
             pcs[key] = xr.DataArray(
                 data=pc,
                 dims=['time', 'mode'],
@@ -274,7 +376,7 @@ class xMCA(MCA):
 
         return pcs
 
-    def eofs(self, n=None, scaling=None, phase_shift=0):
+    def eofs(self, n=None, scaling='None', phase_shift=0, original=False):
         '''Return the first `n` EOFs.
 
         Parameters
@@ -283,27 +385,28 @@ class xMCA(MCA):
             Number of EOFs to return If none, all EOFs are returned.
             The default is None.
         scaling : {None, 'eigen', 'max', 'std'}, optional
-            Scale by singular_values ('eigen'), maximum value ('max') or
-            standard deviation ('std'). The default is None.
+            Scale by square root of singular values ('eigen'), maximum value
+            ('max') or standard deviation ('std'). The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
+        original: boolean, optional
+            If True, return unrotated (original) EOFs even if rotation was
+            applied.
 
         Returns
         -------
         dict[DataArray, DataArray]
             EOFs associated to left and right input field.
         '''
-        eofs = super().eofs(n, scaling, phase_shift)
+        eofs = super().eofs(n, scaling, phase_shift, original)
 
-        if n is None:
-            n = self._singular_values.size
-
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         coords      = self._field_coords
         field_names = self._field_names
+
         for key, eof in eofs.items():
+            modes = list(range(1, eof.shape[-1] +1))
             eofs[key] = xr.DataArray(
                 data=eof,
                 dims=['lat', 'lon', 'mode'],
@@ -317,7 +420,7 @@ class xMCA(MCA):
 
         return eofs
 
-    def spatial_amplitude(self, n=None, scaling=None):
+    def spatial_amplitude(self, n=None, scaling='None', original=False):
         '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -325,25 +428,25 @@ class xMCA(MCA):
         n : int, optional
             Number of amplitude fields to return. If none, all fields are
             returned. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
+        original: boolean, optional
+            If True, return unrotated (original) spatial amplitude even if
+            rotation was applied.
 
         Returns
         -------
         dict[DataArray, DataArray]
             Spatial amplitudes associated to left and right input field.
         '''
-        amplitudes = super().spatial_amplitude(n, scaling)
+        amplitudes = super().spatial_amplitude(n, scaling, original)
 
-        if n is None:
-            n = self._singular_values.size
-
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         coords      = self._field_coords
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
+            modes = list(range(1, amp.shape[-1] + 1))
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['lat', 'lon', 'mode'],
@@ -358,7 +461,7 @@ class xMCA(MCA):
 
         return amplitudes
 
-    def spatial_phase(self, n=None, phase_shift=0):
+    def spatial_phase(self, n=None, phase_shift=0, original=False):
         '''Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -372,6 +475,9 @@ class xMCA(MCA):
         phase_shift : float, optional
             If complex, apply a phase shift to the spatial phases.
             Default is 0.
+        original: boolean, optional
+            If True, return unrotated (original) spatial phase even if rotation
+            was applied.
 
         Returns
         -------
@@ -379,7 +485,7 @@ class xMCA(MCA):
             Spatial phases associated to left and right input field.
 
         '''
-        eofs = self.eofs(n, phase_shift=phase_shift)
+        eofs = self.eofs(n, phase_shift=phase_shift, original=original)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
@@ -391,7 +497,7 @@ class xMCA(MCA):
 
         return phases
 
-    def temporal_amplitude(self, n=None, scaling=None):
+    def temporal_amplitude(self, n=None, scaling='None', original=False):
         '''Return the temporal amplitude functions for the first `n` PCs.
 
         Parameters
@@ -399,25 +505,25 @@ class xMCA(MCA):
         n : int, optional
             Number of amplitude functions to return. If none, all functions are
             returned. The default is None.
-        scaling : {None, 'max'}, optional
+        scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
+        original: boolean, optional
+            If True, return unrotated (original) temporal amplitude even if
+            rotation was applied.
 
         Returns
         -------
         dict[DataArray, DataArray]
             PCs associated to left and right input field.
         '''
-        amplitudes = super().temporal_amplitude(n, scaling)
+        amplitudes = super().temporal_amplitude(n, scaling, original)
 
-        if n is None:
-            n = self._singular_values.size
-
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         coords      = self._field_coords
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
+            modes = list(range(1, amp.shape[-1] + 1))
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['time', 'mode'],
@@ -428,7 +534,7 @@ class xMCA(MCA):
 
         return amplitudes
 
-    def temporal_phase(self, n=None, phase_shift=0):
+    def temporal_phase(self, n=None, phase_shift=0, original=False):
         '''Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -439,13 +545,16 @@ class xMCA(MCA):
         phase_shift : float, optional
             If complex, apply a phase shift to the temporal phases.
             Default is 0.
+        original: boolean, optional
+            If True, return unrotated (original) temporal phase even if
+            rotation was applied.
 
         Returns
         -------
         dict[DataArray, DataArray]
             Temporal phases associated to left and right input field.
         '''
-        pcs = self.pcs(n, phase_shift=phase_shift)
+        pcs = self.pcs(n, phase_shift, original)
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
@@ -479,7 +588,7 @@ class xMCA(MCA):
 
         '''
 
-        fields  = self._get_fields()
+        fields  = self.fields()
         pcs     = self.pcs(n, phase_shift)
 
         field_names = self._field_names
@@ -512,7 +621,7 @@ class xMCA(MCA):
             Heterogeneous patterns associated to left and right input field.
 
         '''
-        fields  = self._get_fields()
+        fields  = self.fields()
         pcs     = self.pcs(n, phase_shift)
 
         field_names = self._field_names
@@ -548,19 +657,37 @@ class xMCA(MCA):
         dict[DataArray, DataArray]
             Left and right reconstructed fields.
         '''
-        eofs    = self.eofs(scaling=None)
+        # TODO: move the computation to a private function;
+        # requires extra work: array has to deal with cool slice(n, m) feature
+        # which already exists for xarray
+        eofs    = self.eofs(scaling='None')
         pcs     = self.pcs(scaling='eigen')
+        dof       = (self._n_observations['left'] - 1)
         coords  = self._field_coords
+        # TODO: remove this super ugly structure
+        n_vars = self._n_variables
+        no_nan_idx = self._no_nan_index
+        fshape = self._fields_spatial_shape
         std     = self._field_stds
         mean    = self._field_means
+        std_with_nan = {}
+        mean_with_nan = {}
+        for k in self._keys:
+            std_with_nan[k] = np.zeros(n_vars[k]) * np.nan
+            mean_with_nan[k] = np.zeros(n_vars[k]) * np.nan
+            std_with_nan[k][no_nan_idx[k]] = std[k]
+            mean_with_nan[k][no_nan_idx[k]] = mean[k]
+            std_with_nan[k] = std_with_nan[k].reshape(fshape[k])
+            mean_with_nan[k] = mean_with_nan[k].reshape(fshape[k])
 
         rec_fields = {}
-        for key in self._fields.keys():
+        for key in self._keys:
             eofs[key]   = eofs[key].sel(mode=mode)
             pcs[key]    = pcs[key].sel(mode=mode)
             rec_fields[key] = xr.dot(
                 pcs[key], eofs[key].conjugate(), dims=['mode']
             )
+            rec_fields[key] *= np.sqrt(dof)
             rec_fields[key] = rec_fields[key].real
 
             if self._analysis['is_coslat_corrected']:
@@ -568,12 +695,62 @@ class xMCA(MCA):
                 rec_fields[key] /= np.sqrt(coslat)
 
             if self._analysis['is_normalized']:
-                rec_fields[key] *= std[key]
+                rec_fields[key] *= std_with_nan[key]
 
             # add mean fields
-            rec_fields[key]  += mean[key]
+            rec_fields[key]  += mean_with_nan[key]
 
         return rec_fields
+
+    def predict(
+            self, left=None, right=None,
+            n=None, scaling='None', phase_shift=0):
+        '''Predict PCs of new data.
+
+        left and right are projected on the left and right singular
+        vectors. If rotation was performed, the predicted PCs will be rotated
+        as well.
+
+        Parameters
+        ----------
+        left : ndarray
+            Description of parameter `left`.
+        right : ndarray
+            Description of parameter `right`.
+        n : int
+            Number of PC modes to return. If None, return all modes.
+            The default is None.
+        scaling : {'None', 'eigen', 'max', 'std'}, optional
+            Scale PCs by square root of eigenvalues ('eigen'), maximum value
+            ('max') or standard deviation ('std').
+        phase_shift : float, optional
+            If complex, apply a phase shift to the temporal phase.
+            Default is 0.
+
+        Returns
+        -------
+        dict[ndarray, ndarray]
+            Predicted PCs associated to left and right input field.
+
+        '''
+        keys = self._keys
+        data = [left, right]
+        values = {k: d if d is None else d.values for k, d in zip(keys, data)}
+
+        pcs_new = super().predict(
+            values['left'], values['right'], n, scaling, phase_shift
+        )
+
+        coords = {
+            k: {
+                'time' : d.coords['time'],
+                'mode' : range(1, pcs_new[k].shape[1] + 1)
+            } for k, d in zip(keys, data) if d is not None
+        }
+        dims = ('time', 'mode')
+        for k, pc in pcs_new.items():
+            pcs_new[k] = xr.DataArray(pcs_new[k], dims=dims, coords=coords[k])
+        return pcs_new
 
     def _create_gridspec(
             self,
@@ -920,18 +1097,16 @@ class xMCA(MCA):
 
         return fig, axes
 
-    def _save_data(self, data_array, path, engine='h5netcdf', *args, **kwargs):
+    def _save_data(self, data, path, engine='h5netcdf', *args, **kwargs):
         analysis_path   = path
-        analysis_name   = self._get_analysis_id()
-        var_name        = secure_str('.'.join([data_array.name, 'nc']))
+        file_name        = secure_str('.'.join([data.name, 'nc']))
 
-        file_name   = '_'.join([analysis_name, var_name])
         output_path = os.path.join(analysis_path, file_name)
 
         invalid_netcdf = True
         if engine != 'h5netcdf':
             invalid_netcdf = False
-        data_array.to_netcdf(
+        data.to_netcdf(
             path=output_path,
             engine=engine, invalid_netcdf=invalid_netcdf, *args, **kwargs
         )
@@ -953,16 +1128,16 @@ class xMCA(MCA):
 
         self._create_info_file(analysis_path)
 
-        fields      = self._get_fields(original_scale=True)
-        eofs        = self.eofs()
-        pcs         = self.pcs()
+        fields      = self.fields(original_scale=True)
+        eofs        = self.eofs(original=True)
         singular_values = self.singular_values()
 
         self._save_data(singular_values, analysis_path, engine)
-        for key in pcs.keys():
-            self._save_data(fields[key], analysis_path, engine)
+        for key in self._keys:
             self._save_data(eofs[key], analysis_path, engine)
-            self._save_data(pcs[key], analysis_path, engine)
+            # save storage and save only real part of fields
+            # complex part can be cheaply reconstructed when loaded
+            self._save_data(fields[key].real, analysis_path, engine)
 
     def load_analysis(self, path, engine='h5netcdf'):
         self._set_info_from_file(path)
@@ -973,38 +1148,34 @@ class xMCA(MCA):
         singular_values = xr.open_dataarray(path_eigen, engine=engine).data
 
         fields  = {}
-        pcs     = {}
         eofs    = {}
+        self._field_coords = {}
+
         for key in self._field_names.keys():
             path_fields   = os.path.join(
                 path_folder, file_names['fields'][key]
-            )
-            path_pcs   = os.path.join(
-                path_folder, file_names['pcs'][key]
             )
             path_eofs   = os.path.join(
                 path_folder, file_names['eofs'][key]
             )
 
+            eofs[key]   = xr.open_dataarray(path_eofs, engine=engine).data
             fields[key] = xr.open_dataarray(path_fields, engine=engine)
-            pcs[key]    = xr.open_dataarray(path_pcs, engine=engine)
-            eofs[key]   = xr.open_dataarray(path_eofs, engine=engine)
-
-        self._field_coords = {}
-        for key, field in fields.items():
-            self._field_coords[key] = field.coords
-            self._field_dims[key]   = field.dims
-
-            fields[key]     = fields[key].data
-            eofs[key]       = eofs[key].data
-            pcs[key]        = pcs[key].data
+            self._field_coords[key] = fields[key].coords
+            self._field_dims[key]   = fields[key].dims
+            fields[key] = fields[key].data
 
         super().load_analysis(
             path=path,
             fields=fields,
             eofs=eofs,
-            pcs=pcs,
             singular_values=singular_values)
 
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
+
+    def summmary(self):
+        '''Return meta information of the performed analysis.
+
+        '''
+        super().summary()

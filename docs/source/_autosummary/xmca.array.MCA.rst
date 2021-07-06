@@ -21,10 +21,13 @@
       ~MCA.correlation_matrix
       ~MCA.eofs
       ~MCA.explained_variance
+      ~MCA.fields
       ~MCA.load_analysis
+      ~MCA.norm
       ~MCA.normalize
       ~MCA.pcs
       ~MCA.plot
+      ~MCA.predict
       ~MCA.rotate
       ~MCA.rotation_matrix
       ~MCA.save_plot
@@ -34,6 +37,7 @@
       ~MCA.solve
       ~MCA.spatial_amplitude
       ~MCA.spatial_phase
+      ~MCA.summary
       ~MCA.temporal_amplitude
       ~MCA.temporal_phase
       ~MCA.truncate

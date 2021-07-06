@@ -3,6 +3,8 @@ xarray>=0.16.2
 statsmodels>=0.12.2
 matplotlib>=3.3.2
 cartopy>=0.18.0
+parameterized>=0.8.1
 netcdf4
 h5netcdf
 tqdm
+PyYAML

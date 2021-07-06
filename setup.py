@@ -1,5 +1,3 @@
-import os
-
 from setuptools import find_packages, setup
 '''
 Run the following code in your conda environment to make the package available
@@ -15,13 +13,6 @@ with open('README.md', 'r') as fh:
 
 with open('requirements.txt', 'r') as fh:
     install_requires = fh.read()
-
-requirements = ['numpy >= 1.19.2',
-                'xarray >= 0.16.2',
-                'matplotlib >= 3.3.2',
-                'statsmodels >= 0.12.2',
-                'tqdm',
-                'cartopy >= 0.18.0']
 
 setup(
     name='xmca',
@@ -46,5 +37,5 @@ setup(
         'dirty_template': '{tag}.post{ccount}'
     },
     setup_requires=['setuptools-git-versioning', 'numpy'],
-    install_requires=requirements,
+    install_requires=install_requires,
 )

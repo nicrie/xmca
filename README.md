@@ -7,9 +7,11 @@
 [![downloads](https://img.shields.io/pypi/dm/xmca?color=f2cc8f)](https://pypi.org/project/xmca/)
 [![DOI](https://zenodo.org/badge/278134135.svg?color=f2cc8f)](https://zenodo.org/badge/latestdoi/278134135)
 
+The aim of this package is to provide a flexible tool for the climate science community to perform Maximum Covariance Analysis (**MCA**) in a simple and consistent way. Given the huge popularity of [`xarray`][xarray] in the climate science community, `xmca` supports `xarray.DataArray` as well as `numpy.ndarray` as input formats.
 
+![Example Figure](figs/example-plot2.png)
+*<sub>Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.</sub>*
 
-The aim of this package is to provide a flexible tool for the climate science community to perform Maximum Covariance Analysis (**MCA**) in a simple and consistent way. Given the huge popularity of [`xarray`][xarray] in the climate science community, the `xmca` package supports `xarray.DataArray` as well as `numpy.ndarray` as input formats.
 
 ## What is MCA?
 MCA maximises the temporal covariance between two different
@@ -18,8 +20,16 @@ Orthogonal Function analysis (**EOF analysis**). While EOF analysis maximises th
 field, MCA allows to extract the dominant co-varying patterns between two different data
 fields. When the two input fields are the same, MCA reduces to standard EOF analysis.
 
-For the mathematical understanding please have a look at e.g. the [lecture material][mca-material] written by C. Bretherton.
+For the mathematical understanding please have a look at e.g. [Bretherton et al.][bretherton-paper] or the [lecture material][mca-material] written by C. Bretherton.
 
+## New in release 1.0.0
+- method `predict` allows to project new, unseen data to obtain the corresponding PCs (works for standard, rotation and complex)
+- more efficient storing/loading of files; Unfortunately, this and the point above made it necessary to change the code considerably. As a consequence, **loading models which were performed and saved using an older package version (0.x.y) is not supported.**
+- add method to summarize performed analysis (`summary`)
+- add method to return input fields
+- improve docs
+- correct and consistent use of definition of loadings
+- some bugfixes
 
 ## Core Features
 
@@ -58,6 +68,8 @@ Kudos to the developers and contributors of the following Github projects which 
 [mca]: ftp://eos.atmos.washington.edu/pub/breth/papers/1992/SVD-theory.pdf
 
 [mca-material]: https://atmos.washington.edu/~breth/classes/AS552/lect/lect22.pdf
+
+[bretherton-paper]: https://journals.ametsoc.org/view/journals/clim/5/6/1520-0442_1992_005_0541_aiomff_2_0_co_2.xml
 
 [rotated-pca]: https://climatedataguide.ucar.edu/climate-data-tools-and-analysis/empirical-orthogonal-function-eof-analysis-and-rotated-eof-analysis
 
