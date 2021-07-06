@@ -85,24 +85,6 @@ class xMCA(MCA):
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
 
-    def _get_fields(self, original_scale=False):
-        dims        = self._field_dims
-        coords      = self._field_coords
-        field_names = self._field_names
-        fields      = super()._get_fields(original_scale=original_scale)
-
-        for key in fields.keys():
-            fields[key] = xr.DataArray(
-                fields[key],
-                dims=dims[key],
-                coords=coords[key],
-                name=field_names[key])
-
-            if (original_scale & self._analysis['is_coslat_corrected']):
-                fields[key] /= np.cos(np.deg2rad(coords[key]['lat']))
-
-        return fields
-
     def apply_weights(self, **weights):
         fields = self._get_fields()
 
@@ -199,10 +181,19 @@ class xMCA(MCA):
         '''
         dims = self._field_dims
         coords = self._field_coords
+        names = self._field_names
         fields = super().fields(original_scale)
 
         for k in self._keys:
-            fields[k] = xr.DataArray(fields[k], dims=dims[k], coords=coords[k])
+            fields[k] = xr.DataArray(
+                fields[k],
+                dims=dims[k],
+                coords=coords[k],
+                name=names[k]
+            )
+            if (original_scale & self._analysis['is_coslat_corrected']):
+                fields[k] /= np.cos(np.deg2rad(coords[k]['lat']))
+
         return fields
 
     def singular_values(self, n=None):
@@ -597,7 +588,7 @@ class xMCA(MCA):
 
         '''
 
-        fields  = self._get_fields()
+        fields  = self.fields()
         pcs     = self.pcs(n, phase_shift)
 
         field_names = self._field_names
@@ -630,7 +621,7 @@ class xMCA(MCA):
             Heterogeneous patterns associated to left and right input field.
 
         '''
-        fields  = self._get_fields()
+        fields  = self.fields()
         pcs     = self.pcs(n, phase_shift)
 
         field_names = self._field_names
@@ -1121,7 +1112,7 @@ class xMCA(MCA):
 
         self._create_info_file(analysis_path)
 
-        fields      = self._get_fields(original_scale=True)
+        fields      = self.fields(original_scale=True)
         eofs        = self.eofs(original=True)
         singular_values = self.singular_values()
 
