@@ -1,9 +1,9 @@
 # xMCA | Maximum Covariance Analysis in Python
 
 [![version](https://img.shields.io/pypi/v/xmca?color=f2cc8f&label=PyPI)](https://pypi.org/project/xmca/)
-![CircleCI](https://img.shields.io/circleci/build/github/nicrie/xmca?color=81b29a)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/nicrie/xmca/build-pip?color=81b29a)
 [![Documentation Status](https://img.shields.io/readthedocs/xmca/latest?color=81b29a)](https://pyxmca.readthedocs.io/en/latest/?badge=latest)
-![Maintenance](https://img.shields.io/maintenance/yes/2021?color=81b29a)
+[![codecov.io](https://codecov.io/github/nicrie/xmca/coverage.svg?branch=master)](https://codecov.io/github/nicrie/xmca?branch=master)
 [![downloads](https://img.shields.io/pypi/dm/xmca?color=f2cc8f)](https://pypi.org/project/xmca/)
 [![DOI](https://zenodo.org/badge/278134135.svg?color=f2cc8f)](https://zenodo.org/badge/latestdoi/278134135)
 
