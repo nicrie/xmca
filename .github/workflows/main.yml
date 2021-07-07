@@ -39,6 +39,7 @@ jobs:
           pip uninstall -y shapely
           pip install shapely --no-binary shapely
           pip install -r requirements.txt
+          pip install flake8
           pip install coverage
       - name: Lint with flake8
         run: |
