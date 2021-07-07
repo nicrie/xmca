@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   python: circleci/python@0.2.1
+  codecov: codecov/codecov@1.2.3
 
 jobs:
   build-pip:
@@ -11,6 +12,7 @@ jobs:
       - python/load-cache:
           key: pip
       - run:
+          name: 'Get dependencies'
           command: |
             pip install numpy
             sudo apt-get install libproj-dev proj-data proj-bin
@@ -22,13 +24,18 @@ jobs:
             pip uninstall -y shapely
             pip install shapely --no-binary shapely
             pip install -r requirements.txt
-          name: 'Get dependencies'
       - python/save-cache:
         key: pip
       - run:
-          command: python -m unittest discover -v -s tests/
-          name: Test
-  
+          name: Run tests
+          command: |
+            pip install coverage
+            coverage run --source=xmca -m unittest discover -v -s tests/
+            coverage xml
+      - codecov/upload:
+        file = 'coverage.xlm'
+
+
 workflows:
   main:
     jobs:
