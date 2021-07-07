@@ -206,10 +206,13 @@ class MCA:
         elif not os.path.isabs(path):
             path = os.path.abspath(path)
 
+        return path
+
+    def _create_analysis_path(self, path):
+        path = self._get_analysis_path(path)
+
         if not os.path.exists(path):
             os.makedirs(path)
-
-        return path
 
     def _get_X(self, original_scale=False):
         std     = self._field_stds
@@ -1281,35 +1284,26 @@ class MCA:
             axes_pc[0].spines['bottom'].set_visible(False)
 
     def save_plot(
-            self, mode, path=None, format='png',
-            plot_kwargs={}, save_kwargs={}):
+            self, mode, path=None, plot_kwargs={}, save_kwargs={}):
         '''Create and save a plot to local disk.
 
         Parameters
         ----------
         mode : int
             Mode to plot.
-        format : string
-            Format the plot should be stored as. Valid formats include e.g.
-            'png', 'jpg', 'eps' etc.
-        path : type
-            Storage location of the saved plot. If none is provided, the plot
-            will be stored at './xmca/<left>_<right>/' where <left> and <right>
-            denote the given field names.
+        path : str
+            Path where to save the plot. If none is provided, an automatic
+            name will be generated based on the mode number.
         plot_kwargs : dict
-            Additional parameters provided to `.plot()`.
+            Additional parameters provided to `xmca.array.plot`.
         save_kwargs : dict
-            Additional parameters provided to `plt.savefig()`.
+            Additional parameters provided to `matplotlib.pyplot.savefig`.
 
         '''
         if path is None:
-            path = self._get_analysis_path()
-
-        mode_id = ''.join(['mode', str(mode)])
-        format = 'png'
-        file_name = '_'.join([self._get_analysis_id(), mode_id])
-        file_path = os.path.join(path, file_name)
-        output = '.'.join([file_path, format])
+            output = 'mode{:}.png'.format(mode)
+        else:
+            output = path
 
         fig, axes = self.plot(mode=mode, **plot_kwargs)
         fig.subplots_adjust(left=0.06)

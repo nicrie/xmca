@@ -1125,7 +1125,7 @@ class xMCA(MCA):
 
         '''
         analysis_path = self._get_analysis_path(path)
-
+        self._create_analysis_path(analysis_path)
         self._create_info_file(analysis_path)
 
         fields      = self.fields(original_scale=True)
