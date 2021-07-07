@@ -95,7 +95,9 @@ class xMCA(MCA):
             raise KeyError('Keys not found. Choose `left` or `right`')
 
     def apply_coslat(self):
-        '''Apply area correction to higher latitudes.'''
+        '''Apply area correction to higher latitudes.
+
+        '''
 
         coords  = self._field_coords
         weights = {}
@@ -650,13 +652,15 @@ class xMCA(MCA):
         mode : int, slice
             Modes to be considered for reconstructing the original fields.
             The default is `slice(1, None)` which returns the original fields
-            based on *all* modes.
+            based on all modes.
 
         Returns
         -------
         dict[DataArray, DataArray]
             Left and right reconstructed fields.
+
         '''
+
         # TODO: move the computation to a private function;
         # requires extra work: array has to deal with cool slice(n, m) feature
         # which already exists for xarray
