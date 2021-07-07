@@ -1,13 +1,13 @@
-# This is a basic workflow to help you get started with Actions
+# Basic workflow for building and testing the pip installation
 
-name: Build
+name: build-pip
 
 on:
   push:
     branches: [ master, develop ]
   pull_request:
     branches: [ master, develop ]
-  
+
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6]
+        python-version: [3.6, 3.7, 3.8]
 
     steps:
       - uses: actions/checkout@v2
@@ -51,7 +51,7 @@ jobs:
         run: |
           coverage run --source=xmca -m unittest discover -v -s tests/
           coverage xml
-          
+
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         with:
