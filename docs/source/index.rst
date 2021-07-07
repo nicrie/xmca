@@ -8,15 +8,15 @@ Maximum Covariance Analysis in Python
 The aim of this package is to provide a flexible tool for the climate
 science community to perform Maximum Covariance Analysis (**MCA**) in a
 simple and consistent way. Given the huge popularity of
-`xarray`_ in the climate
+`xarray <http://xarray.pydata.org/en/stable/>`__ in the climate
 science community, the ``xmca`` package supports ``xarray.DataArray`` as
 well as ``numpy.ndarray`` as input formats.
 
-.. _`xarray`: <http://xarray.pydata.org/en/stable/>`
-
 .. figure:: ../../figs/example-plot2.png
    :alt: Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.
-Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.
+Mode 2 of complex rotated Maximum Covariance Analysis showing the shared 
+dynamics of SST and continental precipitation associated to ENSO between
+1980 and 2020.
 
 What is MCA?
 ------------

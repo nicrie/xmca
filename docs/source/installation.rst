@@ -10,23 +10,13 @@ Installation is simply performed via
 Known Issues
 ''''''''''''
 
-Actually ``pip`` should take care of installing the correct
-dependencies. However, the dependencies of ``cartopy`` itself are not
-installed via ``pip`` which is why the setup may fail in some cases. If
-so, please
+Sometimes there may be problems due to unmet dependencies. One reason is often
+associated to a `known issue <https://github.com/SciTools/cartopy/issues/805>`
+related to the cartopy installation. If so, please
 `install <https://scitools.org.uk/cartopy/docs/latest/installing.html>`__
 ``cartopy`` first before installing ``xmca``. If you are using a
-``conda`` environment, this can be achieved by
+``conda`` environment, this can be achieved via
 
 ::
 
     conda install cartopy
-
-Testing
-'''''''
-
-After cloning the repository
-
-::
-
-    python -m unittest discover -v -s tests/
