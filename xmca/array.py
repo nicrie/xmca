@@ -1306,7 +1306,7 @@ class MCA:
             path = self._get_analysis_path()
 
         mode_id = ''.join(['mode', str(mode)])
-        format = '.png'
+        format = 'png'
         file_name = '_'.join([self._get_analysis_id(), mode_id])
         file_path = os.path.join(path, file_name)
         output = '.'.join([file_path, format])
