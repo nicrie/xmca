@@ -1,12 +1,13 @@
 name: xmca
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - python>3.7
+  - python>3.6
   - numpy
   - matplotlib
   - xarray
-  - cartopy
+  - cartopy=0.18.0
   - statsmodels
   - tqdm
   - yaml
