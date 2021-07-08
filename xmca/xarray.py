@@ -1178,7 +1178,7 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
-    def summmary(self):
+    def summary(self):
         '''Return meta information of the performed analysis.
 
         '''
