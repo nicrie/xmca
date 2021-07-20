@@ -229,6 +229,29 @@ class TestIntegration(unittest.TestCase):
         model.spatial_phase(n, phase_shift, original)
 
     @parameterized.expand([
+        ('std'),
+        ('cplx'),
+        ('varmx')
+    ], name_func=name_func_get)
+    def test_field(self, analysis):
+        expected = {'left' : self.A, 'right': self.B}
+        cplx = False
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=cplx)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        model.fields()
+        result = model.fields(original_scale=True)
+
+        assert_allclose(result['left'].real, expected['left'], **self.tols)
+        assert_allclose(result['right'].real, expected['right'], **self.tols)
+
+    @parameterized.expand([
         ('uni', 'std', 1),
         ('uni', 'cplx', 2),
         ('uni', 'varmx', 3),
