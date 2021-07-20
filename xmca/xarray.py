@@ -739,11 +739,20 @@ class xMCA(MCA):
         '''
         keys = self._keys
         data = [left, right]
-        values = {k: d if d is None else d.values for k, d in zip(keys, data)}
+        try:
+            values = {k: d if d is None else d.values for k, d in zip(keys, data)}
+        except AttributeError as err:
+            msg = 'Please provide `xr.DataArray` to `left` and `right`'
+            raise ValueError(msg) from err
 
-        pcs_new = super().predict(
-            values['left'], values['right'], n, scaling, phase_shift
-        )
+        if self._analysis['is_bivariate']:
+            pcs_new = super().predict(
+                values['left'], values['right'], n, scaling, phase_shift
+            )
+        else:
+            pcs_new = super().predict(
+                values['left'], None, n, scaling, phase_shift
+            )
 
         coords = {
             k: {
