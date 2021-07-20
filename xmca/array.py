@@ -91,6 +91,7 @@ class MCA:
         # field meta information
         self._keys                  = ['left', 'right']
         self._fields                = {}  # input fields
+        self._shape                 = {}  # input field shapes
         self._field_names           = {}  # names of input fields
         self._field_means           = {}  # mean of fields
         self._field_stds            = {}  # standard deviation of fields
@@ -149,9 +150,10 @@ class MCA:
 
     def _set_field_meta(self, fields):
         for k, field in zip(self._keys, fields):
-            spatial_shape = field.shape[1:]
-            n_variables          = np.product(field.shape[1:])
-            n_observations       = field.shape[0]
+            shape = field.shape
+            spatial_shape = shape[1:]
+            n_observations       = shape[0]
+            n_variables          = np.product(shape[1:])
 
             field = field.reshape(n_observations, n_variables)
             field, no_nan_idx       = remove_nan_cols(field)
@@ -163,6 +165,7 @@ class MCA:
             self._fields[k]  = remove_mean(field)
             self._field_names[k] = k
 
+            self._shape[k] = shape
             self._fields_spatial_shape[k] = spatial_shape
             self._n_variables[k] = n_variables
             self._n_observations[k] = n_observations
@@ -1057,11 +1060,11 @@ class MCA:
 
         n_obs = self._n_observations['left']
         dof = n_obs - 1
+        shape = self._shape
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
         V = self._get_V()
-        fields = self._fields
         fields_mean = self._field_means
         fields_std = self._field_stds
 
@@ -1078,6 +1081,32 @@ class MCA:
         pcs_new = {}
         for k, x_new in data_new.items():
             try:
+                x_new = x_new.reshape(x_new.shape[0], n_vars[k])
+                x_new = x_new[:, no_nan_idx[k]]
+            except ValueError as err:
+                if (len(x_new.shape) != len(shape[k])):
+                    msg = (
+                        'Error in {:} field. '
+                        'Dimension of new data ({:}) and the original field '
+                        '({:}) do not match. '
+                        'Did you forget the time dimension?'
+                    )
+
+                    msg = msg.format(k, len(x_new.shape), len(shape[k]))
+                elif x_new.shape[1:] != fields_mean[k].shape:
+                    msg = (
+                        'Error in {:} field. '
+                        'Spatial dimensions of new data {:} and the original '
+                        'field {:} do not match.'
+                    )
+                    msg = msg.format(k, x_new.shape[1:], shape[k][1:])
+                else:
+                    msg = (
+                        'Dimension mismatch in {:} field.'
+                    )
+                    msg = msg.format(k)
+                raise ValueError(msg) from err
+            try:
                 x_new -= fields_mean[k]
             except ValueError as err:
                 msg = (
@@ -1090,19 +1119,6 @@ class MCA:
 
             if self._analysis['is_normalized']:
                 x_new /= fields_std[k]
-
-            try:
-                x_new = x_new.reshape(x_new.shape[0], n_vars[k])
-            except ValueError as err:
-                msg = (
-                    'Error in {:} field. '
-                    'Dimension of new data ({:}) and the original field '
-                    '({:}) do not match. Did you forget the time dimension?'
-                )
-                msg = msg.format(k, len(x_new.shape), len(fields[k].shape))
-                raise ValueError(msg) from err
-
-            x_new = x_new[:, no_nan_idx[k]]
 
             pcs = x_new @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
             pcs = pcs @ R / np.sqrt(dof)

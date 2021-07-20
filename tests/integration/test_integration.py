@@ -229,12 +229,12 @@ class TestIntegration(unittest.TestCase):
         model.spatial_phase(n, phase_shift, original)
 
     @parameterized.expand([
-        ('std', 1),
-        ('cplx', 2),
-        ('varmx', 3),
+        ('std'),
+        ('cplx'),
+        ('varmx')
     ], name_func=name_func_get)
-    def test_plot(self, analysis, n):
-        cplx = False,
+    def test_hom_het_patterns(self, analysis):
+        cplx = False
         n_rot = 0
         if analysis == 'cplx':
             cplx = True
@@ -242,10 +242,108 @@ class TestIntegration(unittest.TestCase):
             n_rot = 10
         model = xMCA(self.A, self.B)
         model.solve(complexify=cplx)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        hom_pat = model.homogeneous_patterns(10)
+        het_pat = model.heterogeneous_patterns(10)
+
+        self.assertGreaterEqual(1, abs(hom_pat['left']).max())
+        self.assertGreaterEqual(1, abs(hom_pat['right']).max())
+        self.assertGreaterEqual(1, abs(het_pat['left']).max())
+        self.assertGreaterEqual(1, abs(het_pat['right']).max())
+
+
+    @parameterized.expand([
+        ('std'),
+        ('cplx'),
+        ('varmx')
+    ], name_func=name_func_get)
+    def test_field(self, analysis):
+        expected = {'left' : self.A, 'right': self.B}
+        cplx = False
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=cplx)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        model.fields()
+        result = model.fields(original_scale=True)
+
+        assert_allclose(result['left'].real, expected['left'], **self.tols)
+        assert_allclose(result['right'].real, expected['right'], **self.tols)
+
+    @parameterized.expand([
+        ('uni', 'std', 1),
+        ('uni', 'cplx', 2),
+        ('uni', 'varmx', 3),
+        ('bi', 'std', 1),
+        ('bi', 'cplx', 2),
+        ('bi', 'varmx', 3),
+    ], name_func=name_func_get)
+    def test_plot(self, analysis, flavour, n):
+        cplx = False,
+        n_rot = 0
+        if flavour == 'cplx':
+            cplx = True
+        if flavour == 'varmx':
+            n_rot = 10
+        if analysis == 'uni':
+            model = xMCA(self.A)
+        elif analysis == 'bi':
+            model = xMCA(self.A, self.B)
+
+        model.solve(complexify=cplx)
         if n_rot > 1:
             model.rotate(n_rot)
         model.plot(n)
 
-        @classmethod
-        def tearDownClass(self):
-            pass
+    @parameterized.expand([
+        ('uni', 'std', 1, 'None', 0),
+        ('uni', 'varmx', 15, 'None', 0.5),
+        ('uni', 'varmx', 15, 'max', -1,),
+        ('bi', 'std', 1, 'None', 0),
+        ('bi', 'varmx', 15, 'None', -1),
+        ('bi', 'varmx', 15, 'max', 0.5),
+    ], name_func=name_func_get)
+    def test_predict(self, analysis, flavour, n, scaling, phase_shift):
+        left = self.A
+        right = self.B
+        new_left = self.A.isel(time=slice(0, 10))
+        new_right = self.A.isel(time=slice(10, 20))
+
+        if analysis == 'uni':
+            model = xMCA(left)
+        elif analysis == 'bi':
+            model = xMCA(left, right)
+        model.solve()
+        if flavour == 'varmx':
+            model.rotate(10)
+
+        model.predict(new_left, n=n, scaling=scaling, phase_shift=phase_shift)
+        if analysis == 'bi':
+            model.predict(new_right)
+            model.predict(new_left, new_right)
+
+        # missing time dimension
+        self.assertRaises(
+            ValueError, model.predict, new_left.isel(time=0)
+        )
+        # wrong spatial dimensions
+        self.assertRaises(
+            ValueError, model.predict, new_left.isel(lon=slice(0, 10))
+        )
+
+    def test_summary(self):
+        left = self.A
+        right = self.B
+        model = xMCA(left, right)
+        model.solve()
+        _ = model.summary()
+
+    @classmethod
+    def tearDownClass(self):
+        pass

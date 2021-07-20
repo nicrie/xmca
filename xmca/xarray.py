@@ -591,7 +591,7 @@ class xMCA(MCA):
         '''
 
         fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift)
+        pcs     = self.pcs(n, phase_shift=phase_shift)
 
         field_names = self._field_names
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -624,7 +624,7 @@ class xMCA(MCA):
 
         '''
         fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift)
+        pcs     = self.pcs(n, phase_shift=phase_shift)
 
         field_names = self._field_names
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -739,11 +739,20 @@ class xMCA(MCA):
         '''
         keys = self._keys
         data = [left, right]
-        values = {k: d if d is None else d.values for k, d in zip(keys, data)}
+        try:
+            values = {k: d if d is None else d.values for k, d in zip(keys, data)}
+        except AttributeError as err:
+            msg = 'Please provide `xr.DataArray` to `left` and `right`'
+            raise ValueError(msg) from err
 
-        pcs_new = super().predict(
-            values['left'], values['right'], n, scaling, phase_shift
-        )
+        if self._analysis['is_bivariate']:
+            pcs_new = super().predict(
+                values['left'], values['right'], n, scaling, phase_shift
+            )
+        else:
+            pcs_new = super().predict(
+                values['left'], None, n, scaling, phase_shift
+            )
 
         coords = {
             k: {
@@ -1178,7 +1187,7 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
-    def summmary(self):
+    def summary(self):
         '''Return meta information of the performed analysis.
 
         '''
