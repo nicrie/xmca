@@ -289,6 +289,13 @@ class TestIntegration(unittest.TestCase):
             ValueError, model.predict, new_left.isel(lon=slice(0, 10))
         )
 
-        @classmethod
-        def tearDownClass(self):
-            pass
+    def test_summary(self):
+        left = self.A
+        right = self.B
+        model = xMCA(left, right)
+        model.solve()
+        _ = model.summary()
+
+    @classmethod
+    def tearDownClass(self):
+        pass
