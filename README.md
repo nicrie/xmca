@@ -29,7 +29,7 @@ For the mathematical understanding please have a look at e.g. [Bretherton et al.
 - add method to return input fields
 - improve docs
 - correct and consistent use of definition of loadings
-- some bugfixes
+- some bugfixes (e.g. hom/het patterns)
 
 ## Core Features
 
