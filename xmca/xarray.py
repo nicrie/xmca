@@ -591,7 +591,7 @@ class xMCA(MCA):
         '''
 
         fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift)
+        pcs     = self.pcs(n, phase_shift=phase_shift)
 
         field_names = self._field_names
         attrs = {k: str(v) for k, v in self._analysis.items()}
@@ -624,7 +624,7 @@ class xMCA(MCA):
 
         '''
         fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift)
+        pcs     = self.pcs(n, phase_shift=phase_shift)
 
         field_names = self._field_names
         attrs = {k: str(v) for k, v in self._analysis.items()}

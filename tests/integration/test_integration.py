@@ -233,6 +233,31 @@ class TestIntegration(unittest.TestCase):
         ('cplx'),
         ('varmx')
     ], name_func=name_func_get)
+    def test_hom_het_patterns(self, analysis):
+        cplx = False
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=cplx)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        hom_pat = model.homogeneous_patterns(10)
+        het_pat = model.heterogeneous_patterns(10)
+
+        self.assertGreaterEqual(1, abs(hom_pat['left']).max())
+        self.assertGreaterEqual(1, abs(hom_pat['right']).max())
+        self.assertGreaterEqual(1, abs(het_pat['left']).max())
+        self.assertGreaterEqual(1, abs(het_pat['right']).max())
+
+
+    @parameterized.expand([
+        ('std'),
+        ('cplx'),
+        ('varmx')
+    ], name_func=name_func_get)
     def test_field(self, analysis):
         expected = {'left' : self.A, 'right': self.B}
         cplx = False
