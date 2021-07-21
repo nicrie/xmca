@@ -1083,7 +1083,7 @@ class MCA:
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
-        V = self._get_V()
+        V = self._get_V(original=True)
         fields_mean = self._field_means
         fields_std = self._field_stds
 

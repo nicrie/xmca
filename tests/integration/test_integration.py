@@ -337,32 +337,55 @@ class TestIntegration(unittest.TestCase):
         model.plot(n)
 
     @parameterized.expand([
-        ('uni', 'std', 1, 'None', 0),
-        ('uni', 'varmx', 15, 'None', 0.5),
-        ('uni', 'varmx', 15, 'max', -1,),
-        ('bi', 'std', 1, 'None', 0),
-        ('bi', 'varmx', 15, 'None', -1),
-        ('bi', 'varmx', 15, 'max', 0.5),
+        ('uni', 'std', 1, 'None', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'None', 0, 'no_weight'),
+        ('uni', 'std', 1, 'max', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'std', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'std', 0.5, 'no_weight'),
+        ('bi', 'std', 1, 'None', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'None', 0, 'no_weight'),
+        ('bi', 'std', 1, 'max', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'max', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'std', 0.5, 'no_weight'),
+        ('bi', 'std', 1, 'None', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'None', 0, 'coslat'),
+        ('bi', 'std', 1, 'max', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'max', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'std', 0.5, 'coslat'),
     ], name_func=name_func_get)
-    def test_predict(self, analysis, flavour, n, scaling, phase_shift):
+    def test_predict(self, analysis, flavour, n, scaling, phase_shift, weight):
         left = self.A
         right = self.B
-        new_left = self.A.isel(time=slice(0, 10))
-        new_right = self.A.isel(time=slice(10, 20))
+        new_left = self.A.isel(time=slice(0, 20))
+        new_right = self.A.isel(time=slice(0, 20))
 
         if analysis == 'uni':
             model = xMCA(left)
         elif analysis == 'bi':
             model = xMCA(left, right)
+        if weight == 'coslat':
+            model.normalize()
         model.solve()
         if flavour == 'varmx':
             model.rotate(10)
 
-        model.predict(new_left, n=n, scaling=scaling, phase_shift=phase_shift)
+        pcs = model.pcs(n=n, scaling=scaling, phase_shift=phase_shift)
+        expected = {
+            k: p.sel(mode=slice(1, 10)).isel(time=slice(0, 20)) for k, p in pcs.items()
+        }
+        result = model.predict(
+            new_left,
+            n=n, scaling=scaling, phase_shift=phase_shift
+        )
         if analysis == 'bi':
             model.predict(new_right)
-            model.predict(new_left, new_right)
+            result = model.predict(
+                new_left, new_right,
+                n=n, scaling=scaling, phase_shift=phase_shift
+            )
 
+        assert_allclose(expected['left'], result['left'], **self.tols)
+        # check wrong input
         # missing time dimension
         self.assertRaises(
             ValueError, model.predict, new_left.isel(time=0)
