@@ -1126,7 +1126,8 @@ class MCA:
                     msg = msg.format(k)
                 raise ValueError(msg) from err
             try:
-                x_new -= fields_mean[k]
+                x_new = self._scale_X({k: x_new})[k]
+                # x_new -= fields_mean[k]
             except ValueError as err:
                 msg = (
                     'Error in {:} field. '
@@ -1135,9 +1136,9 @@ class MCA:
                 )
                 msg = msg.format(k, x_new.shape[1:], fields_mean[k].shape)
                 raise ValueError(msg) from err
-
-            if self._analysis['is_normalized']:
-                x_new /= fields_std[k]
+            #
+            # if self._analysis['is_normalized']:
+            #     x_new /= fields_std[k]
 
             pcs = x_new @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
             pcs = pcs @ R / np.sqrt(dof)

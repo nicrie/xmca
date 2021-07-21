@@ -365,6 +365,7 @@ class TestIntegration(unittest.TestCase):
             model = xMCA(left, right)
         if weight == 'coslat':
             model.normalize()
+            model.apply_coslat()
         model.solve()
         if flavour == 'varmx':
             model.rotate(10)
