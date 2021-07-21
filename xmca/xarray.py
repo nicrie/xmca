@@ -85,14 +85,84 @@ class xMCA(MCA):
         fields = {key : field.values for key, field in fields.items()}
         super().__init__(*fields.values())
 
-    def apply_weights(self, **weights):
-        fields = self._get_fields()
+    def _scale_X(self, data_dict):
+        std     = self._field_stds
+        mean    = self._field_means
+        coords  = self._field_coords
+        spatial_shape = self._fields_spatial_shape
+        no_nan_idx = self._no_nan_index
 
-        try:
-            for key, weight in weights.items():
-                self._fields[key]  = (fields[key] * weight).data
-        except KeyError:
-            raise KeyError('Keys not found. Choose `left` or `right`')
+        scaled = data_dict
+
+        for k, field in scaled.items():
+            scaled[k] -= mean[k]
+        if self._analysis['is_normalized']:
+            scaled[k] /= std[k]
+        if self._analysis['is_coslat_corrected']:
+            coslat = np.sqrt(np.cos(np.deg2rad(coords[k]['lat']))).values
+            coslat = coslat.reshape(coslat.size, 1)
+
+            weights = np.ones(spatial_shape[k]) * coslat
+            weights = weights.flatten()[no_nan_idx[k]]
+
+            scaled[k] *= weights
+        return scaled
+
+    def _scale_X_inverse(self, data_dict):
+        std     = self._field_stds
+        mean    = self._field_means
+        coords  = self._field_coords
+        spatial_shape = self._fields_spatial_shape
+        no_nan_idx = self._no_nan_index
+
+        scaled = data_dict
+
+        for k, field in scaled.items():
+            if self._analysis['is_coslat_corrected']:
+                coslat = np.sqrt(np.cos(np.deg2rad(coords[k]['lat']))).values
+                coslat = coslat.reshape(coslat.size, 1)
+
+                weights = np.ones(spatial_shape[k]) * coslat
+                weights = weights.flatten()[no_nan_idx[k]]
+
+                field /= weights
+            if self._analysis['is_normalized']:
+                field *= std[k]
+            field += mean[k]
+            scaled[k] = field
+
+        return scaled
+
+    def apply_weights(self, **weights):
+        fields = self.fields()
+        n_obs = self._n_observations
+        n_vars = self._n_variables
+        no_nan_idx = self._no_nan_index
+
+        for k, weight in weights.items():
+
+            try:
+                new_field  = (fields[k] * weight).data
+            except KeyError as err:
+                msg = (
+                    'Key `{:}` not found. Please use `left` or `right`'
+                )
+                msg = msg.format(k)
+                raise KeyError(msg) from err
+
+            try:
+                new_field = new_field.reshape(n_obs[k], n_vars[k])
+                new_field = new_field[:, no_nan_idx[k]]
+            except ValueError as err:
+                msg = (
+                    'Error for {:} weights. '
+                    'Mismatch between dimensions of weights ({:}) '
+                    'and original field ({:}).'
+                )
+                msg = msg.format(k, weight.shape, fields[k].shape)
+                raise ValueError(msg) from err
+
+            self._fields[k] = new_field
 
     def apply_coslat(self):
         '''Apply area correction to higher latitudes.
@@ -193,8 +263,6 @@ class xMCA(MCA):
                 coords=coords[k],
                 name=names[k]
             )
-            if (original_scale & self._analysis['is_coslat_corrected']):
-                fields[k] /= np.cos(np.deg2rad(coords[k]['lat']))
 
         return fields
 

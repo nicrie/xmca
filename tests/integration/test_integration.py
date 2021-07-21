@@ -252,7 +252,6 @@ class TestIntegration(unittest.TestCase):
         self.assertGreaterEqual(1, abs(het_pat['left']).max())
         self.assertGreaterEqual(1, abs(het_pat['right']).max())
 
-
     @parameterized.expand([
         ('std'),
         ('cplx'),
@@ -275,6 +274,42 @@ class TestIntegration(unittest.TestCase):
 
         assert_allclose(result['left'].real, expected['left'], **self.tols)
         assert_allclose(result['right'].real, expected['right'], **self.tols)
+
+    @parameterized.expand([
+        ('std'),
+        ('cplx'),
+        ('varmx')
+    ], name_func=name_func_get)
+    def test_field_scaling(self, analysis):
+        expected = {'left' : self.A, 'right': self.B}
+        cplx = False
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        result1 = model.fields(original_scale=True)
+        model.normalize()
+        result2 = model.fields(original_scale=True)
+        model.apply_coslat()
+        result3 = model.fields(original_scale=True)
+        model.solve(complexify=cplx)
+        result4 = model.fields(original_scale=True)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        result5 = model.fields(original_scale=True)
+
+        assert_allclose(result1['left'].real, expected['left'], **self.tols)
+        assert_allclose(result2['left'].real, expected['left'], **self.tols)
+        assert_allclose(result3['left'].real, expected['left'], **self.tols)
+        assert_allclose(result4['left'].real, expected['left'], **self.tols)
+        assert_allclose(result5['left'].real, expected['left'], **self.tols)
+        assert_allclose(result1['right'].real, expected['right'], **self.tols)
+        assert_allclose(result2['right'].real, expected['right'], **self.tols)
+        assert_allclose(result3['right'].real, expected['right'], **self.tols)
+        assert_allclose(result4['right'].real, expected['right'], **self.tols)
+        assert_allclose(result5['right'].real, expected['right'], **self.tols)
 
     @parameterized.expand([
         ('uni', 'std', 1),

@@ -217,18 +217,37 @@ class MCA:
         if not os.path.exists(path):
             os.makedirs(path)
 
-    def _get_X(self, original_scale=False):
+    def _scale_X(self, data_dict):
         std     = self._field_stds
         mean    = self._field_means
-        fields  = self._fields
+        scaled = data_dict.copy()
 
-        X = {}
-        for k, field in fields.items():
-            X[k] = field.copy()
-            if original_scale:
-                if self._analysis['is_normalized']:
-                    X[k] *= std[k]
-                X[k] += mean[k]
+        for k, field in scaled.items():
+            field -= mean[k]
+        if self._analysis['is_normalized']:
+            field /= std[k]
+
+        return scaled
+
+    def _scale_X_inverse(self, data_dict):
+        std     = self._field_stds
+        mean    = self._field_means
+
+        scaled = data_dict
+
+        for k, field in scaled.items():
+            if self._analysis['is_normalized']:
+                field *= std[k]
+            field += mean[k]
+
+        return scaled
+
+    def _get_X(self, original_scale=False):
+        X  = {k : f.copy() for k, f in self._fields.items()}
+
+        if original_scale:
+            X = self._scale_X_inverse(X)
+
         return X
 
     def _get_fields(self, original_scale=False):
