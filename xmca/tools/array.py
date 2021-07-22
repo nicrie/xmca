@@ -45,6 +45,25 @@ def remove_mean(arr):
         return arr - arr.mean(axis=0)
 
 
+def get_nan_cols(arr):
+    '''Get NaN columns from an array.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array to be scanned.
+
+    Returns
+    -------
+    index : 1darray
+        Index of columns with NaN entries from original data
+
+    '''
+    nan_index = np.isnan(arr).any(axis=0)
+
+    return nan_index
+
+
 def remove_nan_cols(arr):
     '''Remove NaN columns in array.
 
@@ -57,15 +76,12 @@ def remove_nan_cols(arr):
     -------
     new_data : ndarray
         Array without NaN columns.
-    index : 1darray
-        Index of columns without NaN entries from original data
 
     '''
-    " Remove all columns where the first row contains"
-    index = np.where(~(np.isnan(arr[0])))[0]
-    new_arr  = arr[:,index]
+    idx = get_nan_cols(arr)
+    new_arr  = arr[:, ~idx]
 
-    return new_arr, index
+    return new_arr
 
 
 def has_nan_time_steps(array):

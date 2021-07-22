@@ -8,6 +8,7 @@ import cmath
 import os
 import warnings
 from datetime import datetime
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,11 +16,13 @@ import yaml
 from numpy.polynomial.polynomial import polyfit
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
-from xmca.tools.array import has_nan_time_steps, remove_mean, remove_nan_cols
+from tqdm import tqdm
+
+from xmca import __version__
+from xmca.tools.array import (get_nan_cols, has_nan_time_steps, remove_mean,
+                              remove_nan_cols)
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
-from tqdm import tqdm
-from xmca import __version__
 
 
 # =============================================================================
@@ -103,8 +106,16 @@ class MCA:
         # set fields
         if len(fields) == 1:
             self._keys.pop()
+        fields = {k: f for k, f in zip(self._keys, fields)}
 
         self._set_field_meta(fields)
+        fields = self._reshape_to_2d(fields)
+        self._set_no_nan_idx(fields)
+        fields = self._remove_nan_cols(fields)
+        self._set_field_means(fields)
+        self._set_field_stds(fields)
+
+        self._fields  = self._center(fields)
 
         # set meta information
         self._analysis = {
@@ -148,28 +159,56 @@ class MCA:
         self._field_names['left']   = left
         self._field_names['right']  = right
 
-    def _set_field_meta(self, fields):
-        for k, field in zip(self._keys, fields):
-            shape = field.shape
-            spatial_shape = shape[1:]
-            n_observations       = shape[0]
-            n_variables          = np.product(shape[1:])
-
-            field = field.reshape(n_observations, n_variables)
-            field, no_nan_idx       = remove_nan_cols(field)
-
-            self._field_means[k]          = field.mean(axis=0)
-            self._field_stds[k]           = field.std(axis=0)
-
-            # center input data
-            self._fields[k]  = remove_mean(field)
+    def _set_field_meta(self, data: Dict[str, np.ndarray]) -> None:
+        for k, field in data.items():
+            self._shape[k] = field.shape
+            self._n_observations[k] = field.shape[0]
+            self._fields_spatial_shape[k] = field.shape[1:]
+            self._n_variables[k] = np.product(field.shape[1:])
             self._field_names[k] = k
 
-            self._shape[k] = shape
-            self._fields_spatial_shape[k] = spatial_shape
-            self._n_variables[k] = n_variables
-            self._n_observations[k] = n_observations
-            self._no_nan_index[k] = no_nan_idx
+    def _center(self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+
+        centered = {}
+        for k, field in data.items():
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                centered[k] = field - field.mean(axis=0)
+
+        return centered
+
+    def _set_field_means(self, data: Dict[str, np.ndarray]) -> None:
+        for k, field in data.items():
+            self._field_means[k] = field.mean(axis=0)
+
+    def _set_field_stds(self, data: Dict[str, np.ndarray]) -> None:
+        for k, field in data.items():
+            self._field_stds[k] = field.std(axis=0)
+
+    def _set_no_nan_idx(self, data: Dict[str, np.ndarray]) -> None:
+
+        for k, field in data.items():
+            self._no_nan_index[k] = ~(get_nan_cols(field))
+
+    def _remove_nan_cols(
+            self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        data_no_nan = {}
+        for k, field in data.items():
+            data_no_nan[k] = remove_nan_cols(field)
+
+        return data_no_nan
+
+    def _reshape_to_2d(
+            self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        data_2d = {}
+        for k, field in data.items():
+            n_obs = field.shape[0]
+            n_vars = np.product(field.shape[1:])
+
+            field = field.reshape(n_obs, n_vars)
+            data_2d[k] = field
+
+        return data_2d
 
     def _get_method_id(self):
         id = 'pca'
@@ -1483,7 +1522,15 @@ class MCA:
         else:
             self._keys = ['left']
 
-        self._set_field_meta(list(fields.values()))
+        self._set_field_meta(fields)
+        fields = self._reshape_to_2d(fields)
+        self._set_no_nan_idx(fields)
+        fields = self._remove_nan_cols(fields)
+        self._set_field_means(fields)
+        self._set_field_stds(fields)
+
+        self._fields  = self._center(fields)
+
         if self._analysis['is_normalized']:
             self.normalize()
         if self._analysis['is_complex']:
@@ -1500,7 +1547,7 @@ class MCA:
 
             n_modes                         = eofs[key].shape[-1]
             eofs[key]    = eofs[key].reshape(self._n_variables[key], n_modes)
-            VT, _   = remove_nan_cols(eofs[key].T)
+            VT   = remove_nan_cols(eofs[key].T)
             self._V[key]    = VT.T
 
         if self._analysis['is_rotated']:
