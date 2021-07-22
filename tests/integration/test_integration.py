@@ -1,3 +1,5 @@
+import contextlib
+import os
 import unittest
 import warnings
 from os import getcwd
@@ -6,8 +8,8 @@ from shutil import rmtree
 
 import numpy as np
 import xarray as xr
-from parameterized import parameterized
 from numpy.testing import assert_allclose, assert_raises
+from parameterized import parameterized
 
 from xmca.xarray import xMCA
 
@@ -16,6 +18,9 @@ class TestIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
+        # catch deprecation warnings from cartopy
+        warnings.simplefilter('ignore', category=DeprecationWarning)
+        
         # Load test data
         self.path = 'tests/integration/fixtures'
         # ignore some deprecation warnings of xarray
@@ -252,7 +257,6 @@ class TestIntegration(unittest.TestCase):
         self.assertGreaterEqual(1, abs(het_pat['left']).max())
         self.assertGreaterEqual(1, abs(het_pat['right']).max())
 
-
     @parameterized.expand([
         ('std'),
         ('cplx'),
@@ -275,6 +279,42 @@ class TestIntegration(unittest.TestCase):
 
         assert_allclose(result['left'].real, expected['left'], **self.tols)
         assert_allclose(result['right'].real, expected['right'], **self.tols)
+
+    @parameterized.expand([
+        ('std'),
+        ('cplx'),
+        ('varmx')
+    ], name_func=name_func_get)
+    def test_field_scaling(self, analysis):
+        expected = {'left' : self.A, 'right': self.B}
+        cplx = False
+        n_rot = 0
+        if analysis == 'cplx':
+            cplx = True
+        if analysis == 'varmx':
+            n_rot = 10
+        model = xMCA(self.A, self.B)
+        result1 = model.fields(original_scale=True)
+        model.normalize()
+        result2 = model.fields(original_scale=True)
+        model.apply_coslat()
+        result3 = model.fields(original_scale=True)
+        model.solve(complexify=cplx)
+        result4 = model.fields(original_scale=True)
+        if n_rot > 0:
+            model.rotate(n_rot)
+        result5 = model.fields(original_scale=True)
+
+        assert_allclose(result1['left'].real, expected['left'], **self.tols)
+        assert_allclose(result2['left'].real, expected['left'], **self.tols)
+        assert_allclose(result3['left'].real, expected['left'], **self.tols)
+        assert_allclose(result4['left'].real, expected['left'], **self.tols)
+        assert_allclose(result5['left'].real, expected['left'], **self.tols)
+        assert_allclose(result1['right'].real, expected['right'], **self.tols)
+        assert_allclose(result2['right'].real, expected['right'], **self.tols)
+        assert_allclose(result3['right'].real, expected['right'], **self.tols)
+        assert_allclose(result4['right'].real, expected['right'], **self.tols)
+        assert_allclose(result5['right'].real, expected['right'], **self.tols)
 
     @parameterized.expand([
         ('uni', 'std', 1),
@@ -302,32 +342,56 @@ class TestIntegration(unittest.TestCase):
         model.plot(n)
 
     @parameterized.expand([
-        ('uni', 'std', 1, 'None', 0),
-        ('uni', 'varmx', 15, 'None', 0.5),
-        ('uni', 'varmx', 15, 'max', -1,),
-        ('bi', 'std', 1, 'None', 0),
-        ('bi', 'varmx', 15, 'None', -1),
-        ('bi', 'varmx', 15, 'max', 0.5),
+        ('uni', 'std', 1, 'None', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'None', 0, 'no_weight'),
+        ('uni', 'std', 1, 'max', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'std', 0, 'no_weight'),
+        ('uni', 'varmx', 15, 'std', 0.5, 'no_weight'),
+        ('bi', 'std', 1, 'None', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'None', 0, 'no_weight'),
+        ('bi', 'std', 1, 'max', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'max', 0, 'no_weight'),
+        ('bi', 'varmx', 15, 'std', 0.5, 'no_weight'),
+        ('bi', 'std', 1, 'None', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'None', 0, 'coslat'),
+        ('bi', 'std', 1, 'max', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'max', 0, 'coslat'),
+        ('bi', 'varmx', 15, 'std', 0.5, 'coslat'),
     ], name_func=name_func_get)
-    def test_predict(self, analysis, flavour, n, scaling, phase_shift):
+    def test_predict(self, analysis, flavour, n, scaling, phase_shift, weight):
         left = self.A
         right = self.B
-        new_left = self.A.isel(time=slice(0, 10))
-        new_right = self.A.isel(time=slice(10, 20))
+        new_left = self.A.isel(time=slice(0, 20))
+        new_right = self.A.isel(time=slice(0, 20))
 
         if analysis == 'uni':
             model = xMCA(left)
         elif analysis == 'bi':
             model = xMCA(left, right)
+        if weight == 'coslat':
+            model.normalize()
+            model.apply_coslat()
         model.solve()
         if flavour == 'varmx':
             model.rotate(10)
 
-        model.predict(new_left, n=n, scaling=scaling, phase_shift=phase_shift)
+        pcs = model.pcs(n=n, scaling=scaling, phase_shift=phase_shift)
+        expected = {
+            k: p.sel(mode=slice(1, 10)).isel(time=slice(0, 20)) for k, p in pcs.items()
+        }
+        result = model.predict(
+            new_left,
+            n=n, scaling=scaling, phase_shift=phase_shift
+        )
         if analysis == 'bi':
             model.predict(new_right)
-            model.predict(new_left, new_right)
+            result = model.predict(
+                new_left, new_right,
+                n=n, scaling=scaling, phase_shift=phase_shift
+            )
 
+        assert_allclose(expected['left'], result['left'], **self.tols)
+        # check wrong input
         # missing time dimension
         self.assertRaises(
             ValueError, model.predict, new_left.isel(time=0)
@@ -342,7 +406,9 @@ class TestIntegration(unittest.TestCase):
         right = self.B
         model = xMCA(left, right)
         model.solve()
-        _ = model.summary()
+
+        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+            model.summary()
 
     @classmethod
     def tearDownClass(self):
