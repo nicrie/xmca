@@ -13,7 +13,6 @@ from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
-from numpy.polynomial.polynomial import polyfit
 from scipy.signal import hilbert
 from statsmodels.tsa.forecasting.theta import ThetaModel
 from tqdm import tqdm
@@ -215,30 +214,6 @@ class MCA:
         if self._analysis['is_bivariate']:
             id = 'mca'
         return id
-
-    def _get_complex_id(self):
-        id = int(self._analysis['is_complex'])
-        return 'c{:}'.format(id)
-
-    def _get_rotation_id(self):
-        if self._analysis['is_rotated']:
-            id = self._analysis['n_rot']
-        else:
-            id = 0
-        return 'r{:02}'.format(id)
-
-    def _get_power_id(self):
-        id = self._analysis['power']
-        return 'p{:02}'.format(id)
-
-    def _get_analysis_id(self):
-        method      = self._get_method_id()
-        hilbert     = self._get_complex_id()
-        rotation    = self._get_rotation_id()
-        power       = self._get_power_id()
-
-        analysis    = '_'.join([method, hilbert, rotation, power])
-        return analysis
 
     def _get_analysis_path(self, path=None):
         if path is None:
@@ -1124,7 +1099,6 @@ class MCA:
 
         V = self._get_V(original=True)
         fields_mean = self._field_means
-        fields_std = self._field_stds
 
         sqrt_svals = np.sqrt(self._get_svals())
         norm = self._get_norm()
@@ -1414,7 +1388,6 @@ class MCA:
             'This file contains information neccessary to load stored analysis'
             'data from xmca module.')
 
-        # path_output   = os.path.join(path, self._get_analysis_id())
         path_output = os.path.join(path, 'info.xmca')
 
         file = open(path_output, 'w+')
@@ -1440,7 +1413,6 @@ class MCA:
         file.close()
 
     def _get_file_names(self, format):
-        # base_name = self._get_analysis_id()
 
         fields  = {}
         eofs    = {}

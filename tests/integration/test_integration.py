@@ -1,3 +1,5 @@
+import contextlib
+import os
 import unittest
 import warnings
 from os import getcwd
@@ -6,8 +8,8 @@ from shutil import rmtree
 
 import numpy as np
 import xarray as xr
-from parameterized import parameterized
 from numpy.testing import assert_allclose, assert_raises
+from parameterized import parameterized
 
 from xmca.xarray import xMCA
 
@@ -16,6 +18,9 @@ class TestIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
+        # catch deprecation warnings from cartopy
+        warnings.simplefilter('ignore', category=DeprecationWarning)
+        
         # Load test data
         self.path = 'tests/integration/fixtures'
         # ignore some deprecation warnings of xarray
@@ -401,7 +406,9 @@ class TestIntegration(unittest.TestCase):
         right = self.B
         model = xMCA(left, right)
         model.solve()
-        _ = model.summary()
+
+        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+            model.summary()
 
     @classmethod
     def tearDownClass(self):
