@@ -411,26 +411,26 @@ class TestIntegration(unittest.TestCase):
             model.summary()
 
     @parameterized.expand([
-        ('uni', 'std', 1, 1),
-        ('uni', 'cplx', 2, 1),
-        ('uni', 'varmx', 3, 1),
-        ('bi', 'std', 1, 1),
-        ('bi', 'cplx', 2, 1),
-        ('bi', 'varmx', 3, 1),
-        ('uni', 'std', 1, 10),
-        ('uni', 'cplx', 2, 10),
-        ('uni', 'varmx', 3, 10),
-        ('bi', 'std', 1, 10),
-        ('bi', 'cplx', 2, 10),
-        ('bi', 'varmx', 3, 10),
-        ('uni', 'std', 1, 100),
-        ('uni', 'cplx', 2, 100),
-        ('uni', 'varmx', 3, 100),
-        ('bi', 'std', 1, 100),
-        ('bi', 'cplx', 2, 100),
-        ('bi', 'varmx', 3, 100),
+        ('uni', 'std', 1),
+        ('uni', 'cplx', 1),
+        ('uni', 'varmx', 1),
+        ('bi', 'std', 1),
+        ('bi', 'cplx', 1),
+        ('bi', 'varmx', 1),
+        ('uni', 'std', 10),
+        ('uni', 'cplx', 10),
+        ('uni', 'varmx', 10),
+        ('bi', 'std', 10),
+        ('bi', 'cplx', 10),
+        ('bi', 'varmx', 10),
+        ('uni', 'std', 100),
+        ('uni', 'cplx', 100),
+        ('uni', 'varmx', 100),
+        ('bi', 'std', 100),
+        ('bi', 'cplx', 100),
+        ('bi', 'varmx', 100),
     ], name_func=name_func_get)
-    def test_truncate(self, analysis, flavour, n, trunc):
+    def test_truncate(self, analysis, flavour, trunc):
         cplx = False,
         n_rot = 0
         if flavour == 'cplx':
@@ -446,7 +446,10 @@ class TestIntegration(unittest.TestCase):
         if n_rot > 1:
             model.rotate(n_rot)
 
-        model.truncate(trunc)
+        if (flavour == 'varmx') & (trunc < n_rot):
+            assert_raises(ValueError, model.truncate, trunc)
+        else:
+            model.truncate(trunc)
 
     @classmethod
     def tearDownClass(self):

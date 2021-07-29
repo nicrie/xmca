@@ -1370,6 +1370,12 @@ class MCA:
             Number of modes to be retained.
 
         '''
+        n_rot = self._analysis['n_rot']
+        is_rotated = self._analysis['is_rotated']
+        if (is_rotated & (n < n_rot)):
+            raise ValueError(
+                'Cannot truncte rotated solution. Please ensure `n` > `n_rot`'
+            )
         if (n < self._singular_values.size):
             self._singular_values = self._singular_values[:n]
 
