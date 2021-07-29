@@ -547,7 +547,7 @@ class MCA:
         for k in self._keys:
             if not original:
                 sqrt_svals = np.sqrt(self._get_svals(n_modes))
-                norm    = self._get_norm(n_modes)
+                norm    = self._get_norm(n_modes, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
@@ -1133,7 +1133,6 @@ class MCA:
         fields_mean = self._field_means
 
         sqrt_svals = np.sqrt(self._get_svals())
-        norm = self._get_norm()
 
         R = self.rotation_matrix(inverse_transpose=True)
         n_rot = R.shape[0]
@@ -1200,6 +1199,7 @@ class MCA:
             if scaling == 'None':
                 pass
             elif scaling == 'eigen':
+                norm = self._get_norm(sorted=True)
                 pcs *= sqrt_svals[:n] * norm[k][:n]
             # by maximum value
             elif scaling == 'max':

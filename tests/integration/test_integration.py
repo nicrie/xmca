@@ -345,18 +345,22 @@ class TestIntegration(unittest.TestCase):
         ('uni', 'std', 1, 'None', 0, 'no_weight'),
         ('uni', 'varmx', 15, 'None', 0, 'no_weight'),
         ('uni', 'std', 1, 'max', 0, 'no_weight'),
+        ('uni', 'std', 1, 'eigen', 0, 'no_weight'),
         ('uni', 'varmx', 15, 'std', 0, 'no_weight'),
         ('uni', 'varmx', 15, 'std', 0.5, 'no_weight'),
+        ('uni', 'varmx', 15, 'eigen', 0.5, 'no_weight'),
         ('bi', 'std', 1, 'None', 0, 'no_weight'),
         ('bi', 'varmx', 15, 'None', 0, 'no_weight'),
         ('bi', 'std', 1, 'max', 0, 'no_weight'),
         ('bi', 'varmx', 15, 'max', 0, 'no_weight'),
         ('bi', 'varmx', 15, 'std', 0.5, 'no_weight'),
         ('bi', 'std', 1, 'None', 0, 'coslat'),
+        ('bi', 'std', 1, 'eigen', 0, 'coslat'),
         ('bi', 'varmx', 15, 'None', 0, 'coslat'),
         ('bi', 'std', 1, 'max', 0, 'coslat'),
         ('bi', 'varmx', 15, 'max', 0, 'coslat'),
         ('bi', 'varmx', 15, 'std', 0.5, 'coslat'),
+        ('bi', 'varmx', 15, 'eigen', 0.5, 'coslat'),
     ], name_func=name_func_get)
     def test_predict(self, analysis, flavour, n, scaling, phase_shift, weight):
         left = self.A
