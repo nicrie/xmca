@@ -631,8 +631,6 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, original=False):
 
         U = self._get_U(n, original=original)
-        n_max_mode = U['left'].shape[1]
-        sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
 
         for k in self._keys:
             # apply phase shift
@@ -643,7 +641,8 @@ class MCA:
                 pass
             # by eigenvalues
             elif scaling == 'eigen':
-                U[k] *= sqrt_svals
+                norm = self._get_norm(n, sorted=True)
+                U[k] *= norm[k]
             # by maximum value
             elif scaling == 'max':
                 U[k] /= np.nanmax(abs(U[k].real), axis=0)
@@ -1199,8 +1198,8 @@ class MCA:
             if scaling == 'None':
                 pass
             elif scaling == 'eigen':
-                norm = self._get_norm(sorted=True)
-                pcs *= sqrt_svals[:n] * norm[k][:n]
+                norm = self._get_norm(n, sorted=True)
+                pcs *= norm[k]
             # by maximum value
             elif scaling == 'max':
                 original_pcs = self._get_pcs(n, 'None', phase_shift)
