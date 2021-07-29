@@ -401,6 +401,28 @@ class TestIntegration(unittest.TestCase):
             ValueError, model.predict, new_left.isel(lon=slice(0, 10))
         )
 
+    @parameterized.expand([
+        (None,), (1,), (10,), (100,),
+    ], name_func=name_func_get)
+    def test_norm(self, n):
+        left = self.A
+        right = self.B
+        model = xMCA(left, right)
+        model.solve(complexify=True)
+        model.rotate(10)
+        model.norm(n)
+
+    @parameterized.expand([
+        (None,), (1,), (10,), (100,),
+    ], name_func=name_func_get)
+    def test_variance(self, n):
+        left = self.A
+        right = self.B
+        model = xMCA(left, right)
+        model.solve(complexify=True)
+        model.rotate(10)
+        model.variance(n)
+
     def test_summary(self):
         left = self.A
         right = self.B

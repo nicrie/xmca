@@ -669,6 +669,15 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
+    def _get_variance(self, n=None):
+        norm = self._get_norm(n)
+        if self._analysis['is_bivariate']:
+            var = norm['left'] * norm['right']
+        else:
+            var = norm['left']**2
+
+        return var
+
     def rotate(self, n_rot, power=1, tol=1e-8):
         '''Perform Promax rotation on the first `n` EOFs.
 
@@ -829,11 +838,28 @@ class MCA:
 
         Returns
         -------
-        DataArray
+        dict[str, ndarray]
             L2 norm associated to each mode and vector.
 
         '''
         return self._get_norm(n)
+
+    def variance(self, n=None):
+        '''Return variance of first `n` loaded singular vectors.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default will return all modes.
+
+        Returns
+        -------
+        dict[str, ndarray]
+            Variance of each mode and vector.
+
+        '''
+        return self._get_variance(n)
+
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.

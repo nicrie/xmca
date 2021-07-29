@@ -306,21 +306,19 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of modes to return. The default will return all modes.
+            Number of modes to return. By default will return all modes.
 
         Returns
         -------
-        DataArray
+        dict[str, DataArray]
             L2 norm associated to each mode and vector.
 
         '''
         norm = super().norm(n)
 
-        # if n is not provided, take all modes
-        if n is None:
-            n = self._analysis['n_rot']
+        n_modes = norm['left'].size
 
-        modes = list(range(1, n + 1))
+        modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
 
@@ -333,6 +331,38 @@ class xMCA(MCA):
                 attrs=attrs)
 
         return norm
+
+        def variance(self, n=None):
+            '''Return variance of first `n` loaded singular vectors.
+
+            Parameters
+            ----------
+            n : int, optional
+                Number of modes to return. By default will return all modes.
+
+            Returns
+            -------
+            dict[str, DataArray]
+                Variance associated to each mode and vector.
+
+            '''
+            var = super().variance(n)
+
+            n_modes = var.size
+
+            modes = list(range(1, n_modes + 1))
+            attrs = {k: str(v) for k, v in self._analysis.items()}
+            field_names = self._field_names
+
+            for k, data in var.items():
+                var[k] = xr.DataArray(
+                    data,
+                    dims=['mode'],
+                    coords={'mode' : modes},
+                    name=' '.join([field_names[k], 'variance']),
+                    attrs=attrs)
+
+            return var
 
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
