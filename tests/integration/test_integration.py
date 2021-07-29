@@ -20,7 +20,7 @@ class TestIntegration(unittest.TestCase):
     def setUpClass(self):
         # catch deprecation warnings from cartopy
         warnings.simplefilter('ignore', category=DeprecationWarning)
-        
+
         # Load test data
         self.path = 'tests/integration/fixtures'
         # ignore some deprecation warnings of xarray
@@ -409,6 +409,44 @@ class TestIntegration(unittest.TestCase):
 
         with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
             model.summary()
+
+    @parameterized.expand([
+        ('uni', 'std', 1, 1),
+        ('uni', 'cplx', 2, 1),
+        ('uni', 'varmx', 3, 1),
+        ('bi', 'std', 1, 1),
+        ('bi', 'cplx', 2, 1),
+        ('bi', 'varmx', 3, 1),
+        ('uni', 'std', 1, 10),
+        ('uni', 'cplx', 2, 10),
+        ('uni', 'varmx', 3, 10),
+        ('bi', 'std', 1, 10),
+        ('bi', 'cplx', 2, 10),
+        ('bi', 'varmx', 3, 10),
+        ('uni', 'std', 1, 100),
+        ('uni', 'cplx', 2, 100),
+        ('uni', 'varmx', 3, 100),
+        ('bi', 'std', 1, 100),
+        ('bi', 'cplx', 2, 100),
+        ('bi', 'varmx', 3, 100),
+    ], name_func=name_func_get)
+    def test_truncate(self, analysis, flavour, n, trunc):
+        cplx = False,
+        n_rot = 0
+        if flavour == 'cplx':
+            cplx = True
+        if flavour == 'varmx':
+            n_rot = 10
+        if analysis == 'uni':
+            model = xMCA(self.A)
+        elif analysis == 'bi':
+            model = xMCA(self.A, self.B)
+
+        model.solve(complexify=cplx)
+        if n_rot > 1:
+            model.rotate(n_rot)
+
+        model.truncate(trunc)
 
     @classmethod
     def tearDownClass(self):

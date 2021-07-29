@@ -1373,8 +1373,7 @@ class MCA:
         if (n < self._singular_values.size):
             self._singular_values = self._singular_values[:n]
 
-            for key in self._U.keys():
-                self._U[key] = self._U[key][:, :n]
+            for key in self._keys:
                 self._V[key] = self._V[key][:, :n]
 
             self._analysis['is_truncated'] = True
