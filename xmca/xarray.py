@@ -300,7 +300,7 @@ class xMCA(MCA):
 
         return values
 
-    def norm(self, n=None):
+    def norm(self, n=None, sorted=True):
         '''Return L2 norm of first `n` loaded singular vectors.
 
         Parameters
@@ -314,55 +314,53 @@ class xMCA(MCA):
             L2 norm associated to each mode and vector.
 
         '''
-        norm = super().norm(n)
+        norms = super().norm(n=n, sorted=sorted)
 
-        n_modes = norm['left'].size
+        n_modes = norms['left'].size
 
         modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
 
-        for k, data in norm.items():
-            norm[k] = xr.DataArray(
+        for k, data in norms.items():
+            norms[k] = xr.DataArray(
                 data,
                 dims=['mode'],
                 coords={'mode' : modes},
                 name=' '.join([field_names[k], 'norm']),
                 attrs=attrs)
 
-        return norm
+        return norms
 
-        def variance(self, n=None):
-            '''Return variance of first `n` loaded singular vectors.
+    def variance(self, n=None, sorted=True):
+        '''Return variance of first `n` loaded singular vectors.
 
-            Parameters
-            ----------
-            n : int, optional
-                Number of modes to return. By default will return all modes.
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. By default will return all modes.
 
-            Returns
-            -------
-            dict[str, DataArray]
-                Variance associated to each mode and vector.
+        Returns
+        -------
+        dict[str, DataArray]
+            Variance associated to each mode and vector.
 
-            '''
-            var = super().variance(n)
+        '''
+        var = super().variance(n=n, sorted=sorted)
 
-            n_modes = var.size
+        n_modes = var.size
 
-            modes = list(range(1, n_modes + 1))
-            attrs = {k: str(v) for k, v in self._analysis.items()}
-            field_names = self._field_names
+        modes = list(range(1, n_modes + 1))
+        attrs = {k: str(v) for k, v in self._analysis.items()}
 
-            for k, data in var.items():
-                var[k] = xr.DataArray(
-                    data,
-                    dims=['mode'],
-                    coords={'mode' : modes},
-                    name=' '.join([field_names[k], 'variance']),
-                    attrs=attrs)
+        var = xr.DataArray(
+            var,
+            dims=['mode'],
+            coords={'mode' : modes},
+            name='variance',
+            attrs=attrs)
 
-            return var
+        return var
 
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.

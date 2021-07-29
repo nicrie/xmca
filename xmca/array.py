@@ -660,17 +660,24 @@ class MCA:
 
         return U
 
-    def _get_norm(self, n=None):
+    def _get_norm(self, n=None, sorted=True):
         try:
-            return {k: norm[:n] for k, norm in self._norm.items()}
+            norm = self._norm
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve field norms. '
                 'Please call the method `solve` first.'
             )
+        if sorted:
+            idx = self._var_idx
+            norm = {k: nrm[idx] for k, nrm in norm.items()}
 
-    def _get_variance(self, n=None):
-        norm = self._get_norm(n)
+        norm = {k: nrm[:n] for k, nrm in norm.items()}
+
+        return norm
+
+    def _get_variance(self, n=None, sorted=True):
+        norm = self._get_norm(n=n, sorted=sorted)
         if self._analysis['is_bivariate']:
             var = norm['left'] * norm['right']
         else:
@@ -828,7 +835,7 @@ class MCA:
         '''
         return self._get_svals(n)
 
-    def norm(self, n=None):
+    def norm(self, n=None, sorted=True):
         '''Return L2 norm of first `n` loaded singular vectors.
 
         Parameters
@@ -842,9 +849,9 @@ class MCA:
             L2 norm associated to each mode and vector.
 
         '''
-        return self._get_norm(n)
+        return self._get_norm(n=n, sorted=sorted)
 
-    def variance(self, n=None):
+    def variance(self, n=None, sorted=True):
         '''Return variance of first `n` loaded singular vectors.
 
         Parameters
@@ -858,8 +865,7 @@ class MCA:
             Variance of each mode and vector.
 
         '''
-        return self._get_variance(n)
-
+        return self._get_variance(n=n, sorted=sorted)
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
