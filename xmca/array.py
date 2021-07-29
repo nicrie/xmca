@@ -547,7 +547,7 @@ class MCA:
         for k in self._keys:
             if not original:
                 sqrt_svals = np.sqrt(self._get_svals(n_modes))
-                norm    = self._get_norm(n_modes)
+                norm    = self._get_norm(n_modes, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
@@ -587,8 +587,6 @@ class MCA:
             scaling='None', phase_shift=0, original=False):
 
         V = self._get_V(n, original=original)
-        n_max_mode = V['left'].shape[1]
-        sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
@@ -610,7 +608,11 @@ class MCA:
                 pass
             # by eigenvalues (field units)
             elif scaling == 'eigen':
-                eofs[k] *= sqrt_svals[:n_max_mode]
+                # sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
+                # sqrt_svals[:n_max_mode]
+                n_max_mode = V['left'].shape[1]
+                norm = self._get_norm(n_max_mode, sorted=True)
+                eofs[k] *= norm[k]
             # by maximum value
             elif scaling == 'max':
                 eofs[k] /= np.nanmax(abs(eofs[k].real), axis=(0, 1))
@@ -631,8 +633,6 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, original=False):
 
         U = self._get_U(n, original=original)
-        n_max_mode = U['left'].shape[1]
-        sqrt_svals = np.sqrt(self._get_svals(n_max_mode))
 
         for k in self._keys:
             # apply phase shift
@@ -643,7 +643,8 @@ class MCA:
                 pass
             # by eigenvalues
             elif scaling == 'eigen':
-                U[k] *= sqrt_svals
+                norm = self._get_norm(n, sorted=True)
+                U[k] *= norm[k]
             # by maximum value
             elif scaling == 'max':
                 U[k] /= np.nanmax(abs(U[k].real), axis=0)
@@ -660,14 +661,30 @@ class MCA:
 
         return U
 
-    def _get_norm(self, n=None):
+    def _get_norm(self, n=None, sorted=True):
         try:
-            return {k: norm[:n] for k, norm in self._norm.items()}
+            norm = self._norm
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve field norms. '
                 'Please call the method `solve` first.'
             )
+        if sorted:
+            idx = self._var_idx
+            norm = {k: nrm[idx] for k, nrm in norm.items()}
+
+        norm = {k: nrm[:n] for k, nrm in norm.items()}
+
+        return norm
+
+    def _get_variance(self, n=None, sorted=True):
+        norm = self._get_norm(n=n, sorted=sorted)
+        if self._analysis['is_bivariate']:
+            var = norm['left'] * norm['right']
+        else:
+            var = norm['left']**2
+
+        return var
 
     def rotate(self, n_rot, power=1, tol=1e-8):
         '''Perform Promax rotation on the first `n` EOFs.
@@ -819,7 +836,7 @@ class MCA:
         '''
         return self._get_svals(n)
 
-    def norm(self, n=None):
+    def norm(self, n=None, sorted=True):
         '''Return L2 norm of first `n` loaded singular vectors.
 
         Parameters
@@ -829,11 +846,27 @@ class MCA:
 
         Returns
         -------
-        DataArray
+        dict[str, ndarray]
             L2 norm associated to each mode and vector.
 
         '''
-        return self._get_norm(n)
+        return self._get_norm(n=n, sorted=sorted)
+
+    def variance(self, n=None, sorted=True):
+        '''Return variance of first `n` loaded singular vectors.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to return. The default will return all modes.
+
+        Returns
+        -------
+        dict[str, ndarray]
+            Variance of each mode and vector.
+
+        '''
+        return self._get_variance(n=n, sorted=sorted)
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
@@ -1101,7 +1134,6 @@ class MCA:
         fields_mean = self._field_means
 
         sqrt_svals = np.sqrt(self._get_svals())
-        norm = self._get_norm()
 
         R = self.rotation_matrix(inverse_transpose=True)
         n_rot = R.shape[0]
@@ -1168,7 +1200,8 @@ class MCA:
             if scaling == 'None':
                 pass
             elif scaling == 'eigen':
-                pcs *= sqrt_svals[:n] * norm[k][:n]
+                norm = self._get_norm(n, sorted=True)
+                pcs *= norm[k]
             # by maximum value
             elif scaling == 'max':
                 original_pcs = self._get_pcs(n, 'None', phase_shift)
@@ -1370,11 +1403,16 @@ class MCA:
             Number of modes to be retained.
 
         '''
+        n_rot = self._analysis['n_rot']
+        is_rotated = self._analysis['is_rotated']
+        if (is_rotated & (n < n_rot)):
+            raise ValueError(
+                'Cannot truncte rotated solution. Please ensure `n` > `n_rot`'
+            )
         if (n < self._singular_values.size):
             self._singular_values = self._singular_values[:n]
 
-            for key in self._U.keys():
-                self._U[key] = self._U[key][:, :n]
+            for key in self._keys:
                 self._V[key] = self._V[key][:, :n]
 
             self._analysis['is_truncated'] = True
