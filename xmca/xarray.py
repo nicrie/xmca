@@ -180,7 +180,7 @@ class xMCA(MCA):
         else:
             print('Coslat correction already applied. Nothing was done.')
 
-    def solve(self, complexify=False, extend=False, period=365):
+    def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
 
         Under the hood the method performs singular value decomposition on
@@ -198,10 +198,11 @@ class xMCA(MCA):
             to the Hilbert transform when time series are not stationary.
             Only used for complex time series i.e. when omplexify=True.
             Default is False.
-        period : int, optional
-            Only applies if a Theta model is selected as time series extension.
-            Default is 365, representing a yearly cycle for daily data.
-            If Theta model is not selected this parameter has no effect.
+        period : float, optional
+            If Theta model, it represents the number of time steps for a
+            season. If exponential model, it represents the number of time
+            steps for the exponential to decrease to 1/e. If no extension is
+            selected, this parameter has no effect. Default is 1.
         '''
         super().solve(complexify, extend, period)
 

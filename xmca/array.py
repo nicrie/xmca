@@ -368,12 +368,11 @@ class MCA:
         series_end = field[-1, :]
         offset      = series_end - linear_end
 
-        b = 1
-        tau = b * 50 / N
+        theta = self._analysis['theta_period']
         # start x at 1, because exp(0) would produce same value as the last
         # point of the original time series
         x_shift = x + 1
-        exp_extension = offset * np.exp(-tau * x_shift)
+        exp_extension = offset * np.exp(-x_shift / theta)
         lin_extension = (slope * x) + linear_end
 
         return exp_extension + lin_extension
@@ -440,7 +439,7 @@ class MCA:
 
         return None
 
-    def solve(self, complexify=False, extend=False, period=365):
+    def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
 
         Under the hood the method performs singular value decomposition on
@@ -458,10 +457,11 @@ class MCA:
             to the Hilbert transform when time series are not stationary.
             Only used for complex time series i.e. when omplexify=True.
             Default is False.
-        period : int, optional
-            Only applies if a Theta model is selected as time series extension.
-            Default is 365, representing a yearly cycle for daily data.
-            If Theta model is not selected this parameter has no effect.
+        period : float, optional
+            If Theta model, it represents the number of time steps for a
+            season. If exponential model, it represents the number of time
+            steps for the exponential to decrease to 1/e. If no extension is
+            selected, this parameter has no effect. Default is 1.
         '''
         if any([np.isnan(field).all() for field in self._fields.values()]):
             raise RuntimeError('''
