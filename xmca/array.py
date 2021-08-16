@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from xmca import __version__
 from xmca.tools.array import (get_nan_cols, has_nan_time_steps, remove_mean,
-                              remove_nan_cols)
+                              remove_nan_cols, block_permutations)
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
 
@@ -1504,6 +1504,40 @@ class MCA:
                     value = line.split(':')[1].strip()
                     self._set_analysis(key, value)
         info_file.close()
+
+    def monte_carlo_simulation(
+            self, n_surrogates,
+            n=None, on_left=True, on_right=False, block_size=1, replace=True):
+        # get meta information from original analysis
+        is_rotated = self._analysis['is_rotated']
+        n_rot = self._analysis['n_rot']
+        power = self._analysis['power']
+
+        n_modes_max = n
+        if n_modes_max is None:
+            n_modes_max = self._rotation_matrix.shape[0]
+
+        keys = []
+        if on_left:
+            keys.append('left')
+        if on_right:
+            keys.append('right')
+
+        svals_surr = np.zeros([n_modes_max, n_surrogates])
+        for i in tqdm(range(n_surrogates)):
+            X_surr = self._get_X(original_scale=False)
+            for k in keys:
+                X_surr[k] = block_permutations(
+                    X_surr[k], block_size=block_size, replace=replace
+                )
+
+            model = MCA(*list(X_surr.values()))
+            model.solve()
+            if is_rotated:
+                model.rotate(n_rot, power)
+            svals_surr[:, i] = model._get_svals(n_modes_max)
+
+        return svals_surr
 
     def load_analysis(
             self, path,

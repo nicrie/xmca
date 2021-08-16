@@ -70,3 +70,19 @@ def has_nan_time_steps(array):
     '''
 
     return (np.isnan(array).all(axis=tuple(range(1, array.ndim))).any())
+
+
+def block_permutations(
+        arr: np.ndarray, block_size: int, replace: bool = True) -> np.ndarray:
+    n_obs, n_vars = arr.shape
+    try:
+        block_arr = arr.reshape(-1, block_size, arr.shape[1])
+    except ValueError as err:
+        msg = 'Length of data array ({:}) must be a multiple of block size {:}'
+        msg = msg.format(n_obs, block_size)
+        raise ValueError(msg) from err
+    n_samples = block_arr.shape[0]
+    idx_samples = np.random.choice(n_samples, size=n_samples, replace=replace)
+    samples = block_arr[idx_samples]
+    new_arr = samples.reshape(arr.shape)
+    return new_arr

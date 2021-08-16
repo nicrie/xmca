@@ -1284,6 +1284,29 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
+    def monte_carlo_simulation(
+            self, n_surrogates,
+            n=None, on_left=True, on_right=False, block_size=1, replace=True):
+
+        surr_svals = super().monte_carlo_simulation(
+            n_surrogates=n_surrogates, n=n,
+            on_left=on_left, on_right=on_right,
+            block_size=block_size, replace=replace
+        )
+
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+        surr_svals = xr.DataArray(
+            surr_svals,
+            dims=['mode', 'run'],
+            coords={
+                'mode' : range(1, surr_svals.shape[0] + 1),
+                'run' : range(1, surr_svals.shape[1] + 1)
+            },
+            name='singular values',
+            attrs=attrs
+        )
+        return surr_svals
+
     def summary(self):
         '''Return meta information of the performed analysis.
 
