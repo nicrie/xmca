@@ -393,7 +393,7 @@ class MCA:
 
         return extended
 
-    def _complexify(self):
+    def _complexify(self, fields: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         '''Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -418,7 +418,6 @@ class MCA:
 
         '''
         n_observations = self._n_observations['left']
-        fields = self._fields
 
         for k in self._keys:
             fields[k] = fields[k].real
@@ -437,7 +436,18 @@ class MCA:
                 fields[k] = fields[k][n_observations:(2 * n_observations)]
                 fields[k] = remove_mean(fields[k])
 
-        return None
+        return fields
+
+    def _svd(self, fields: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        Us = {}
+        Ss = {}
+        Vts = {}
+        for k, f in fields.items():
+            u, s, vt = np.linalg.svd(f, full_matrices=False)
+            Us[k] = u
+            Ss[k] = s
+            Vts[k] = vt
+        return Us, Ss, Vts
 
     def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
@@ -477,15 +487,25 @@ class MCA:
 
         # complexify input data via Hilbert transform
         if self._analysis['is_complex']:
-            self._complexify()
+            self._fields = self._complexify(self._fields)
 
         X = self._get_X()
 
+        # perform PCA of input to speed up algorithm
+        k, l, mt = self._svd(X)
+        R = {key: k[key] * l[key] for key in self._keys}
         # create covariance matrix
-        if self._analysis['is_bivariate']:
-            kernel = X['left'].conjugate().T @ X['right']
-        else:
-            kernel = X['left'].conjugate().T @ X['left']
+        try:
+            kernel = R['left'].conj().T @ R['right']
+        except KeyError:
+            try:
+                kernel = R['left'].conj().T @ R['left']
+            except KeyError as err:
+                msg = (
+                    'Error in creating kernel. Please report this issue on '
+                    'GitHub'
+                )
+                raise KeyError(msg) from err
         kernel = kernel / dof
 
         # perform singular value decomposition
@@ -493,18 +513,22 @@ class MCA:
             VLeft, singular_values, VTRight = np.linalg.svd(
                 kernel, full_matrices=False
             )
+            VRight = VTRight.conj().T
+            del(VTRight)
         except np.linalg.LinAlgError:
             raise np.linalg.LinAlgError(
                 '''SVD failed. NaN entries may be the problem.'''
             )
 
+        V = {}
+        V['left'] = VLeft
+        V['right'] = VRight
         # singular vectors (EOFs) = V
-        self._V = {'left' : VLeft}
-        if self._analysis['is_bivariate']:
-            self._V['right'] = VTRight.conjugate().T
-        # free up some space
+        self._V = {key: mt[key].conj().T @ V[key] for key in self._keys}
+
+        # free up space
         del(VLeft)
-        del(VTRight)
+        del(VRight)
 
         self._singular_values = singular_values
         self._variance = singular_values
@@ -1544,7 +1568,7 @@ class MCA:
         if self._analysis['is_normalized']:
             self.normalize()
         if self._analysis['is_complex']:
-            self._complexify()
+            self._fields = self._complexify(self._fields)
 
         self._V = {}
         self._norm = {}
