@@ -172,7 +172,10 @@ class xMCA(MCA):
         coords  = self._field_coords
         weights = {}
         for key, coord in coords.items():
-            weights[key] = np.sqrt(np.cos(np.deg2rad(coord['lat'])))
+            # add small epsilon to assure correct handling of boundaries
+            # e.g. 90.00001 degrees results in a negative value for sqrt
+            epsilon = 1e-6
+            weights[key] = np.sqrt(np.cos(np.deg2rad(coord['lat'])) + epsilon)
 
         if (not self._analysis['is_coslat_corrected']):
             self.apply_weights(**weights)
