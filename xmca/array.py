@@ -256,8 +256,11 @@ class MCA:
 
         return scaled
 
-    def _get_X(self, original_scale=False):
+    def _get_X(self, original_scale=False, real=False):
         X  = {k : f.copy() for k, f in self._fields.items()}
+
+        if real:
+            X  = {k : x.real for k, x in X.items()}
 
         if original_scale:
             X = self._scale_X_inverse(X)
@@ -1533,13 +1536,14 @@ class MCA:
             self, n_surrogates,
             n=None, on_left=True, on_right=False, block_size=1, replace=True):
         # get meta information from original analysis
+        complexify = self._analysis['is_complex']
+        extend = self._analysis['extend']
+        period = self._analysis['theta_period']
         is_rotated = self._analysis['is_rotated']
         n_rot = self._analysis['n_rot']
         power = self._analysis['power']
 
-        n_modes_max = n
-        if n_modes_max is None:
-            n_modes_max = self._rotation_matrix.shape[0]
+        n_modes_max = n  # self._get_max_mode(n, rotated=True)
 
         keys = []
         if on_left:
@@ -1549,18 +1553,20 @@ class MCA:
 
         svals_surr = np.zeros([n_modes_max, n_surrogates])
         for i in tqdm(range(n_surrogates)):
-            X_surr = self._get_X(original_scale=False)
+            X_surr = self._get_X(original_scale=False, real=True)
             for k in keys:
                 X_surr[k] = block_permutations(
                     X_surr[k], block_size=block_size, replace=replace
                 )
 
             model = MCA(*list(X_surr.values()))
-            model.solve()
+            model.solve(
+                complexify=complexify, extend=extend, period=period
+            )
             if is_rotated:
                 model.rotate(n_rot, power)
             svals_surr[:, i] = model._get_svals(n_modes_max)
-
+            del(model)
         return svals_surr
 
     def load_analysis(
