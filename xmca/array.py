@@ -1555,7 +1555,7 @@ class MCA:
         n_rot = self._analysis['n_rot']
         power = self._analysis['power']
 
-        n_modes_max = n  # self._get_max_mode(n, rotated=True)
+        n_modes_max = self._get_max_mode(n, rotated=True)
 
         keys = []
         if on_left:

@@ -276,7 +276,7 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of singular values to return. If None, then all singular
+            Number of singular values to return. If None, all singular
             values are returned. The default is None.
 
         Returns
@@ -285,16 +285,11 @@ class xMCA(MCA):
             Singular values of the SVD.
 
         '''
-        # for n=Nonr, all singular_values are returned
-        values = super().singular_values(n)
-
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = values.size
-
+        n = self._get_max_mode(n)
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
+        values = super().singular_values(n)
         values = xr.DataArray(
             values,
             dims=['mode'],
