@@ -449,6 +449,18 @@ class MCA:
             Vts[k] = vt
         return Us, Ss, Vts
 
+    def _get_max_mode(self, n=None, rotated=False):
+        n_modes = []
+        n_modes.append(self._analysis['rank'])
+
+        if n is not None:
+            n_modes.append(n)
+
+        if rotated:
+            n_modes.append(self._analysis['n_rot'])
+
+        return np.min(n_modes)
+
     def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
 
@@ -554,14 +566,12 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
-    def _get_V(self, n=None, original=False):
-        if original:
-            n_modes = n
-        else:
-            n_modes = self._analysis['n_rot']
+    def _get_V(self, n=None, rotated=True):
+        all_modes = self._get_max_mode(rotated=rotated)
+        n = self._get_max_mode(n, rotated=rotated)
 
         try:
-            V = {k: v[:, :n_modes] for k, v in self._V.items()}
+            V = {k: v[:, :all_modes] for k, v in self._V.items()}
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular vectors. '
@@ -569,9 +579,9 @@ class MCA:
             )
 
         for k in self._keys:
-            if not original:
-                sqrt_svals = np.sqrt(self._get_svals(n_modes))
-                norm    = self._get_norm(n_modes, sorted=False)
+            if rotated:
+                sqrt_svals = np.sqrt(self._get_svals(all_modes))
+                norm    = self._get_norm(all_modes, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
@@ -582,15 +592,13 @@ class MCA:
 
         return V
 
-    def _get_U(self, n=None, original=False):
-        if original:
-            n_modes = n
-        else:
-            n_modes = self._analysis['n_rot']
+    def _get_U(self, n=None, rotated=True):
+        all_modes = self._get_max_mode(rotated=rotated)
+        n = self._get_max_mode(n, rotated=rotated)
 
         fields  = self._get_X()
-        V = self._get_V(n_modes, original=True)
-        sqrt_svals = np.sqrt(self._get_svals(n_modes))
+        V = self._get_V(all_modes, rotated=False)
+        sqrt_svals = np.sqrt(self._get_svals(all_modes))
         R       = self.rotation_matrix(inverse_transpose=True)
         var_idx = self._var_idx
         dof = self._n_observations['left'] - 1
@@ -598,7 +606,7 @@ class MCA:
         U = {}
         for k in self._keys:
             U[k] = fields[k] @ V[k] / sqrt_svals
-            if not original:
+            if rotated:
                 U[k] = U[k] @ R  / np.sqrt(dof)
                 # reorder according to variance
                 U[k] = U[k][:, var_idx]
@@ -608,9 +616,9 @@ class MCA:
 
     def _get_eofs(
             self, n=None,
-            scaling='None', phase_shift=0, original=False):
+            scaling='None', phase_shift=0, rotated=True):
 
-        V = self._get_V(n, original=original)
+        V = self._get_V(n, rotated=rotated)
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
@@ -654,9 +662,9 @@ class MCA:
         return eofs
 
     def _get_pcs(
-            self, n=None, scaling='None', phase_shift=0, original=False):
+            self, n=None, scaling='None', phase_shift=0, rotated=True):
 
-        U = self._get_U(n, original=original)
+        U = self._get_U(n, rotated=rotated)
 
         for k in self._keys:
             # apply phase shift
@@ -746,7 +754,7 @@ class MCA:
 
         singular_values = self._get_svals(n_rot)
         sqrt_svals = np.sqrt(singular_values)
-        V = self._get_V(n_rot, original=True)
+        V = self._get_V(n_rot, rotated=False)
         n_vars_left = V['left'].shape[0]
 
         # rotate loadings (Cheng and Dunkerton 1995)
@@ -937,7 +945,7 @@ class MCA:
         exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
-    def pcs(self, n=None, scaling='None', phase_shift=0, original=False):
+    def pcs(self, n=None, scaling='None', phase_shift=0, rotated=True):
         '''Return the first `n` PCs.
 
         Depending on the model the PCs may be real or complex, rotated or
@@ -954,9 +962,9 @@ class MCA:
             ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) PCs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated PCs while
+            False returns the unrotated (original) PCs. Default is True.
 
         Returns
         -------
@@ -964,9 +972,9 @@ class MCA:
             PCs associated to left and right input field.
 
         '''
-        return self._get_pcs(n, scaling, phase_shift, original)
+        return self._get_pcs(n, scaling, phase_shift, rotated)
 
-    def eofs(self, n=None, scaling='None', phase_shift=0, original=False):
+    def eofs(self, n=None, scaling='None', phase_shift=0, rotated=True):
         '''Return the first `n` EOFs.
 
         Depending on the model the PCs may be real or complex, rotated or
@@ -982,9 +990,9 @@ class MCA:
             ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) EOFs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated PCs while
+            False returns the unrotated (original) EOFs. Default is True.
 
         Returns
         -------
@@ -992,9 +1000,9 @@ class MCA:
             EOFs associated to left and right input field.
 
         '''
-        return self._get_eofs(n, scaling, phase_shift, original)
+        return self._get_eofs(n, scaling, phase_shift, rotated)
 
-    def spatial_amplitude(self, n=None, scaling='None', original=False):
+    def spatial_amplitude(self, n=None, scaling='None', rotated=True):
         '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -1004,9 +1012,10 @@ class MCA:
             fields. The default is None.
         scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
-        original: boolean, optional
-            If True, return unrotated (original) EOFs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated spatial
+            amplitudes while False returns the unrotated (original) spatial
+            amplitudes. Default is True.
 
         Returns
         -------
@@ -1014,7 +1023,7 @@ class MCA:
             Spatial amplitude fields associated to left and right field.
 
         '''
-        eofs = self.eofs(n, scaling='None', original=original)
+        eofs = self.eofs(n, scaling='None', rotated=rotated)
 
         amplitudes = {}
         for key, eof in eofs.items():
@@ -1025,7 +1034,7 @@ class MCA:
 
         return amplitudes
 
-    def spatial_phase(self, n=None, phase_shift=0, original=False):
+    def spatial_phase(self, n=None, phase_shift=0, rotated=True):
         '''Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -1035,9 +1044,10 @@ class MCA:
             The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the spatial phase. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) spatial phase even if rotation
-            was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated spatial
+            phases while False returns the unrotated (original) spatial
+            phases. Default is True.
 
         Returns
         -------
@@ -1045,7 +1055,7 @@ class MCA:
             Spatial phase fields associated to left and right field.
 
         '''
-        eofs = self.eofs(n, phase_shift=phase_shift, original=original)
+        eofs = self.eofs(n, phase_shift=phase_shift, rotated=rotated)
 
         phases = {}
         for key, eof in eofs.items():
@@ -1053,7 +1063,7 @@ class MCA:
 
         return phases
 
-    def temporal_amplitude(self, n=None, scaling='None', original=False):
+    def temporal_amplitude(self, n=None, scaling='None', rotated=True):
         '''Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
@@ -1063,9 +1073,10 @@ class MCA:
             series. The default is None.
         scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
-        original: boolean, optional
-            If True, return unrotated (original) temporal phase even if
-            rotation was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated temporal
+            amplitudes while False returns the unrotated (original) temporal
+            amplitudes. Default is True.
 
         Returns
         -------
@@ -1073,7 +1084,7 @@ class MCA:
             Temporal ampliude series associated to left and right field.
 
         '''
-        pcs = self.pcs(n, scaling='None', original=original)
+        pcs = self.pcs(n, scaling='None', rotated=rotated)
 
         amplitudes = {}
         for key, pc in pcs.items():
@@ -1084,7 +1095,7 @@ class MCA:
 
         return amplitudes
 
-    def temporal_phase(self, n=None, phase_shift=0, original=False):
+    def temporal_phase(self, n=None, phase_shift=0, rotated=True):
         '''Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -1095,9 +1106,10 @@ class MCA:
         phase_shift : float, optional
             If complex, apply a phase shift to the temporal phase.
             Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) temporal phase even if
-            rotation was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated temporal
+            phases while False returns the unrotated (original) temporal
+            phases. Default is True.
 
         Returns
         -------
@@ -1105,7 +1117,7 @@ class MCA:
             Temporal phase function associated to left and right field.
 
         '''
-        pcs = self.pcs(n, phase_shift=phase_shift, original=original)
+        pcs = self.pcs(n, phase_shift=phase_shift, rotated=rotated)
 
         phases = {}
         for key, pc in pcs.items():
@@ -1154,7 +1166,7 @@ class MCA:
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
-        V = self._get_V(original=True)
+        V = self._get_V(rotated=False)
         fields_mean = self._field_means
 
         sqrt_svals = np.sqrt(self._get_svals())
