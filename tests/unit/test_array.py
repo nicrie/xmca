@@ -1,5 +1,4 @@
 import unittest
-
 import numpy as np
 
 from xmca.array import MCA
@@ -25,6 +24,9 @@ class TestArray(unittest.TestCase):
         with self.assertRaises(ValueError):
             MCA(self.A, self.B, self.A)
 
+        with self.assertRaises(ValueError):
+            MCA(self.A[:-1], self.B)
+
         with self.assertRaises(TypeError):
             MCA([1, 2, 3])
 
@@ -46,6 +48,7 @@ class TestArray(unittest.TestCase):
         eofs = mca.eofs()
         self.assertEqual(self.A.shape[1:] + (self.rank,), eofs['left'].shape)
         self.assertEqual(self.B.shape[1:] + (self.rank,), eofs['right'].shape)
+
 
     def tearDown(self):
         pass

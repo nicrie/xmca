@@ -232,6 +232,8 @@ class TestIntegration(unittest.TestCase):
         model.eofs(n, scaling, phase_shift, rotated)
         model.spatial_amplitude(n, scaling, rotated)
         model.spatial_phase(n, phase_shift, rotated)
+        model.temporal_amplitude(n, scaling, rotated)
+        model.temporal_phase(n, phase_shift, rotated)
 
     @parameterized.expand([
         ('std'),
@@ -476,6 +478,42 @@ class TestIntegration(unittest.TestCase):
             assert_raises(ValueError, model.truncate, trunc)
         else:
             model.truncate(trunc)
+
+    def test_apply_weights(self):
+        model = xMCA(self.A, self.B)
+        weights = {}
+        weights['left'] = self.A.coords['lat']
+        weights['right'] = self.B.coords['lat']
+        model.apply_weights(**weights)
+
+    def test_complex_solver(self):
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=True, extend=False)
+        model.solve(complexify=True, extend='theta', period=12)
+        model.solve(complexify=True, extend='exp', period=6)
+
+    def test_solver_errors(self):
+        model = xMCA(self.A, self.B)
+        with self.assertRaises(RuntimeError):
+            model.singular_values()
+            model.norms()
+            model.pcs()
+            model.eofs()
+            model.rotation_matrix()
+            model.correlation_matrix()
+
+        model.solve()
+        model.rotation_matrix()
+        model.correlation_matrix()
+
+        model.rotate(10)
+        model.rotation_matrix()
+        model.correlation_matrix()
+
+    def test_rule_n(self):
+        model = xMCA(self.A, self.B)
+        model.solve()
+        model.rule_n(10)
 
     @classmethod
     def tearDownClass(self):

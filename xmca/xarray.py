@@ -589,15 +589,27 @@ class xMCA(MCA):
             Spatial phases associated to left and right input field.
 
         '''
-        eofs = self.eofs(n, phase_shift=phase_shift, rotated=rotated)
+        phases = super().spatial_phase(
+            n, phase_shift=phase_shift, rotated=rotated
+        )
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
+        coords      = self._field_coords
         field_names = self._field_names
-        phases = {}
-        for key, eof in eofs.items():
-            phases[key]         = np.arctan2(eof.imag, eof.real).real
-            phases[key].name    = ' '.join([field_names[key], 'spatial phase'])
-            phases[key].attrs   = attrs
+
+        for key, pha in phases.items():
+            modes = list(range(1, pha.shape[-1] + 1))
+            phases[key] = xr.DataArray(
+                data=pha,
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon'   : coords[key]['lon'],
+                    'lat'   : coords[key]['lat'],
+                    'mode'  : modes
+                },
+                name=' '.join([field_names[key], 'spatial phase']),
+                attrs=attrs
+            )
 
         return phases
 
@@ -660,17 +672,23 @@ class xMCA(MCA):
         dict[DataArray, DataArray]
             Temporal phases associated to left and right input field.
         '''
-        pcs = self.pcs(n, phase_shift, rotated)
+        phases = super().temporal_phase(
+            n, phase_shift=phase_shift, rotated=rotated
+        )
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
+        coords      = self._field_coords
 
-        phases = {}
-        for key, pc in pcs.items():
-            phases[key] = np.arctan2(pc.imag, pc.real).real
-            name = ' '.join([field_names[key], 'temporal phase'])
-            phases[key].name  = name
-            phases[key].attrs = attrs
+        for key, pha in phases.items():
+            modes = list(range(1, pha.shape[-1] + 1))
+            phases[key] = xr.DataArray(
+                data=pha,
+                dims=['time', 'mode'],
+                coords={'time' : coords[key]['time'], 'mode' : modes},
+                name=' '.join([field_names[key], 'temporal phase']),
+                attrs=attrs
+            )
 
         return phases
 
