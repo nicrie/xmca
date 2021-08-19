@@ -22,14 +22,10 @@ fields. When the two input fields are the same, MCA reduces to standard EOF anal
 
 For the mathematical understanding please have a look at e.g. [Bretherton et al.][bretherton-paper] or the [lecture material][mca-material] written by C. Bretherton.
 
-## New in release 1.0.x
-- method `predict` allows to project new, unseen data to obtain the corresponding PCs (works for standard, rotation and complex)
-- more efficient storing/loading of files; Unfortunately, this and the point above made it necessary to change the code considerably. As a consequence, **loading models which were performed and saved using an older package version (0.x.y) is not supported.**
-- add method to summarize performed analysis (`summary`)
-- add method to return input fields
-- improve docs
-- correct and consistent use of definition of loadings
-- some bugfixes (e.g. hom/het patterns)
+## New in release 1.2.0
+- much faster and more memory-efficient algorithm
+- added *Rule N* for significance testing of obtained singular values
+- period parameter of `solve` method provides more flexibility to exponential extension, making complex MCA more stable
 
 ## Core Features
 
