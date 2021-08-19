@@ -1326,9 +1326,10 @@ class MCA:
             'pc'    : r'PC {:d} ({:.1f} \%)'.format(mode, var),
             'eof'   : eof_title,
             'phase' : 'Phase',
-            'var1'  : self._field_names['left'],
-            'var2'  : self._field_names['right']
+            'var1'  : self._field_names['left']
         }
+        if 'right' in self._keys:
+            titles['var2'] = self._field_names['right']
 
         titles.update({k: v.replace('_', ' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
@@ -1343,8 +1344,10 @@ class MCA:
 
         axes_space = axes_eof
 
-        var_names = [titles['var1'], titles['var2']]
-
+        var_names = [titles['var1']]
+        if 'right' in self._keys:
+            var_names.append(titles['var2'])
+    
         # plot PCs
         for i, pc in enumerate(pcs.values()):
             axes_pc[i].plot(pc)
