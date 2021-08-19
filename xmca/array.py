@@ -1541,6 +1541,52 @@ class MCA:
                     self._set_analysis(key, value)
         info_file.close()
 
+    def rule_n(self, n_surrogates):
+        '''Apply *Rule N* by Overland and Preisendorfer, 1982.
+
+        The aim of Rule N is to provide a rule of thumb for the significance of
+        the obtained singular values via Monte Carlo simulations of
+        uncorrelated Gaussian random variables. The obtained singular values
+        are scaled such that their sum equals the sum of true singular value
+        spectrum.
+
+        Parameters
+        ----------
+        n : int
+            Number of synthetic samples.
+
+        Returns
+        -------
+        DataArray
+            Singular values obtained by Rule N.
+
+        References
+        ----------
+        * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
+        principal components applied to a cyclone climatology. Mon. Weather
+        Rev. 110, 1–4.
+
+        '''
+        m = self._n_observations
+        n = self._n_variables
+        complexify = self._analysis['is_complex']
+
+        svals = []
+
+        for i in tqdm(range(n_surrogates)):
+            data = {}
+            for k in self._keys:
+                data[k] = np.random.standard_normal([m[k], n[k]])
+            model = MCA(*list(data.values()))
+            model.solve(complexify=complexify)
+            svals.append(model._get_svals())
+            del(model)
+
+        svals = np.array(svals).T
+        ref = self._get_svals()
+        svals /= svals.sum(axis=0) / ref.sum()
+        return svals
+
     def load_analysis(
             self, path,
             fields=None, eofs=None, singular_values=None):

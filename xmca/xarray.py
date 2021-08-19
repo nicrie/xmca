@@ -1296,3 +1296,42 @@ class xMCA(MCA):
 
         '''
         super().summary()
+
+    def rule_n(self, n):
+        '''Apply *Rule N* by Overland and Preisendorfer, 1982.
+
+        The aim of Rule N is to provide a rule of thumb for the significance of
+        the obtained singular values via Monte Carlo simulations of
+        uncorrelated Gaussian random variables. The obtained singular values
+        are scaled such that their sum equals the sum of true singular value
+        spectrum.
+
+        Parameters
+        ----------
+        n : int
+            Number of Monte Carlo simulations.
+
+        Returns
+        -------
+        DataArray
+            Singular values obtained by Rule N.
+
+        References
+        ----------
+        * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
+        principal components applied to a cyclone climatology. Mon. Weather
+        Rev. 110, 1–4.
+
+        '''
+        svals = super().rule_n(n)
+
+        svals = xr.DataArray(
+            svals,
+            dims=['mode', 'run'],
+            coords={
+                'mode' : np.arange(1, svals.shape[0] + 1),
+                'run' : np.arange(1, n + 1)
+            },
+            name='singular values'
+        )
+        return svals
