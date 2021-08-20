@@ -30,6 +30,7 @@
       ~MCA.predict
       ~MCA.rotate
       ~MCA.rotation_matrix
+      ~MCA.rule_n
       ~MCA.save_plot
       ~MCA.scf
       ~MCA.set_field_names
@@ -41,6 +42,7 @@
       ~MCA.temporal_amplitude
       ~MCA.temporal_phase
       ~MCA.truncate
+      ~MCA.variance
    
    
 
