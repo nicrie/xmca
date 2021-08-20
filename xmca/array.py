@@ -368,12 +368,11 @@ class MCA:
         series_end = field[-1, :]
         offset      = series_end - linear_end
 
-        b = 1
-        tau = b * 50 / N
+        theta = self._analysis['theta_period']
         # start x at 1, because exp(0) would produce same value as the last
         # point of the original time series
         x_shift = x + 1
-        exp_extension = offset * np.exp(-tau * x_shift)
+        exp_extension = offset * np.exp(-x_shift / theta)
         lin_extension = (slope * x) + linear_end
 
         return exp_extension + lin_extension
@@ -394,7 +393,7 @@ class MCA:
 
         return extended
 
-    def _complexify(self):
+    def _complexify(self, fields: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         '''Complexify data via Hilbert transform.
 
         Calculating Hilbert transform via scipy.signal.hilbert is done
@@ -419,7 +418,6 @@ class MCA:
 
         '''
         n_observations = self._n_observations['left']
-        fields = self._fields
 
         for k in self._keys:
             fields[k] = fields[k].real
@@ -438,9 +436,32 @@ class MCA:
                 fields[k] = fields[k][n_observations:(2 * n_observations)]
                 fields[k] = remove_mean(fields[k])
 
-        return None
+        return fields
 
-    def solve(self, complexify=False, extend=False, period=365):
+    def _svd(self, fields: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        Us = {}
+        Ss = {}
+        Vts = {}
+        for k, f in fields.items():
+            u, s, vt = np.linalg.svd(f, full_matrices=False)
+            Us[k] = u
+            Ss[k] = s
+            Vts[k] = vt
+        return Us, Ss, Vts
+
+    def _get_max_mode(self, n=None, rotated=False):
+        n_modes = []
+        n_modes.append(self._analysis['rank'])
+
+        if n is not None:
+            n_modes.append(n)
+
+        if rotated:
+            n_modes.append(self._analysis['n_rot'])
+
+        return np.min(n_modes)
+
+    def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
 
         Under the hood the method performs singular value decomposition on
@@ -458,10 +479,11 @@ class MCA:
             to the Hilbert transform when time series are not stationary.
             Only used for complex time series i.e. when omplexify=True.
             Default is False.
-        period : int, optional
-            Only applies if a Theta model is selected as time series extension.
-            Default is 365, representing a yearly cycle for daily data.
-            If Theta model is not selected this parameter has no effect.
+        period : float, optional
+            If Theta model, it represents the number of time steps for a
+            season. If exponential model, it represents the number of time
+            steps for the exponential to decrease to 1/e. If no extension is
+            selected, this parameter has no effect. Default is 1.
         '''
         if any([np.isnan(field).all() for field in self._fields.values()]):
             raise RuntimeError('''
@@ -477,15 +499,25 @@ class MCA:
 
         # complexify input data via Hilbert transform
         if self._analysis['is_complex']:
-            self._complexify()
+            self._fields = self._complexify(self._fields)
 
         X = self._get_X()
 
+        # perform PCA of input to speed up algorithm
+        k, l, mt = self._svd(X)
+        R = {key: k[key] * l[key] for key in self._keys}
         # create covariance matrix
-        if self._analysis['is_bivariate']:
-            kernel = X['left'].conjugate().T @ X['right']
-        else:
-            kernel = X['left'].conjugate().T @ X['left']
+        try:
+            kernel = R['left'].conj().T @ R['right']
+        except KeyError:
+            try:
+                kernel = R['left'].conj().T @ R['left']
+            except KeyError as err:
+                msg = (
+                    'Error in creating kernel. Please report this issue on '
+                    'GitHub'
+                )
+                raise KeyError(msg) from err
         kernel = kernel / dof
 
         # perform singular value decomposition
@@ -493,18 +525,22 @@ class MCA:
             VLeft, singular_values, VTRight = np.linalg.svd(
                 kernel, full_matrices=False
             )
+            VRight = VTRight.conj().T
+            del(VTRight)
         except np.linalg.LinAlgError:
             raise np.linalg.LinAlgError(
                 '''SVD failed. NaN entries may be the problem.'''
             )
 
+        V = {}
+        V['left'] = VLeft
+        V['right'] = VRight
         # singular vectors (EOFs) = V
-        self._V = {'left' : VLeft}
-        if self._analysis['is_bivariate']:
-            self._V['right'] = VTRight.conjugate().T
-        # free up some space
+        self._V = {key: mt[key].conj().T @ V[key] for key in self._keys}
+
+        # free up space
         del(VLeft)
-        del(VTRight)
+        del(VRight)
 
         self._singular_values = singular_values
         self._variance = singular_values
@@ -530,14 +566,12 @@ class MCA:
                 'Please call the method `solve` first.'
             )
 
-    def _get_V(self, n=None, original=False):
-        if original:
-            n_modes = n
-        else:
-            n_modes = self._analysis['n_rot']
+    def _get_V(self, n=None, rotated=True):
+        all_modes = self._get_max_mode(rotated=rotated)
+        n = self._get_max_mode(n, rotated=rotated)
 
         try:
-            V = {k: v[:, :n_modes] for k, v in self._V.items()}
+            V = {k: v[:, :all_modes] for k, v in self._V.items()}
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular vectors. '
@@ -545,9 +579,9 @@ class MCA:
             )
 
         for k in self._keys:
-            if not original:
-                sqrt_svals = np.sqrt(self._get_svals(n_modes))
-                norm    = self._get_norm(n_modes, sorted=False)
+            if rotated:
+                sqrt_svals = np.sqrt(self._get_svals(all_modes))
+                norm    = self._get_norm(all_modes, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
@@ -558,15 +592,13 @@ class MCA:
 
         return V
 
-    def _get_U(self, n=None, original=False):
-        if original:
-            n_modes = n
-        else:
-            n_modes = self._analysis['n_rot']
+    def _get_U(self, n=None, rotated=True):
+        all_modes = self._get_max_mode(rotated=rotated)
+        n = self._get_max_mode(n, rotated=rotated)
 
         fields  = self._get_X()
-        V = self._get_V(n_modes, original=True)
-        sqrt_svals = np.sqrt(self._get_svals(n_modes))
+        V = self._get_V(all_modes, rotated=False)
+        sqrt_svals = np.sqrt(self._get_svals(all_modes))
         R       = self.rotation_matrix(inverse_transpose=True)
         var_idx = self._var_idx
         dof = self._n_observations['left'] - 1
@@ -574,7 +606,7 @@ class MCA:
         U = {}
         for k in self._keys:
             U[k] = fields[k] @ V[k] / sqrt_svals
-            if not original:
+            if rotated:
                 U[k] = U[k] @ R  / np.sqrt(dof)
                 # reorder according to variance
                 U[k] = U[k][:, var_idx]
@@ -584,9 +616,9 @@ class MCA:
 
     def _get_eofs(
             self, n=None,
-            scaling='None', phase_shift=0, original=False):
+            scaling='None', phase_shift=0, rotated=True):
 
-        V = self._get_V(n, original=original)
+        V = self._get_V(n, rotated=rotated)
         n_var       = self._n_variables
         no_nan_idx  = self._no_nan_index
         field_shape = self._fields_spatial_shape
@@ -630,9 +662,9 @@ class MCA:
         return eofs
 
     def _get_pcs(
-            self, n=None, scaling='None', phase_shift=0, original=False):
+            self, n=None, scaling='None', phase_shift=0, rotated=True):
 
-        U = self._get_U(n, original=original)
+        U = self._get_U(n, rotated=rotated)
 
         for k in self._keys:
             # apply phase shift
@@ -722,7 +754,7 @@ class MCA:
 
         singular_values = self._get_svals(n_rot)
         sqrt_svals = np.sqrt(singular_values)
-        V = self._get_V(n_rot, original=True)
+        V = self._get_V(n_rot, rotated=False)
         n_vars_left = V['left'].shape[0]
 
         # rotate loadings (Cheng and Dunkerton 1995)
@@ -913,7 +945,7 @@ class MCA:
         exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
-    def pcs(self, n=None, scaling='None', phase_shift=0, original=False):
+    def pcs(self, n=None, scaling='None', phase_shift=0, rotated=True):
         '''Return the first `n` PCs.
 
         Depending on the model the PCs may be real or complex, rotated or
@@ -930,9 +962,9 @@ class MCA:
             ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the PCs. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) PCs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated PCs while
+            False returns the unrotated (original) PCs. Default is True.
 
         Returns
         -------
@@ -940,9 +972,9 @@ class MCA:
             PCs associated to left and right input field.
 
         '''
-        return self._get_pcs(n, scaling, phase_shift, original)
+        return self._get_pcs(n, scaling, phase_shift, rotated)
 
-    def eofs(self, n=None, scaling='None', phase_shift=0, original=False):
+    def eofs(self, n=None, scaling='None', phase_shift=0, rotated=True):
         '''Return the first `n` EOFs.
 
         Depending on the model the PCs may be real or complex, rotated or
@@ -958,9 +990,9 @@ class MCA:
             ('max') or standard deviation ('std').
         phase_shift : float, optional
             If complex, apply a phase shift to the EOFs. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) EOFs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated PCs while
+            False returns the unrotated (original) EOFs. Default is True.
 
         Returns
         -------
@@ -968,9 +1000,9 @@ class MCA:
             EOFs associated to left and right input field.
 
         '''
-        return self._get_eofs(n, scaling, phase_shift, original)
+        return self._get_eofs(n, scaling, phase_shift, rotated)
 
-    def spatial_amplitude(self, n=None, scaling='None', original=False):
+    def spatial_amplitude(self, n=None, scaling='None', rotated=True):
         '''Return the spatial amplitude fields for the first `n` EOFs.
 
         Parameters
@@ -980,9 +1012,10 @@ class MCA:
             fields. The default is None.
         scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
-        original: boolean, optional
-            If True, return unrotated (original) EOFs even if rotation was
-            applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated spatial
+            amplitudes while False returns the unrotated (original) spatial
+            amplitudes. Default is True.
 
         Returns
         -------
@@ -990,7 +1023,7 @@ class MCA:
             Spatial amplitude fields associated to left and right field.
 
         '''
-        eofs = self.eofs(n, scaling='None', original=original)
+        eofs = self.eofs(n, scaling='None', rotated=rotated)
 
         amplitudes = {}
         for key, eof in eofs.items():
@@ -1001,7 +1034,7 @@ class MCA:
 
         return amplitudes
 
-    def spatial_phase(self, n=None, phase_shift=0, original=False):
+    def spatial_phase(self, n=None, phase_shift=0, rotated=True):
         '''Return the spatial phase fields for the first `n` EOFs.
 
         Parameters
@@ -1011,9 +1044,10 @@ class MCA:
             The default is None.
         phase_shift : float, optional
             If complex, apply a phase shift to the spatial phase. Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) spatial phase even if rotation
-            was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated spatial
+            phases while False returns the unrotated (original) spatial
+            phases. Default is True.
 
         Returns
         -------
@@ -1021,7 +1055,7 @@ class MCA:
             Spatial phase fields associated to left and right field.
 
         '''
-        eofs = self.eofs(n, phase_shift=phase_shift, original=original)
+        eofs = self.eofs(n, phase_shift=phase_shift, rotated=rotated)
 
         phases = {}
         for key, eof in eofs.items():
@@ -1029,7 +1063,7 @@ class MCA:
 
         return phases
 
-    def temporal_amplitude(self, n=None, scaling='None', original=False):
+    def temporal_amplitude(self, n=None, scaling='None', rotated=True):
         '''Return the temporal amplitude time series for the first `n` PCs.
 
         Parameters
@@ -1039,9 +1073,10 @@ class MCA:
             series. The default is None.
         scaling : {'None', 'max'}, optional
             Scale by maximum value ('max'). The default is None.
-        original: boolean, optional
-            If True, return unrotated (original) temporal phase even if
-            rotation was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated temporal
+            amplitudes while False returns the unrotated (original) temporal
+            amplitudes. Default is True.
 
         Returns
         -------
@@ -1049,7 +1084,7 @@ class MCA:
             Temporal ampliude series associated to left and right field.
 
         '''
-        pcs = self.pcs(n, scaling='None', original=original)
+        pcs = self.pcs(n, scaling='None', rotated=rotated)
 
         amplitudes = {}
         for key, pc in pcs.items():
@@ -1060,7 +1095,7 @@ class MCA:
 
         return amplitudes
 
-    def temporal_phase(self, n=None, phase_shift=0, original=False):
+    def temporal_phase(self, n=None, phase_shift=0, rotated=True):
         '''Return the temporal phase function for the first `n` PCs.
 
         Parameters
@@ -1071,9 +1106,10 @@ class MCA:
         phase_shift : float, optional
             If complex, apply a phase shift to the temporal phase.
             Default is 0.
-        original: boolean, optional
-            If True, return unrotated (original) temporal phase even if
-            rotation was applied.
+        rotated: boolean, optional
+            When rotation was performed, True returns the rotated temporal
+            phases while False returns the unrotated (original) temporal
+            phases. Default is True.
 
         Returns
         -------
@@ -1081,7 +1117,7 @@ class MCA:
             Temporal phase function associated to left and right field.
 
         '''
-        pcs = self.pcs(n, phase_shift=phase_shift, original=original)
+        pcs = self.pcs(n, phase_shift=phase_shift, rotated=rotated)
 
         phases = {}
         for key, pc in pcs.items():
@@ -1130,7 +1166,7 @@ class MCA:
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
 
-        V = self._get_V(original=True)
+        V = self._get_V(rotated=False)
         fields_mean = self._field_means
 
         sqrt_svals = np.sqrt(self._get_svals())
@@ -1290,9 +1326,10 @@ class MCA:
             'pc'    : r'PC {:d} ({:.1f} \%)'.format(mode, var),
             'eof'   : eof_title,
             'phase' : 'Phase',
-            'var1'  : self._field_names['left'],
-            'var2'  : self._field_names['right']
+            'var1'  : self._field_names['left']
         }
+        if 'right' in self._keys:
+            titles['var2'] = self._field_names['right']
 
         titles.update({k: v.replace('_', ' ') for k, v in titles.items()})
         titles.update({k: boldify_str(v) for k, v in titles.items()})
@@ -1307,8 +1344,10 @@ class MCA:
 
         axes_space = axes_eof
 
-        var_names = [titles['var1'], titles['var2']]
-
+        var_names = [titles['var1']]
+        if 'right' in self._keys:
+            var_names.append(titles['var2'])
+    
         # plot PCs
         for i, pc in enumerate(pcs.values()):
             axes_pc[i].plot(pc)
@@ -1505,6 +1544,52 @@ class MCA:
                     self._set_analysis(key, value)
         info_file.close()
 
+    def rule_n(self, n_surrogates):
+        '''Apply *Rule N* by Overland and Preisendorfer, 1982.
+
+        The aim of Rule N is to provide a rule of thumb for the significance of
+        the obtained singular values via Monte Carlo simulations of
+        uncorrelated Gaussian random variables. The obtained singular values
+        are scaled such that their sum equals the sum of true singular value
+        spectrum.
+
+        Parameters
+        ----------
+        n : int
+            Number of synthetic samples.
+
+        Returns
+        -------
+        DataArray
+            Singular values obtained by Rule N.
+
+        References
+        ----------
+        * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
+        principal components applied to a cyclone climatology. Mon. Weather
+        Rev. 110, 1–4.
+
+        '''
+        m = self._n_observations
+        n = self._n_variables
+        complexify = self._analysis['is_complex']
+
+        svals = []
+
+        for i in tqdm(range(n_surrogates)):
+            data = {}
+            for k in self._keys:
+                data[k] = np.random.standard_normal([m[k], n[k]])
+            model = MCA(*list(data.values()))
+            model.solve(complexify=complexify)
+            svals.append(model._get_svals())
+            del(model)
+
+        svals = np.array(svals).T
+        ref = self._get_svals()
+        svals /= svals.sum(axis=0) / ref.sum()
+        return svals
+
     def load_analysis(
             self, path,
             fields=None, eofs=None, singular_values=None):
@@ -1544,7 +1629,7 @@ class MCA:
         if self._analysis['is_normalized']:
             self.normalize()
         if self._analysis['is_complex']:
-            self._complexify()
+            self._fields = self._complexify(self._fields)
 
         self._V = {}
         self._norm = {}

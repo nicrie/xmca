@@ -115,7 +115,7 @@ class TestIntegration(unittest.TestCase):
         new = xMCA()
         new.load_analysis('tests/integration/temp/info.xmca')
         vals = new.singular_values(n)
-        eofs = new.eofs(n, original=True)
+        eofs = new.eofs(n, rotated=False)
         assert_allclose(
             svalues, vals, err_msg='svalues do not match', **self.tols
         )
@@ -199,25 +199,25 @@ class TestIntegration(unittest.TestCase):
         )
 
     @parameterized.expand([
-        ('std', None, 'None', 0, False),
-        ('cplx', None, 'None', 0, False),
-        ('varmx', None, 'None', 0, False),
-        ('std', 100, 'None', 0, False),
-        ('cplx', 100, 'None', 0, False),
-        ('varmx', 100, 'None', 0, False),
-        ('std', None, 'max', 0, False),
-        ('cplx', None, 'std', 0, False),
-        ('varmx', None, 'eigen', 0, False),
-        ('std', 100, 'eigen', 0, False),
-        ('cplx', 100, 'std', 0, False),
-        ('varmx', 100, 'max', 0, False),
-        ('cplx', 100, 'std', 1.234, False),
-        ('varmx', 100, 'max', 3, False),
-        ('std', 100, 'eigen', -2, True),
+        ('std', None, 'None', 0, True),
+        ('cplx', None, 'None', 0, True),
+        ('varmx', None, 'None', 0, True),
+        ('std', 100, 'None', 0, True),
+        ('cplx', 100, 'None', 0, True),
+        ('varmx', 100, 'None', 0, True),
+        ('std', None, 'max', 0, True),
+        ('cplx', None, 'std', 0, True),
+        ('varmx', None, 'eigen', 0, True),
+        ('std', 100, 'eigen', 0, True),
+        ('cplx', 100, 'std', 0, True),
+        ('varmx', 100, 'max', 0, True),
         ('cplx', 100, 'std', 1.234, True),
         ('varmx', 100, 'max', 3, True),
+        ('std', 100, 'eigen', -2, False),
+        ('cplx', 100, 'std', 1.234, False),
+        ('varmx', 100, 'max', 3, False),
     ], name_func=name_func_get)
-    def test_getter(self, analysis, n, scaling, phase_shift, original):
+    def test_getter(self, analysis, n, scaling, phase_shift, rotated):
         cplx = False,
         n_rot = 0
         if analysis == 'cplx':
@@ -228,10 +228,12 @@ class TestIntegration(unittest.TestCase):
         model.solve(complexify=cplx)
         if n_rot > 1:
             model.rotate(n_rot)
-        model.pcs(n, scaling, phase_shift, original)
-        model.eofs(n, scaling, phase_shift, original)
-        model.spatial_amplitude(n, scaling, original)
-        model.spatial_phase(n, phase_shift, original)
+        model.pcs(n, scaling, phase_shift, rotated)
+        model.eofs(n, scaling, phase_shift, rotated)
+        model.spatial_amplitude(n, scaling, rotated)
+        model.spatial_phase(n, phase_shift, rotated)
+        model.temporal_amplitude(n, scaling, rotated)
+        model.temporal_phase(n, phase_shift, rotated)
 
     @parameterized.expand([
         ('std'),
@@ -476,6 +478,42 @@ class TestIntegration(unittest.TestCase):
             assert_raises(ValueError, model.truncate, trunc)
         else:
             model.truncate(trunc)
+
+    def test_apply_weights(self):
+        model = xMCA(self.A, self.B)
+        weights = {}
+        weights['left'] = self.A.coords['lat']
+        weights['right'] = self.B.coords['lat']
+        model.apply_weights(**weights)
+
+    def test_complex_solver(self):
+        model = xMCA(self.A, self.B)
+        model.solve(complexify=True, extend=False)
+        model.solve(complexify=True, extend='theta', period=12)
+        model.solve(complexify=True, extend='exp', period=6)
+
+    def test_solver_errors(self):
+        model = xMCA(self.A, self.B)
+        with self.assertRaises(RuntimeError):
+            model.singular_values()
+            model.norms()
+            model.pcs()
+            model.eofs()
+            model.rotation_matrix()
+            model.correlation_matrix()
+
+        model.solve()
+        model.rotation_matrix()
+        model.correlation_matrix()
+
+        model.rotate(10)
+        model.rotation_matrix()
+        model.correlation_matrix()
+
+    def test_rule_n(self):
+        model = xMCA(self.A, self.B)
+        model.solve()
+        model.rule_n(10)
 
     @classmethod
     def tearDownClass(self):

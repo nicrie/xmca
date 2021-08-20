@@ -22,14 +22,10 @@ fields. When the two input fields are the same, MCA reduces to standard EOF anal
 
 For the mathematical understanding please have a look at e.g. [Bretherton et al.][bretherton-paper] or the [lecture material][mca-material] written by C. Bretherton.
 
-## New in release 1.0.x
-- method `predict` allows to project new, unseen data to obtain the corresponding PCs (works for standard, rotation and complex)
-- more efficient storing/loading of files; Unfortunately, this and the point above made it necessary to change the code considerably. As a consequence, **loading models which were performed and saved using an older package version (0.x.y) is not supported.**
-- add method to summarize performed analysis (`summary`)
-- add method to return input fields
-- improve docs
-- correct and consistent use of definition of loadings
-- some bugfixes (e.g. hom/het patterns)
+## New in release 1.2.0
+- much faster and more memory-efficient algorithm
+- added *Rule N* for significance testing of obtained singular values
+- period parameter of `solve` method provides more flexibility to exponential extension, making complex MCA more stable
 
 ## Core Features
 
@@ -77,7 +73,7 @@ Construct a model with only one field and solve it to perform standard PCA /
 EOF analysis.
 ```py
     pca = xMCA(west)                        # PCA of west coast
-    pca.solve(complexfify=False)            # True for complex PCA
+    pca.solve(complexify=False)            # True for complex PCA
 
     eigenvalues = pca.singular_values()     # singular vales = eigenvalues for PCA
     expvar      = pca.explained_variance()  # explained variance
@@ -101,12 +97,42 @@ Same as for PCA / EOF analysis, but with two input fields instead of
 one.
 ```py    
     mca = xMCA(west, east)                  # MCA of field A and B
-    mca.solve(complexfify=False)            # True for complex MCA
+    mca.solve(complexify=False)            # True for complex MCA
 
     eigenvalues = mca.singular_values()     # singular vales
     pcs = mca.pcs()                         # expansion coefficient (PCs)
     eofs = mca.eofs()                       # spatial patterns (EOFs)
 ```
+
+#### Significance analysis
+A simple way of estimating the significance of the obtained modes is by
+running Monte Carlo simulations based on uncorrelated Gaussian white
+noise known as **Rule N** (Overland and Preisendorfer 1982). Here we create 200 of such synthetic data sets and compare the synthetic with the real singular spectrum to assess significance.
+
+```py    
+    surr = mca.rule_n(200)
+    median = surr.median('run')
+    q99 = surr.quantile(.99, dim='run')
+    q01 = surr.quantile(.01, dim='run')
+
+    cutoff = np.sum((svals - q99 > 0)).values  # first 8 modes significant
+
+    fig = plt.figure(figsize=(10, 4))
+    ax = fig.add_subplot(111)
+    svals.plot(ax=ax, yscale='log', label='true')
+    median.plot(ax=ax, yscale='log', color='.5', label='rule N')
+    q99.plot(ax=ax, yscale='log', color='.5', ls=':')
+    q01.plot(ax=ax, yscale='log', color='.5', ls=':')
+    ax.axvline(cutoff + 0.5, ls=':')
+    ax.set_xlim(-2, 200)
+    ax.set_ylim(1e-1, 2.5e4)
+    ax.set_title('Significance based on Rule N')
+    ax.legend()
+```
+
+![Example Figure Mode1](figs/rule-n.png)
+*The first 8 modes are significant according to rule N using 200 synthetic runs.*
+
 
 #### Saving/loading an analysis
 
@@ -160,6 +186,7 @@ You can save the plot to your local disk as a ``.png`` file via
     skwargs={'dpi':200}
     mca2.save_plot(mode=3, plot_kwargs=pkwargs, save_kwargs=skwargs)
 ```
+
 
 ## Documentation
 Please have a look at the [documentation page](https://pyxmca.readthedocs.io/en/latest/index.html) for instructions on how to install and some examples to get started.
