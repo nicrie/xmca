@@ -1315,7 +1315,17 @@ class xMCA(MCA):
         https://doi.org/10.1175/1520-0450(1984)023<1660:CPCATA>2.0.CO;2.
 
         '''
-        return super().rule_thumb(n=n)
+        uncertainties = super().rule_thumb(n=n)
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+
+        uncertainties = xr.DataArray(
+            uncertainties,
+            dims=['mode'],
+            coords={'mode' : np.arange(1, uncertainties.shape[0] + 1)},
+            attrs=attrs,
+            name='singular values'
+        )
+        return uncertainties
 
     def bootstrapping(
             self, n_runs,
