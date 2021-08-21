@@ -276,7 +276,7 @@ class xMCA(MCA):
         Parameters
         ----------
         n : int, optional
-            Number of singular values to return. If None, then all singular
+            Number of singular values to return. If None, all singular
             values are returned. The default is None.
 
         Returns
@@ -285,16 +285,11 @@ class xMCA(MCA):
             Singular values of the SVD.
 
         '''
-        # for n=Nonr, all singular_values are returned
-        values = super().singular_values(n)
-
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = values.size
-
+        n = self._get_max_mode(n)
         modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
+        values = super().singular_values(n)
         values = xr.DataArray(
             values,
             dims=['mode'],
@@ -1308,6 +1303,114 @@ class xMCA(MCA):
 
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
+
+
+    def rule_thumb(self, n=None):
+        '''Uncertainties of singular values based on North's *rule of thumb*.
+
+        In case of compex PCA/MCA, the rule of thumb includes another factor of
+        spqrt(2) according to Horel 1984.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to be returned. By default return all.
+
+        Returns
+        -------
+        ndarray
+            Uncertainties associated to singular values.
+
+        References
+        ----------
+        North, G, T L. Bell, R Cahalan, and F J. Moeng. 1982.
+        “Sampling Errors in the Estimation of Empirical Orthogonal Functions.”
+        Monthly Weather Review 110.
+        https://doi.org/10.1175/1520-0493(1982)110<0699:SEITEO>2.0.CO;2.
+
+        Horel, JD. 1984. “Complex Principal Component Analysis: Theory and
+        Examples.” Journal of Climate and Applied Meteorology 23 (12): 1660–73.
+        https://doi.org/10.1175/1520-0450(1984)023<1660:CPCATA>2.0.CO;2.
+
+        '''
+        uncertainties = super().rule_thumb(n=n)
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+
+        uncertainties = xr.DataArray(
+            uncertainties,
+            dims=['mode'],
+            coords={'mode' : np.arange(1, uncertainties.shape[0] + 1)},
+            attrs=attrs,
+            name='singular values'
+        )
+        return uncertainties
+
+    def bootstrapping(
+            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, disable_progress=False):
+        '''Perform Monte Carlo bootstrapping on model.
+
+        Monte Carlo simulations allow to assess the signifcance of the
+        obtained singular values and hence modes by re-performing the analysis
+        on synthetic sample data. Using bootstrapping the synthetic data is
+        created by resampling the original data.
+
+        Parameters
+        ----------
+        n_runs : int
+            Number of Monte Carlo simulations.
+        n_modes : int
+            Number of modes to be returned. By default return all modes.
+        axis : int
+            Whether to resample along time (axis=0) or in space (axis=1).
+            The default is 0.
+        on_left : bool
+            Whether to resample the left field. True by default.
+        on_right : bool
+            Whether to resample the right field. False by default.
+        block_size : int
+            Resamples blocks of data of size `block_size`. This is particular
+            useful when there is strong autocorrelation (e.g. annual cycle)
+            which would be destroyed under standard bootstrapping. This
+            procedure is known as moving-block bootstrapping. By default block
+            size is 1.
+        replace : bool
+            Whether to resample with (bootstrap) or without replacement
+            (permutation). True by default (bootstrap).
+        disable_progress : bool
+            Whether to disable progress bar or not. By default False.
+
+        Returns
+        -------
+        np.ndarray
+            2d-array containing the singular values for each Monte Carlo
+            simulation.
+
+        References
+        ----------
+        Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
+        Chapman and Hall. 436 pp.
+
+        '''
+
+        surr_svals = super().bootstrapping(
+            n_runs=n_runs, n_modes=n_modes, axis=0,
+            on_left=on_left, on_right=on_right, block_size=block_size,
+            replace=replace, disable_progress=disable_progress
+        )
+
+        attrs = {k: str(v) for k, v in self._analysis.items()}
+        surr_svals = xr.DataArray(
+            surr_svals,
+            dims=['mode', 'run'],
+            coords={
+                'mode' : range(1, surr_svals.shape[0] + 1),
+                'run' : range(1, surr_svals.shape[1] + 1)
+            },
+            name='singular values',
+            attrs=attrs
+        )
+        return surr_svals
 
     def summary(self):
         '''Return meta information of the performed analysis.
