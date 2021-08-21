@@ -1286,12 +1286,85 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
-    def monte_carlo_simulation(
-            self, n_surrogates,
-            n=None, on_left=True, on_right=False, block_size=1, replace=True):
 
-        surr_svals = super().monte_carlo_simulation(
-            n_surrogates=n_surrogates, n=n,
+    def rule_thumb(self, n=None):
+        '''Uncertainties of singular values based on North's *rule of thumb*.
+
+        In case of compex PCA/MCA, the rule of thumb includes another factor of
+        spqrt(2) according to Horel 1984.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to be returned. By default return all.
+
+        Returns
+        -------
+        ndarray
+            Uncertainties associated to singular values.
+
+        References
+        ----------
+        North, G, T L. Bell, R Cahalan, and F J. Moeng. 1982.
+        “Sampling Errors in the Estimation of Empirical Orthogonal Functions.”
+        Monthly Weather Review 110.
+        https://doi.org/10.1175/1520-0493(1982)110<0699:SEITEO>2.0.CO;2.
+
+        Horel, JD. 1984. “Complex Principal Component Analysis: Theory and
+        Examples.” Journal of Climate and Applied Meteorology 23 (12): 1660–73.
+        https://doi.org/10.1175/1520-0450(1984)023<1660:CPCATA>2.0.CO;2.
+
+        '''
+        return super().rule_thumb(n=n)
+
+    def bootstrapping(
+            self, n_runs,
+            n_modes=None, axis=0, on_left=True, on_right=False, block_size=1, replace=True):
+        '''Perform Monte Carlo bootstrapping on model.
+
+        Monte Carlo simulations allow to assess the signifcance of the
+        obtained singular values and hence modes by re-performing the analysis
+        on synthetic sample data. Using bootstrapping the synthetic data is
+        created by resampling the original data.
+
+        Parameters
+        ----------
+        n_runs : int
+            Number of Monte Carlo simulations.
+        n_modes : int
+            Number of modes to be returned. By default return all modes.
+        axis : int
+            Whether to resample along time (axis=0) or in space (axis=1).
+            The default is 0.
+        on_left : bool
+            Whether to resample the left field. True by default.
+        on_right : bool
+            Whether to resample the right field. False by default.
+        block_size : int
+            Resamples blocks of data of size `block_size`. This is particular
+            useful when there is strong autocorrelation (e.g. annual cycle)
+            which would be destroyed under standard bootstrapping. This
+            procedure is known as moving-block bootstrapping. By default block
+            size is 1.
+        replace : bool
+            Whether to resample with (bootstrap) or without replacement
+            (permutation). True by default (bootstrap).
+
+        Returns
+        -------
+        np.ndarray
+            2d-array containing the singular values for each Monte Carlo
+            simulation.
+
+        References
+        ----------
+        Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
+        Chapman and Hall. 436 pp.
+
+        '''
+
+        surr_svals = super().bootstrapping(
+            n_runs=n_runs, n_modes=n_modes, axis=0,
             on_left=on_left, on_right=on_right,
             block_size=block_size, replace=replace
         )

@@ -72,8 +72,39 @@ def has_nan_time_steps(array):
     return (np.isnan(array).all(axis=tuple(range(1, array.ndim))).any())
 
 
-def block_permutations(
-        arr: np.ndarray, block_size: int, replace: bool = True) -> np.ndarray:
+def block_bootstrap(
+        arr: np.ndarray,
+        axis : int = 0,
+        block_size: int = 1,
+        replace: bool = True) -> np.ndarray:
+    '''Perform (moving-block) bootstrapping on a 2darray.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Array to perform bootstrapping on. Must be 2d.
+    axis : int
+        Axis on which to bootstrap on. The default is 0.
+    block_size : int
+        Block size to keep intact when bootstrapping. By default 1.
+    replace : bool
+        Whether to resample with replacement (bootstrapping) or without
+        (permutation). By default with replacement.
+
+    Returns
+    -------
+    np.ndarray
+        Resampled array.
+
+    '''
+    if axis == 0:
+        pass
+    elif axis == 1:
+        arr = arr.T
+    else:
+        msg = '{:} not a valid axis. either 0 or 1.'.format(axis)
+        raise ValueError(msg)
+
     n_obs, n_vars = arr.shape
     try:
         block_arr = arr.reshape(-1, block_size, arr.shape[1])
@@ -85,4 +116,7 @@ def block_permutations(
     idx_samples = np.random.choice(n_samples, size=n_samples, replace=replace)
     samples = block_arr[idx_samples]
     new_arr = samples.reshape(arr.shape)
+
+    if axis == 1:
+        new_arr = new_arr.T
     return new_arr
