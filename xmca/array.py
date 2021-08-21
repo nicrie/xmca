@@ -944,7 +944,7 @@ class MCA:
             Fraction of described covariance of each mode.
 
         '''
-        variance  = self._variance[self._var_idx][:n]
+        variance  = self._get_variance(n=n, sorted=True)
         exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
@@ -1594,7 +1594,7 @@ class MCA:
         return svals
 
 
-    def rule_thumb(self, n=None):
+    def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
 
         In case of compex PCA/MCA, the rule of thumb includes another factor of

@@ -1305,7 +1305,7 @@ class xMCA(MCA):
             self.apply_coslat()
 
 
-    def rule_thumb(self, n=None):
+    def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
 
         In case of compex PCA/MCA, the rule of thumb includes another factor of
@@ -1333,7 +1333,7 @@ class xMCA(MCA):
         https://doi.org/10.1175/1520-0450(1984)023<1660:CPCATA>2.0.CO;2.
 
         '''
-        uncertainties = super().rule_thumb(n=n)
+        uncertainties = super().rule_north(n=n)
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         uncertainties = xr.DataArray(
