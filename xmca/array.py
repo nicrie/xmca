@@ -1585,8 +1585,8 @@ class MCA:
         return err
 
     def bootstrapping(
-            self, n_runs,
-            n_modes=None, axis=0, on_left=True, on_right=False, block_size=1, replace=True):
+            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1616,6 +1616,8 @@ class MCA:
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        disable_progress : bool
+            Whether to disable progress bar or not. By default False.
 
         Returns
         -------
@@ -1636,6 +1638,7 @@ class MCA:
         is_rotated = self._analysis['is_rotated']
         n_rot = self._analysis['n_rot']
         power = self._analysis['power']
+        is_bivariate = self._analysis['is_bivariate']
 
         n_modes_max = self._get_max_mode(n_modes, rotated=True)
 
@@ -1644,9 +1647,19 @@ class MCA:
             keys.append('left')
         if on_right:
             keys.append('right')
+            if not is_bivariate:
+                msg = (
+                    'No bootstrapping possible. There is no right field. '
+                    'Set `on_right=False`.'
+                )
+                raise ValueError(msg)
+
+        if len(keys) == 0:
+            msg = 'Either `on_left` or `on_right` needs to be True.'
+            raise ValueError(msg)
 
         svals_surr = np.zeros([n_modes_max, n_runs])
-        for i in tqdm(range(n_runs)):
+        for i in tqdm(range(n_runs), disable=disable_progress):
             X_surr = self._get_X(original_scale=False, real=True)
             for k in keys:
                 X_surr[k] = block_bootstrap(

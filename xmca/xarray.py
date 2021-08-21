@@ -1328,8 +1328,8 @@ class xMCA(MCA):
         return uncertainties
 
     def bootstrapping(
-            self, n_runs,
-            n_modes=None, axis=0, on_left=True, on_right=False, block_size=1, replace=True):
+            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1359,6 +1359,8 @@ class xMCA(MCA):
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        disable_progress : bool
+            Whether to disable progress bar or not. By default False.
 
         Returns
         -------
@@ -1375,8 +1377,8 @@ class xMCA(MCA):
 
         surr_svals = super().bootstrapping(
             n_runs=n_runs, n_modes=n_modes, axis=0,
-            on_left=on_left, on_right=on_right,
-            block_size=block_size, replace=replace
+            on_left=on_left, on_right=on_right, block_size=block_size,
+            replace=replace, disable_progress=disable_progress
         )
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
