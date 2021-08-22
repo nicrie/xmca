@@ -545,7 +545,7 @@ class TestIntegration(unittest.TestCase):
         if flavour == 'varmx':
             model.rotate(n_rot)
 
-        model.rule_thumb(3)
+        model.rule_north(3)
         model.rule_n(3)
         incorrect_params = (
             (axis not in [0, 1]) or
