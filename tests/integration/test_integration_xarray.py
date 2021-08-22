@@ -510,10 +510,60 @@ class TestIntegration(unittest.TestCase):
         model.rotation_matrix()
         model.correlation_matrix()
 
-    def test_rule_n(self):
-        model = xMCA(self.A, self.B)
-        model.solve()
-        model.rule_n(10)
+    @parameterized.expand([
+        ('uni', 'std', 0, True, 1, True, True),
+        ('uni', 'std', 0, True, 1, False, False),
+        ('uni', 'std', 0, True, 1, True, False),
+        ('uni', 'cplx', 0, True, 1, True, False),
+        ('uni', 'varmx', 0, True, 1, True, False),
+        ('uni', 'std', 1, True, 1, True, False),
+        ('uni', 'cplx', 1, False, 1, True, False),
+        ('uni', 'varmx', 1, False, 2, True, False),
+        ('uni', 'varmx', 1, False, 3, True, False),
+        ('bi', 'std', 0, True, 1, True, False),
+        ('bi', 'cplx', 0, True, 1, True, False),
+        ('bi', 'varmx', 0, True, 1, True, False),
+        ('bi', 'std', 1, True, 1, True, False),
+        ('bi', 'cplx', 1, False, 1, True, False),
+        ('bi', 'varmx', 1, False, 2, True, False),
+        ('bi', 'varmx', 1, False, 3, True, False),
+    ], name_func=name_func_get)
+    def test_significance_methods(
+            self, analysis, flavour, axis, replace, block_size, on_left, on_right):
+        cplx = False,
+        n_rot = 0
+        if flavour == 'cplx':
+            cplx = True
+        if flavour == 'varmx':
+            n_rot = 10
+        if analysis == 'uni':
+            model = xMCA(self.A)
+        elif analysis == 'bi':
+            model = xMCA(self.A, self.B)
+
+        model.solve(complexify=cplx)
+        if flavour == 'varmx':
+            model.rotate(n_rot)
+
+        model.rule_north(3)
+        model.rule_n(3)
+        incorrect_params = (
+            (axis not in [0, 1]) or
+            ((analysis == 'uni') and (on_right == True)) or
+            ((on_left == False) and (on_right == False)) or
+            ((self.A.shape[0] % block_size) != 0)
+        )
+        if incorrect_params:
+            assert_raises(
+                ValueError,
+                model.bootstrapping,
+                3, None, axis, on_left, on_right, block_size, replace, True
+            )
+        else:
+            model.bootstrapping(
+                n_runs=3, axis=axis, on_left=on_left, on_right=on_right,
+                block_size=block_size, replace=replace, disable_progress=True
+            )
 
     @classmethod
     def tearDownClass(self):

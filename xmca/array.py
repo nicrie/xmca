@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from xmca import __version__
 from xmca.tools.array import (get_nan_cols, has_nan_time_steps, remove_mean,
-                              remove_nan_cols)
+                              remove_nan_cols, block_bootstrap)
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
 
@@ -256,8 +256,11 @@ class MCA:
 
         return scaled
 
-    def _get_X(self, original_scale=False):
+    def _get_X(self, original_scale=False, real=False):
         X  = {k : f.copy() for k, f in self._fields.items()}
+
+        if real:
+            X  = {k : x.real for k, x in X.items()}
 
         if original_scale:
             X = self._scale_X_inverse(X)
@@ -941,7 +944,7 @@ class MCA:
             Fraction of described covariance of each mode.
 
         '''
-        variance  = self._variance[self._var_idx][:n]
+        variance  = self._get_variance(n=n, sorted=True)
         exp_var = variance / self._analysis['total_covariance'] * 100
         return exp_var
 
@@ -1347,7 +1350,7 @@ class MCA:
         var_names = [titles['var1']]
         if 'right' in self._keys:
             var_names.append(titles['var2'])
-    
+
         # plot PCs
         for i, pc in enumerate(pcs.values()):
             axes_pc[i].plot(pc)
@@ -1544,7 +1547,7 @@ class MCA:
                     self._set_analysis(key, value)
         info_file.close()
 
-    def rule_n(self, n_surrogates):
+    def rule_n(self, n_runs, n_modes=None):
         '''Apply *Rule N* by Overland and Preisendorfer, 1982.
 
         The aim of Rule N is to provide a rule of thumb for the significance of
@@ -1555,8 +1558,10 @@ class MCA:
 
         Parameters
         ----------
-        n : int
-            Number of synthetic samples.
+        n_runs : int
+            Number of Monte Carlo simulations.
+        n_modes : int
+            Number of singular values to return.
 
         Returns
         -------
@@ -1576,7 +1581,7 @@ class MCA:
 
         svals = []
 
-        for i in tqdm(range(n_surrogates)):
+        for i in tqdm(range(n_runs)):
             data = {}
             for k in self._keys:
                 data[k] = np.random.standard_normal([m[k], n[k]])
@@ -1588,7 +1593,152 @@ class MCA:
         svals = np.array(svals).T
         ref = self._get_svals()
         svals /= svals.sum(axis=0) / ref.sum()
-        return svals
+        return svals[:n_modes]
+
+    def rule_north(self, n=None):
+        '''Uncertainties of singular values based on North's *rule of thumb*.
+
+        In case of compex PCA/MCA, the rule of thumb includes another factor of
+        spqrt(2) according to Horel 1984.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of modes to be returned. By default return all.
+
+        Returns
+        -------
+        ndarray
+            Uncertainties associated to singular values.
+
+        References
+        ----------
+        North, G, T L. Bell, R Cahalan, and F J. Moeng. 1982.
+        “Sampling Errors in the Estimation of Empirical Orthogonal Functions.”
+        Monthly Weather Review 110.
+        https://doi.org/10.1175/1520-0493(1982)110<0699:SEITEO>2.0.CO;2.
+
+        Horel, JD. 1984. “Complex Principal Component Analysis: Theory and
+        Examples.” Journal of Climate and Applied Meteorology 23 (12): 1660–73.
+        https://doi.org/10.1175/1520-0450(1984)023<1660:CPCATA>2.0.CO;2.
+
+        '''
+
+        svals = self._get_svals(n)
+        n_obs = self._n_observations['left']
+        is_complex = self._analysis['is_complex']
+
+        err = svals * np.sqrt(2. / n_obs)
+
+        if is_complex:
+            err *= np.sqrt(2)
+
+        return err
+
+    def bootstrapping(
+            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, disable_progress=False):
+        '''Perform Monte Carlo bootstrapping on model.
+
+        Monte Carlo simulations allow to assess the signifcance of the
+        obtained singular values and hence modes by re-performing the analysis
+        on synthetic sample data. Using bootstrapping the synthetic data is
+        created by resampling the original data.
+
+        Parameters
+        ----------
+        n_runs : int
+            Number of Monte Carlo simulations.
+        n_modes : int
+            Number of modes to be returned. By default return all modes.
+        axis : int
+            Whether to resample along time (axis=0) or in space (axis=1).
+            The default is 0.
+        on_left : bool
+            Whether to resample the left field. True by default.
+        on_right : bool
+            Whether to resample the right field. False by default.
+        block_size : int
+            Resamples blocks of data of size `block_size`. This is particular
+            useful when there is strong autocorrelation (e.g. annual cycle)
+            which would be destroyed under standard bootstrapping. This
+            procedure is known as moving-block bootstrapping. By default block
+            size is 1.
+        replace : bool
+            Whether to resample with (bootstrap) or without replacement
+            (permutation). True by default (bootstrap).
+        disable_progress : bool
+            Whether to disable progress bar or not. By default False.
+
+        Returns
+        -------
+        np.ndarray
+            2d-array containing the singular values for each Monte Carlo
+            simulation.
+
+        References
+        ----------
+        Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
+        Chapman and Hall. 436 pp.
+
+        '''
+        # get meta information from original analysis
+        complexify = self._analysis['is_complex']
+        extend = self._analysis['extend']
+        period = self._analysis['theta_period']
+        is_rotated = self._analysis['is_rotated']
+        n_rot = self._analysis['n_rot']
+        power = self._analysis['power']
+
+        n_modes_max = self._get_max_mode(n_modes, rotated=True)
+
+        svals_surr = np.zeros([n_modes_max, n_runs])
+        for i in tqdm(range(n_runs), disable=disable_progress):
+
+            # get original data
+            X_surr = self._get_X(original_scale=False, real=True)
+
+            # resample data
+            if on_left and not on_right:
+                X_surr['left'] = block_bootstrap(
+                    X_surr['left'], axis=axis, block_size=block_size,
+                    replace=replace
+                )
+            elif on_right and not on_left:
+                try:
+                    X_surr['right'] = block_bootstrap(
+                        X_surr['right'], axis=axis, block_size=block_size,
+                        replace=replace
+                    )
+                except KeyError as err:
+                    msg = (
+                        'No bootstrapping possible. There is no right field. '
+                        'Set `on_right=False`.'
+                    )
+                    raise ValueError(msg) from err
+            elif on_left and on_right:
+                concat = np.concatenate(list(X_surr.values()), axis=1)
+                concat = block_bootstrap(
+                    concat, axis=axis, block_size=block_size,
+                    replace=replace
+                )
+                X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
+                X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
+            else:
+                msg = 'Either `on_left` or `on_right` needs to be True.'
+                raise ValueError(msg)
+
+            # perform analysis
+            model = MCA(*list(X_surr.values()))
+            model.solve(
+                complexify=complexify, extend=extend, period=period
+            )
+            if is_rotated:
+                model.rotate(n_rot, power)
+
+            svals_surr[:, i] = model._get_svals(n_modes_max)
+            del(model)
+        return svals_surr
 
     def load_analysis(
             self, path,

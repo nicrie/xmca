@@ -19,6 +19,7 @@
       ~xMCA.__init__
       ~xMCA.apply_coslat
       ~xMCA.apply_weights
+      ~xMCA.bootstrapping
       ~xMCA.correlation_matrix
       ~xMCA.eofs
       ~xMCA.explained_variance
@@ -34,6 +35,8 @@
       ~xMCA.reconstructed_fields
       ~xMCA.rotate
       ~xMCA.rotation_matrix
+      ~xMCA.rule_n
+      ~xMCA.rule_north
       ~xMCA.save_analysis
       ~xMCA.save_plot
       ~xMCA.scf
@@ -43,10 +46,10 @@
       ~xMCA.spatial_amplitude
       ~xMCA.spatial_phase
       ~xMCA.summary
-      ~xMCA.summmary
       ~xMCA.temporal_amplitude
       ~xMCA.temporal_phase
       ~xMCA.truncate
+      ~xMCA.variance
    
    
 

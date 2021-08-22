@@ -15,7 +15,7 @@ well as ``numpy.ndarray`` as input formats.
 .. figure:: ../../figs/example-plot2.png
    :alt: Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.
 
-Mode 2 of complex rotated Maximum Covariance Analysis showing the shared 
+Mode 2 of complex rotated Maximum Covariance Analysis showing the shared
 dynamics of SST and continental precipitation associated to ENSO between
 1980 and 2020.
 
@@ -42,7 +42,7 @@ Documentation
 
 .. toctree::
    installation
-   quickstart
+   tutorial
    api
 
 

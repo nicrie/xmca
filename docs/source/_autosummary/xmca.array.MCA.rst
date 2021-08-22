@@ -18,6 +18,7 @@
    
       ~MCA.__init__
       ~MCA.apply_weights
+      ~MCA.bootstrapping
       ~MCA.correlation_matrix
       ~MCA.eofs
       ~MCA.explained_variance
@@ -30,6 +31,8 @@
       ~MCA.predict
       ~MCA.rotate
       ~MCA.rotation_matrix
+      ~MCA.rule_n
+      ~MCA.rule_north
       ~MCA.save_plot
       ~MCA.scf
       ~MCA.set_field_names
@@ -41,6 +44,7 @@
       ~MCA.temporal_amplitude
       ~MCA.temporal_phase
       ~MCA.truncate
+      ~MCA.variance
    
    
 
