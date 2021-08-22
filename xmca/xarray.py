@@ -1418,7 +1418,7 @@ class xMCA(MCA):
         '''
         super().summary()
 
-    def rule_n(self, n):
+    def rule_n(self, n_runs, n_modes):
         '''Apply *Rule N* by Overland and Preisendorfer, 1982.
 
         The aim of Rule N is to provide a rule of thumb for the significance of
@@ -1429,8 +1429,10 @@ class xMCA(MCA):
 
         Parameters
         ----------
-        n : int
+        n_runs : int
             Number of Monte Carlo simulations.
+        n_modes : int
+            Number of singular values to return.
 
         Returns
         -------
@@ -1444,14 +1446,14 @@ class xMCA(MCA):
         Rev. 110, 1–4.
 
         '''
-        svals = super().rule_n(n)
+        svals = super().rule_n(n_runs, n_modes)
 
         svals = xr.DataArray(
             svals,
             dims=['mode', 'run'],
             coords={
-                'mode' : np.arange(1, svals.shape[0] + 1),
-                'run' : np.arange(1, n + 1)
+                'mode' : np.arange(1, n_modes + 1),
+                'run' : np.arange(1, n_runs + 1)
             },
             name='singular values'
         )
