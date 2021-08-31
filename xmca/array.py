@@ -142,6 +142,36 @@ class MCA:
 
         self._analysis['method']        = self._get_method_id()
 
+    def _get_slice(self, input):
+        ''' Create a appropriate slice object.
+
+        If input is an int, create slice(0, input). If input is a slice, create
+        slice(input.start - 1, input.stop, input.step).
+
+        '''
+
+        if np.issubdtype(type(input), np.integer) or input is None:
+            if input is None:
+                input = self._analysis['rank']
+            output = slice(0, input)
+        elif isinstance(input, slice):
+            try:
+                new_start = max(0, input.start - 1)
+            except TypeError:
+                new_start = 0
+            try:
+                new_stop = min(input.stop, self._analysis['rank'])
+            except TypeError:
+                new_stop = self._analysis['rank']
+            new_step = input.step
+            output = slice(new_start, new_stop, new_step)
+        else:
+            dtype = type(input)
+            msg = 'Invalid type {:}. Must be either int or slice.'.format(dtype)
+            raise ValueError(msg)
+
+        return output
+
     def set_field_names(self, left='left', right='right'):
         '''Set the name of the left and/or right field.
 
@@ -452,7 +482,7 @@ class MCA:
             Vts[k] = vt
         return Us, Ss, Vts
 
-    def _get_max_mode(self, n=None, rotated=False):
+    def _get_min_mode(self, n=None, rotated=False):
         n_modes = []
         n_modes.append(self._analysis['rank'])
 
@@ -463,6 +493,18 @@ class MCA:
             n_modes.append(self._analysis['n_rot'])
 
         return np.min(n_modes)
+
+    def _get_max_mode(self, n=None, rotated=False):
+        n_modes = []
+        n_modes.append(self._analysis['rank'])
+
+        if n is not None:
+            n_modes[0] = n
+
+        if rotated:
+            n_modes.append(self._analysis['n_rot'])
+
+        return np.max(n_modes)
 
     def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
@@ -561,8 +603,9 @@ class MCA:
         self._analysis['is_truncated_at'] = len(singular_values)
 
     def _get_svals(self, n=None):
+        modes = self._get_slice(n)
         try:
-            return self._singular_values[:n]
+            return self._singular_values[modes]
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular values. '
@@ -570,11 +613,18 @@ class MCA:
             )
 
     def _get_V(self, n=None, rotated=True):
-        all_modes = self._get_max_mode(rotated=rotated)
-        n = self._get_max_mode(n, rotated=rotated)
+        if rotated:
+            max_mode = self._analysis['n_rot']
+        else:
+            if isinstance(n, slice):
+                max_mode = n.stop
+            else:
+                max_mode = n
+
+        keep_modes = self._get_slice(n)
 
         try:
-            V = {k: v[:, :all_modes] for k, v in self._V.items()}
+            V = {k: v[:, :max_mode] for k, v in self._V.items()}
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular vectors. '
@@ -583,25 +633,32 @@ class MCA:
 
         for k in self._keys:
             if rotated:
-                sqrt_svals = np.sqrt(self._get_svals(all_modes))
-                norm    = self._get_norm(all_modes, sorted=False)
+                sqrt_svals = np.sqrt(self._get_svals(max_mode))
+                norm    = self._get_norm(max_mode, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
                 # reorder according to variance
                 V[k] = V[k][:, var_idx]
 
-            V[k] = V[k][:, :n]
+            V[k] = V[k][:, keep_modes]
 
         return V
 
     def _get_U(self, n=None, rotated=True):
-        all_modes = self._get_max_mode(rotated=rotated)
-        n = self._get_max_mode(n, rotated=rotated)
+        if rotated:
+            max_mode = self._analysis['n_rot']
+        else:
+            if isinstance(n, slice):
+                max_mode = n.stop
+            else:
+                max_mode = n
+
+        keep_modes = self._get_slice(n)
 
         fields  = self._get_X()
-        V = self._get_V(all_modes, rotated=False)
-        sqrt_svals = np.sqrt(self._get_svals(all_modes))
+        V = self._get_V(max_mode, rotated=False)
+        sqrt_svals = np.sqrt(self._get_svals(max_mode))
         R       = self.rotation_matrix(inverse_transpose=True)
         var_idx = self._var_idx
 
@@ -609,10 +666,10 @@ class MCA:
         for k in self._keys:
             U[k] = fields[k] @ V[k] / sqrt_svals
             if rotated:
-                U[k] = U[k] @ R 
+                U[k] = U[k] @ R
                 # reorder according to variance
                 U[k] = U[k][:, var_idx]
-            U[k] = U[k][:, :n]
+            U[k] = U[k][:, keep_modes]
 
         return U
 
@@ -667,7 +724,6 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, rotated=True):
 
         U = self._get_U(n, rotated=rotated)
-        sqrt_dof = np.sqrt(self._n_observations['left'] - 1)
 
         for k in self._keys:
             # apply phase shift
@@ -697,6 +753,7 @@ class MCA:
         return U
 
     def _get_norm(self, n=None, sorted=True):
+        modes = self._get_slice(n)
         try:
             norm = self._norm
         except AttributeError:
@@ -708,7 +765,7 @@ class MCA:
             idx = self._var_idx
             norm = {k: nrm[idx] for k, nrm in norm.items()}
 
-        norm = {k: nrm[:n] for k, nrm in norm.items()}
+        norm = {k: nrm[modes] for k, nrm in norm.items()}
 
         return norm
 
@@ -1127,6 +1184,31 @@ class MCA:
             phases[key] = np.arctan2(pc.imag, pc.real).real
 
         return phases
+
+    def reconstructed_fields(self, mode=None, original_scale=True):
+        V = self._get_V(n=mode, rotated=True)
+        U = self._get_pcs(n=mode, scaling='eigen', rotated=True)
+
+        Xrec = {}
+        for loc in self._keys:
+            Xrec[loc] = U[loc] @ V[loc].conj().T
+            # ensure real part only for complex solution
+            Xrec[loc] = Xrec[loc].real
+
+        if original_scale:
+            Xrec = self._scale_X_inverse(Xrec)
+
+        # reshape to input dimensions
+        n_obs = self._n_observations['left']
+        n_vars = self._n_variables
+        spatial_shape = self._fields_spatial_shape
+        no_nan_idx = self._no_nan_index
+        for k in Xrec.keys():
+            rec_fields = np.zeros((n_obs, n_vars[k])) * np.nan
+            rec_fields[:, no_nan_idx[k]]  = Xrec[k]
+            Xrec[k] = rec_fields.reshape((-1,) + spatial_shape[k])
+
+        return Xrec
 
     def predict(
             self, left=None, right=None,
@@ -1596,7 +1678,8 @@ class MCA:
         svals = np.array(svals).T
         ref = self._get_variance()
         svals /= svals.sum(axis=0) / ref.sum()
-        return svals[:n_modes]
+        n_modes = self._get_slice(n_modes)
+        return svals[n_modes]
 
     def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
@@ -1693,7 +1776,7 @@ class MCA:
         n_rot = self._analysis['n_rot']
         power = self._analysis['power']
 
-        n_modes_max = self._get_max_mode(n_modes, rotated=True)
+        n_modes_max = self._get_min_mode(n_modes, rotated=True)
 
         var_surr = np.zeros([n_modes_max, n_runs])
         for i in tqdm(range(n_runs), disable=disable_progress):

@@ -285,11 +285,13 @@ class xMCA(MCA):
             Singular values of the SVD.
 
         '''
-        n = self._get_max_mode(n)
-        modes = list(range(1, n + 1))
+
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         values = super().singular_values(n)
+
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(values)]
         values = xr.DataArray(
             values,
             dims=['mode'],
@@ -315,13 +317,12 @@ class xMCA(MCA):
         '''
         norms = super().norm(n=n, sorted=sorted)
 
-        n_modes = norms['left'].size
-
-        modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
 
         for k, data in norms.items():
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:len(data)]
             norms[k] = xr.DataArray(
                 data,
                 dims=['mode'],
@@ -347,9 +348,9 @@ class xMCA(MCA):
         '''
         var = super().variance(n=n, sorted=sorted)
 
-        n_modes = var.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(var)]
 
-        modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         var = xr.DataArray(
@@ -379,23 +380,21 @@ class xMCA(MCA):
             Fraction of described covariance of each mode.
 
         '''
-        variance = super().explained_variance(n)
+        expvar = super().explained_variance(n)
 
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = variance.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(expvar)]
 
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
-        variance = xr.DataArray(
-            variance,
+        expvar = xr.DataArray(
+            expvar,
             dims=['mode'],
             coords={'mode' : modes},
             name='covariance fraction',
             attrs=attrs)
 
-        return variance
+        return expvar
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
@@ -417,11 +416,9 @@ class xMCA(MCA):
         '''
         variance = super().scf(n)
 
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = variance.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(variance)]
 
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         variance = xr.DataArray(
@@ -463,7 +460,8 @@ class xMCA(MCA):
         coords      = self._field_coords
         field_names = self._field_names
         for key, pc in pcs.items():
-            modes = list(range(1, pc.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pc.shape[-1]]
             pcs[key] = xr.DataArray(
                 data=pc,
                 dims=['time', 'mode'],
@@ -503,7 +501,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, eof in eofs.items():
-            modes = list(range(1, eof.shape[-1] +1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:eof.shape[-1]]
             eofs[key] = xr.DataArray(
                 data=eof,
                 dims=['lat', 'lon', 'mode'],
@@ -544,7 +543,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
-            modes = list(range(1, amp.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:amp.shape[-1]]
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['lat', 'lon', 'mode'],
@@ -593,7 +593,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, pha in phases.items():
-            modes = list(range(1, pha.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pha.shape[-1]]
             phases[key] = xr.DataArray(
                 data=pha,
                 dims=['lat', 'lon', 'mode'],
@@ -635,7 +636,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
-            modes = list(range(1, amp.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:amp.shape[-1]]
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['time', 'mode'],
@@ -676,7 +678,8 @@ class xMCA(MCA):
         coords      = self._field_coords
 
         for key, pha in phases.items():
-            modes = list(range(1, pha.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pha.shape[-1]]
             phases[key] = xr.DataArray(
                 data=pha,
                 dims=['time', 'mode'],
@@ -761,7 +764,7 @@ class xMCA(MCA):
 
         return het_patterns
 
-    def reconstructed_fields(self, mode=slice(1, None)):
+    def reconstructed_fields(self, mode=slice(1, None), original_scale=True):
         '''Reconstruct original input fields based on specified `mode`s.
 
         Parameters
@@ -777,51 +780,22 @@ class xMCA(MCA):
             Left and right reconstructed fields.
 
         '''
-
-        # TODO: move the computation to a private function;
-        # requires extra work: array has to deal with cool slice(n, m) feature
-        # which already exists for xarray
-        eofs    = self.eofs(scaling='None')
-        pcs     = self.pcs(scaling='eigen')
-        dof       = (self._n_observations['left'] - 1)
         coords  = self._field_coords
-        # TODO: remove this super ugly structure
-        n_vars = self._n_variables
-        no_nan_idx = self._no_nan_index
-        fshape = self._fields_spatial_shape
-        std     = self._field_stds
-        mean    = self._field_means
-        std_with_nan = {}
-        mean_with_nan = {}
-        for k in self._keys:
-            std_with_nan[k] = np.zeros(n_vars[k]) * np.nan
-            mean_with_nan[k] = np.zeros(n_vars[k]) * np.nan
-            std_with_nan[k][no_nan_idx[k]] = std[k]
-            mean_with_nan[k][no_nan_idx[k]] = mean[k]
-            std_with_nan[k] = std_with_nan[k].reshape(fshape[k])
-            mean_with_nan[k] = mean_with_nan[k].reshape(fshape[k])
+        dims  = self._field_dims
+        rec_fields = super().reconstructed_fields(
+            mode=mode, original_scale=original_scale
+        )
 
-        rec_fields = {}
         for key in self._keys:
-            eofs[key]   = eofs[key].sel(mode=mode)
-            pcs[key]    = pcs[key].sel(mode=mode)
-            rec_fields[key] = xr.dot(
-                pcs[key], eofs[key].conjugate(), dims=['mode']
+            rec_fields[key] = xr.DataArray(
+                rec_fields[key],
+                dims=dims[key],
+                coords=coords[key],
+                name='reconstructed_{:}_field'.format(key)
             )
-            rec_fields[key] *= np.sqrt(dof)
-            rec_fields[key] = rec_fields[key].real
-
-            if self._analysis['is_coslat_corrected']:
-                coslat = np.cos(np.deg2rad(coords[key]['lat']))
-                rec_fields[key] /= np.sqrt(coslat)
-
-            if self._analysis['is_normalized']:
-                rec_fields[key] *= std_with_nan[key]
-
-            # add mean fields
-            rec_fields[key]  += mean_with_nan[key]
 
         return rec_fields
+
 
     def predict(
             self, left=None, right=None,
@@ -1334,11 +1308,12 @@ class xMCA(MCA):
         '''
         uncertainties = super().rule_north(n=n)
         attrs = {k: str(v) for k, v in self._analysis.items()}
-
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(uncertainties)]
         uncertainties = xr.DataArray(
             uncertainties,
             dims=['mode'],
-            coords={'mode' : np.arange(1, uncertainties.shape[0] + 1)},
+            coords={'mode' : modes},
             attrs=attrs,
             name='singular values'
         )
@@ -1398,12 +1373,15 @@ class xMCA(MCA):
             replace=replace, disable_progress=disable_progress
         )
 
+        slice = self._get_slice(n_modes)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(surr_svals)]
+
         attrs = {k: str(v) for k, v in self._analysis.items()}
         surr_svals = xr.DataArray(
             surr_svals,
             dims=['mode', 'run'],
             coords={
-                'mode' : range(1, surr_svals.shape[0] + 1),
+                'mode' : modes,
                 'run' : range(1, surr_svals.shape[1] + 1)
             },
             name='singular values',
@@ -1447,11 +1425,13 @@ class xMCA(MCA):
         '''
         svals = super().rule_n(n_runs, n_modes)
 
+        slice = self._get_slice(n_modes)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:svals.shape[0]]
         svals = xr.DataArray(
             svals,
             dims=['mode', 'run'],
             coords={
-                'mode' : np.arange(1, svals.shape[0] + 1),
+                'mode' : modes,
                 'run' : np.arange(1, n_runs + 1)
             },
             name='singular values'
