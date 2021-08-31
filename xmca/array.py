@@ -1578,6 +1578,9 @@ class MCA:
         m = self._n_observations
         n = self._n_variables
         complexify = self._analysis['is_complex']
+        rotated = self._analysis['is_rotated']
+        n_rot = self._analysis['n_rot']
+        power = self._analysis['power']
 
         svals = []
 
@@ -1587,11 +1590,13 @@ class MCA:
                 data[k] = np.random.standard_normal([m[k], n[k]])
             model = MCA(*list(data.values()))
             model.solve(complexify=complexify)
-            svals.append(model._get_svals())
+            if rotated:
+                model.rotate(n_rot, power)
+            svals.append(model._get_variance())
             del(model)
 
         svals = np.array(svals).T
-        ref = self._get_svals()
+        ref = self._get_variance()
         svals /= svals.sum(axis=0) / ref.sum()
         return svals[:n_modes]
 
@@ -1692,7 +1697,7 @@ class MCA:
 
         n_modes_max = self._get_max_mode(n_modes, rotated=True)
 
-        svals_surr = np.zeros([n_modes_max, n_runs])
+        var_surr = np.zeros([n_modes_max, n_runs])
         for i in tqdm(range(n_runs), disable=disable_progress):
 
             # get original data
@@ -1736,9 +1741,9 @@ class MCA:
             if is_rotated:
                 model.rotate(n_rot, power)
 
-            svals_surr[:, i] = model._get_svals(n_modes_max)
+            var_surr[:, i] = model._get_variance(n_modes_max)
             del(model)
-        return svals_surr
+        return var_surr
 
     def load_analysis(
             self, path,
