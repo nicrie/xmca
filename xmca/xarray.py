@@ -1304,7 +1304,6 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
-
     def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
 

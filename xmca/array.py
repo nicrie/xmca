@@ -604,13 +604,12 @@ class MCA:
         sqrt_svals = np.sqrt(self._get_svals(all_modes))
         R       = self.rotation_matrix(inverse_transpose=True)
         var_idx = self._var_idx
-        dof = self._n_observations['left'] - 1
 
         U = {}
         for k in self._keys:
             U[k] = fields[k] @ V[k] / sqrt_svals
             if rotated:
-                U[k] = U[k] @ R  / np.sqrt(dof)
+                U[k] = U[k] @ R 
                 # reorder according to variance
                 U[k] = U[k][:, var_idx]
             U[k] = U[k][:, :n]
@@ -668,6 +667,7 @@ class MCA:
             self, n=None, scaling='None', phase_shift=0, rotated=True):
 
         U = self._get_U(n, rotated=rotated)
+        sqrt_dof = np.sqrt(self._n_observations['left'] - 1)
 
         for k in self._keys:
             # apply phase shift
@@ -679,7 +679,7 @@ class MCA:
             # by eigenvalues
             elif scaling == 'eigen':
                 norm = self._get_norm(n, sorted=True)
-                U[k] *= norm[k]
+                U[k] *= (norm[k])
             # by maximum value
             elif scaling == 'max':
                 U[k] /= np.nanmax(abs(U[k].real), axis=0)
@@ -1163,8 +1163,6 @@ class MCA:
         data = [left, right]
         data_new = {k: d.copy() for k, d in zip(keys, data) if d is not None}
 
-        n_obs = self._n_observations['left']
-        dof = n_obs - 1
         shape = self._shape
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
@@ -1225,7 +1223,7 @@ class MCA:
             #     x_new /= fields_std[k]
 
             pcs = x_new @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
-            pcs = pcs @ R / np.sqrt(dof)
+            pcs = pcs @ R
             # reorder according to variance
             pcs = pcs[:, var_idx]
             # take first n PCs only
