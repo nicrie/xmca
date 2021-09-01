@@ -1321,7 +1321,8 @@ class xMCA(MCA):
 
     def bootstrapping(
             self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
-            block_size=1, replace=True, disable_progress=False):
+            block_size=1, replace=True, strategy='standard',
+            disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1351,6 +1352,14 @@ class xMCA(MCA):
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        strategy : ['standard', 'iterative']
+            Whether to perform standard or iterative permutation. Standard
+            permutation typically is overly conservative since it estimates
+            the entire singular value spectrum at once. Iterative approach is
+            more realistic taking into account each singular value before
+            estimating the next one. The iterative approach usually takes much
+            more time. Consult Winkler et al. (2020) for more details on
+            the iterative approach.
         disable_progress : bool
             Whether to disable progress bar or not. By default False.
 
@@ -1365,12 +1374,17 @@ class xMCA(MCA):
         Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
         Chapman and Hall. 436 pp.
 
+        Winkler, A. M., Renaud, O., Smith, S. M. & Nichols, T. E. Permutation
+        inference for canonical correlation analysis. NeuroImage 220, 117065
+        (2020).
+
         '''
 
         surr_svals = super().bootstrapping(
             n_runs=n_runs, n_modes=n_modes, axis=0,
             on_left=on_left, on_right=on_right, block_size=block_size,
-            replace=replace, disable_progress=disable_progress
+            replace=replace, strategy=strategy,
+            disable_progress=disable_progress
         )
 
         slice = self._get_slice(n_modes)

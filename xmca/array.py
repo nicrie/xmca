@@ -1185,7 +1185,7 @@ class MCA:
 
         return phases
 
-    def reconstructed_fields(self, mode=None, original_scale=True):
+    def _reconstructed_X(self, mode=None, original_scale=True):
         V = self._get_V(n=mode, rotated=True)
         U = self._get_pcs(n=mode, scaling='eigen', rotated=True)
 
@@ -1198,6 +1198,12 @@ class MCA:
         if original_scale:
             Xrec = self._scale_X_inverse(Xrec)
 
+        return Xrec
+
+    def _reconstructed_fields(self, mode=None, original_scale=True):
+        Xrec = self._reconstructed_X(
+            mode=mode, original_scale=original_scale
+        )
         # reshape to input dimensions
         n_obs = self._n_observations['left']
         n_vars = self._n_variables
@@ -1209,6 +1215,11 @@ class MCA:
             Xrec[k] = rec_fields.reshape((-1,) + spatial_shape[k])
 
         return Xrec
+
+    def reconstructed_fields(self, mode=None, original_scale=True):
+        return self._reconstructed_fields(
+            mode=mode, original_scale=original_scale
+        )
 
     def predict(
             self, left=None, right=None,
@@ -1723,7 +1734,8 @@ class MCA:
 
     def bootstrapping(
             self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
-            block_size=1, replace=True, disable_progress=False):
+            block_size=1, replace=True, strategy='standard',
+            disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1753,6 +1765,14 @@ class MCA:
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        strategy : ['standard', 'iterative']
+            Whether to perform standard or iterative permutation. Standard
+            permutation typically is overly conservative since it estimates
+            the entire singular value spectrum at once. Iterative approach is
+            more realistic taking into account each singular value before
+            estimating the next one. The iterative approach usually takes much
+            more time. Consult Winkler et al. (2020) for more details on
+            the iterative approach.
         disable_progress : bool
             Whether to disable progress bar or not. By default False.
 
@@ -1767,6 +1787,11 @@ class MCA:
         Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
         Chapman and Hall. 436 pp.
 
+        Winkler, A. M., Renaud, O., Smith, S. M. & Nichols, T. E. Permutation
+        inference for canonical correlation analysis. NeuroImage 220, 117065
+        (2020).
+
+
         '''
         # get meta information from original analysis
         complexify = self._analysis['is_complex']
@@ -1779,51 +1804,70 @@ class MCA:
         n_modes_max = self._get_min_mode(n_modes, rotated=True)
 
         var_surr = np.zeros([n_modes_max, n_runs])
-        for i in tqdm(range(n_runs), disable=disable_progress):
 
-            # get original data
-            X_surr = self._get_X(original_scale=False, real=True)
-
-            # resample data
-            if on_left and not on_right:
-                X_surr['left'] = block_bootstrap(
-                    X_surr['left'], axis=axis, block_size=block_size,
-                    replace=replace
-                )
-            elif on_right and not on_left:
-                try:
-                    X_surr['right'] = block_bootstrap(
-                        X_surr['right'], axis=axis, block_size=block_size,
+        # check each individual mode; for standard approach the singular value
+        # spectrum is estimated within one single iteration. For iterative
+        # approach, estimate first mode, then remove the mode from the data
+        # and rerun the analysis on the residual data for testing the second
+        # mode. Repeat this up to n_modes.
+        for mode in tqdm(range(n_modes), disable=disable_progress):
+            if strategy == 'standard':
+                # get original data
+                X_surr = self._get_X(original_scale=False, real=True)
+            elif strategy == 'iterative':
+                # get resuidual data by removing first modes
+                X_surr = self._get_X(original_scale=False, real=True)
+                X_rec = self._reconstructed_X(mode=mode, original_scale=False)
+                for k in X_surr.keys():
+                    X_surr[k] -= X_rec[k]
+            # perform n_runs on bootstrapped data
+            for run in tqdm(range(n_runs), disable=disable_progress, leave=True):
+                # resample data
+                if on_left and not on_right:
+                    X_surr['left'] = block_bootstrap(
+                        X_surr['left'], axis=axis, block_size=block_size,
                         replace=replace
                     )
-                except KeyError as err:
-                    msg = (
-                        'No bootstrapping possible. There is no right field. '
-                        'Set `on_right=False`.'
+                elif on_right and not on_left:
+                    try:
+                        X_surr['right'] = block_bootstrap(
+                            X_surr['right'], axis=axis, block_size=block_size,
+                            replace=replace
+                        )
+                    except KeyError as err:
+                        msg = (
+                            'No bootstrapping possible. There is no right field. '
+                            'Set `on_right=False`.'
+                        )
+                        raise ValueError(msg) from err
+                elif on_left and on_right:
+                    concat = np.concatenate(list(X_surr.values()), axis=1)
+                    concat = block_bootstrap(
+                        concat, axis=axis, block_size=block_size,
+                        replace=replace
                     )
-                    raise ValueError(msg) from err
-            elif on_left and on_right:
-                concat = np.concatenate(list(X_surr.values()), axis=1)
-                concat = block_bootstrap(
-                    concat, axis=axis, block_size=block_size,
-                    replace=replace
+                    X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
+                    X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
+                else:
+                    pass
+                    # msg = 'Either `on_left` or `on_right` needs to be True.'
+                    # raise ValueError(msg)
+
+                # perform analysis
+                model = MCA(*list(X_surr.values()))
+                model.solve(
+                    complexify=complexify, extend=extend, period=period
                 )
-                X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
-                X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
-            else:
-                msg = 'Either `on_left` or `on_right` needs to be True.'
-                raise ValueError(msg)
+                if is_rotated:
+                    model.rotate(n_rot, power)
 
-            # perform analysis
-            model = MCA(*list(X_surr.values()))
-            model.solve(
-                complexify=complexify, extend=extend, period=period
-            )
-            if is_rotated:
-                model.rotate(n_rot, power)
+                var = model._get_variance(n_modes_max - mode)
+                var_surr[mode:, run] = var
+                del(model)
 
-            var_surr[:, i] = model._get_variance(n_modes_max)
-            del(model)
+            if strategy == 'standard':
+                break
+
         return var_surr
 
     def load_analysis(
