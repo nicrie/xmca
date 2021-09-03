@@ -513,25 +513,27 @@ class TestIntegration(unittest.TestCase):
         model.correlation_matrix()
 
     @parameterized.expand([
-        ('uni', 'std', 0, True, 1, True, True),
-        ('uni', 'std', 0, True, 1, False, False),
-        ('uni', 'std', 0, True, 1, True, False),
-        ('uni', 'cplx', 0, True, 1, True, False),
-        ('uni', 'varmx', 0, True, 1, True, False),
-        ('uni', 'std', 1, True, 1, True, False),
-        ('uni', 'cplx', 1, False, 1, True, False),
-        ('uni', 'varmx', 1, False, 2, True, False),
-        ('uni', 'varmx', 1, False, 3, True, False),
-        ('bi', 'std', 0, True, 1, True, False),
-        ('bi', 'cplx', 0, True, 1, True, False),
-        ('bi', 'varmx', 0, True, 1, True, False),
-        ('bi', 'std', 1, True, 1, True, False),
-        ('bi', 'cplx', 1, False, 1, True, False),
-        ('bi', 'varmx', 1, False, 2, True, False),
-        ('bi', 'varmx', 1, False, 3, True, False),
+        ('uni', 'std', 0, True, 1, True, True, 'standard'),
+        ('uni', 'std', 0, True, 1, False, False, 'standard'),
+        ('uni', 'std', 0, True, 1, True, False, 'standard'),
+        ('uni', 'cplx', 0, True, 1, True, False, 'standard'),
+        ('uni', 'varmx', 0, True, 1, True, False, 'standard'),
+        ('uni', 'std', 1, True, 1, True, False, 'standard'),
+        ('uni', 'cplx', 1, False, 1, True, False, 'standard'),
+        ('uni', 'varmx', 1, False, 2, True, False, 'standard'),
+        ('uni', 'varmx', 1, False, 3, True, False, 'standard'),
+        ('bi', 'std', 0, True, 1, True, False, 'standard'),
+        ('bi', 'cplx', 0, True, 1, True, False, 'standard'),
+        ('bi', 'varmx', 0, True, 1, True, False, 'standard'),
+        ('bi', 'std', 1, True, 1, True, False, 'standard'),
+        ('bi', 'cplx', 1, False, 1, True, False, 'standard'),
+        ('bi', 'varmx', 1, False, 2, True, False, 'standard'),
+        ('bi', 'varmx', 1, False, 3, True, False, 'standard'),
+        ('bi', 'varmx', 1, False, 3, True, False, 'iterative'),
     ], name_func=name_func_get)
     def test_significance_methods(
-            self, analysis, flavour, axis, replace, block_size, on_left, on_right):
+            self, analysis, flavour, axis, replace, block_size,
+            on_left, on_right, strategy):
         cplx = False,
         n_rot = 0
         if flavour == 'cplx':
@@ -552,19 +554,21 @@ class TestIntegration(unittest.TestCase):
         incorrect_params = (
             (axis not in [0, 1]) or
             ((analysis == 'uni') and (on_right == True)) or
-            ((on_left == False) and (on_right == False)) or
+            # ((on_left == False) and (on_right == False)) or
             ((self.A.shape[0] % block_size) != 0)
         )
         if incorrect_params:
             assert_raises(
                 ValueError,
                 model.bootstrapping,
-                3, None, axis, on_left, on_right, block_size, replace, True
+                3, 3, axis, on_left, on_right, block_size, replace, strategy, True
             )
         else:
             model.bootstrapping(
-                n_runs=3, axis=axis, on_left=on_left, on_right=on_right,
-                block_size=block_size, replace=replace, disable_progress=True
+                n_runs=3, n_modes=3, axis=axis,
+                on_left=on_left, on_right=on_right,
+                block_size=block_size, replace=replace,
+                strategy=strategy, disable_progress=True
             )
 
     @classmethod
