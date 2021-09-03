@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 from xmca.array import MCA
 from xmca.tools.text import boldify_str, secure_str
-from xmca.tools.xarray import calc_temporal_corr, get_extent
+from xmca.tools.xarray import get_extent
 
 # =============================================================================
 # xMCA
@@ -710,19 +710,42 @@ class xMCA(MCA):
 
         '''
 
-        fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift=phase_shift)
+        hom_pats, pvals = super().homogeneous_patterns(
+            n=n, phase_shift=phase_shift
+        )
 
         field_names = self._field_names
+        coords      = self._field_coords
         attrs = {k: str(v) for k, v in self._analysis.items()}
-        hom_patterns = {}
-        for key, field in fields.items():
-            hom_patterns[key] = calc_temporal_corr(fields[key], pcs[key].real)
-            name = ' '.join([field_names[key], 'homogeneous patterns'])
-            hom_patterns[key].name  = name
-            hom_patterns[key].attrs = attrs
 
-        return hom_patterns
+        for key in self._keys:
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))
+            modes = modes[:hom_pats[key].shape[-1]]
+
+            hom_pats[key] = xr.DataArray(
+                data=hom_pats[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'homogeneous patterns']),
+                attrs=attrs
+            )
+
+            pvals[key] = xr.DataArray(
+                data=pvals[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'pvalues homogeneous patterns']),
+                attrs=attrs
+            )
+
+        return hom_pats, pvals
 
     def heterogeneous_patterns(self, n=None, phase_shift=0):
         '''
@@ -743,26 +766,42 @@ class xMCA(MCA):
             Heterogeneous patterns associated to left and right input field.
 
         '''
-        fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift=phase_shift)
+        het_pats, pvals = super().heterogeneous_patterns(
+            n=n, phase_shift=phase_shift
+        )
 
         field_names = self._field_names
+        coords      = self._field_coords
         attrs = {k: str(v) for k, v in self._analysis.items()}
-        het_patterns = {}
-        reverse = {'left' : 'right', 'right' : 'left'}
-        for key, field in fields.items():
-            try:
-                het_patterns[key] = calc_temporal_corr(
-                    fields[key], pcs[reverse[key]].real
-                )
-            except KeyError:
-                err = 'Key not found. Two fields needed for heterogenous maps.'
-                raise KeyError(err)
-            name = ' '.join([field_names[key], 'heterogenous patterns'])
-            het_patterns[key].name  = name
-            het_patterns[key].attrs = attrs
 
-        return het_patterns
+        for key in self._keys:
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))
+            modes = modes[:het_pats[key].shape[-1]]
+
+            het_pats[key] = xr.DataArray(
+                data=het_pats[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'heterogeneous patterns']),
+                attrs=attrs
+            )
+
+            pvals[key] = xr.DataArray(
+                data=pvals[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'pvalues heterogeneous patterns']),
+                attrs=attrs
+            )
+
+        return het_pats, pvals
 
     def reconstructed_fields(self, mode=slice(1, None), original_scale=True):
         '''Reconstruct original input fields based on specified `mode`s.
@@ -795,7 +834,6 @@ class xMCA(MCA):
             )
 
         return rec_fields
-
 
     def predict(
             self, left=None, right=None,
