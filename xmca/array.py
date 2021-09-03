@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from xmca import __version__
 from xmca.tools.array import (get_nan_cols, has_nan_time_steps, remove_mean,
-                              remove_nan_cols, block_bootstrap)
+                              remove_nan_cols, pearsonr, block_bootstrap)
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
 
@@ -1184,6 +1184,81 @@ class MCA:
             phases[key] = np.arctan2(pc.imag, pc.real).real
 
         return phases
+
+    def homogeneous_patterns(self, n=None, phase_shift=0):
+        pcs = self._get_pcs(n=n, phase_shift=phase_shift)
+        Xraw = self._get_X(real=True)
+
+        r = {}
+        p = {}
+        for key in self._keys:
+            r[key], p[key] = pearsonr(Xraw[key], pcs[key].real)
+
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
+
+        rvals = {}
+        pvals = {}
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = r[k].dtype
+            n_modes = r[k].shape[1]
+            rvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            rvals[k][no_nan_idx[k], :] = r[k]
+            # reshape eofs to have original input shape
+            rvals[k]   = rvals[k].reshape(field_shape[k] + (n_modes,))
+
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = p[k].dtype
+            n_modes = p[k].shape[1]
+            pvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            pvals[k][no_nan_idx[k], :] = p[k]
+            # reshape eofs to have original input shape
+            pvals[k]   = pvals[k].reshape(field_shape[k] + (n_modes,))
+
+        return rvals, pvals
+
+    def heterogeneous_patterns(self, n=None, phase_shift=0):
+        pcs = self._get_pcs(n=n, phase_shift=phase_shift)
+        Xraw = self._get_X(real=True)
+
+        r = {}
+        p = {}
+        reverse = dict(zip(self._keys, self._keys[::-1]))
+        for key in self._keys:
+            try:
+                r[key], p[key] = pearsonr(Xraw[key], pcs[reverse[key]].real)
+            except KeyError:
+                err = 'Key not found. Two fields needed for heterogenous maps.'
+                raise KeyError(err)
+
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
+
+        rvals = {}
+        pvals = {}
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = r[k].dtype
+            n_modes = r[k].shape[1]
+            rvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            rvals[k][no_nan_idx[k], :] = r[k]
+            # reshape eofs to have original input shape
+            rvals[k]   = rvals[k].reshape(field_shape[k] + (n_modes,))
+
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = p[k].dtype
+            n_modes = p[k].shape[1]
+            pvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            pvals[k][no_nan_idx[k], :] = p[k]
+            # reshape eofs to have original input shape
+            pvals[k]   = pvals[k].reshape(field_shape[k] + (n_modes,))
+
+        return rvals, pvals
 
     def _reconstructed_X(self, mode=None, original_scale=True):
         V = self._get_V(n=mode, rotated=True)

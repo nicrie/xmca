@@ -253,8 +253,8 @@ class TestIntegration(unittest.TestCase):
         model.solve(complexify=cplx)
         if n_rot > 0:
             model.rotate(n_rot)
-        hom_pat = model.homogeneous_patterns(10)
-        het_pat = model.heterogeneous_patterns(10)
+        hom_pat, _ = model.homogeneous_patterns(10)
+        het_pat, _ = model.heterogeneous_patterns(10)
 
         self.assertGreaterEqual(1, abs(hom_pat['left']).max())
         self.assertGreaterEqual(1, abs(hom_pat['right']).max())
