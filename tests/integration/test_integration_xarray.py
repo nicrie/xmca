@@ -173,7 +173,9 @@ class TestIntegration(unittest.TestCase):
         ('cplx_promx', True, True, 10, 4)
     ], name_func=name_func)
     def test_correlation(self, analysis, norm, cplx, n_rot, power):
-        n = self.modes
+        n_modes = self.modes
+        dof = self.A.shape[0] - 1
+
         model = xMCA(self.A, self.B)
         model.set_field_names('sst', 'prcp')
         if norm:
@@ -181,11 +183,11 @@ class TestIntegration(unittest.TestCase):
         model.solve(complexify=cplx)
         if n_rot > 1:
             model.rotate(n_rot, power)
-            n = n_rot
+            n_modes = n_rot
         U = model._get_U()
-        result = (U['left'].conjugate().T @ U['right']).real
-        result = result[:n, :n]
-        expected = np.eye(n)
+        result = (U['left'].conjugate().T @ U['right']).real / dof
+        result = result[:n_modes, :n_modes]
+        expected = np.eye(n_modes)
 
         if model._analysis['power'] > 1:
             assert_raises(AssertionError, assert_allclose, result, expected)
