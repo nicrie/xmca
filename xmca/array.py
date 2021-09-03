@@ -1808,7 +1808,7 @@ class MCA:
         return err
 
     def bootstrapping(
-            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
+            self, n_runs, n_modes=20, axis=0, on_left=True, on_right=False,
             block_size=1, replace=True, strategy='standard',
             disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
