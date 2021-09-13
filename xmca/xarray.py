@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 from xmca.array import MCA
 from xmca.tools.text import boldify_str, secure_str
-from xmca.tools.xarray import calc_temporal_corr, get_extent
+from xmca.tools.xarray import get_extent
 
 # =============================================================================
 # xMCA
@@ -285,11 +285,13 @@ class xMCA(MCA):
             Singular values of the SVD.
 
         '''
-        n = self._get_max_mode(n)
-        modes = list(range(1, n + 1))
+
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         values = super().singular_values(n)
+
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(values)]
         values = xr.DataArray(
             values,
             dims=['mode'],
@@ -315,13 +317,12 @@ class xMCA(MCA):
         '''
         norms = super().norm(n=n, sorted=sorted)
 
-        n_modes = norms['left'].size
-
-        modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
         field_names = self._field_names
 
         for k, data in norms.items():
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:len(data)]
             norms[k] = xr.DataArray(
                 data,
                 dims=['mode'],
@@ -347,9 +348,9 @@ class xMCA(MCA):
         '''
         var = super().variance(n=n, sorted=sorted)
 
-        n_modes = var.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(var)]
 
-        modes = list(range(1, n_modes + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         var = xr.DataArray(
@@ -379,23 +380,21 @@ class xMCA(MCA):
             Fraction of described covariance of each mode.
 
         '''
-        variance = super().explained_variance(n)
+        expvar = super().explained_variance(n)
 
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = variance.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(expvar)]
 
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
-        variance = xr.DataArray(
-            variance,
+        expvar = xr.DataArray(
+            expvar,
             dims=['mode'],
             coords={'mode' : modes},
             name='covariance fraction',
             attrs=attrs)
 
-        return variance
+        return expvar
 
     def scf(self, n=None):
         '''Return the SCF of the first `n` modes.
@@ -417,11 +416,9 @@ class xMCA(MCA):
         '''
         variance = super().scf(n)
 
-        # if n is not provided, take all singular_values
-        if n is None:
-            n = variance.size
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(variance)]
 
-        modes = list(range(1, n + 1))
         attrs = {k: str(v) for k, v in self._analysis.items()}
 
         variance = xr.DataArray(
@@ -463,7 +460,8 @@ class xMCA(MCA):
         coords      = self._field_coords
         field_names = self._field_names
         for key, pc in pcs.items():
-            modes = list(range(1, pc.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pc.shape[-1]]
             pcs[key] = xr.DataArray(
                 data=pc,
                 dims=['time', 'mode'],
@@ -503,7 +501,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, eof in eofs.items():
-            modes = list(range(1, eof.shape[-1] +1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:eof.shape[-1]]
             eofs[key] = xr.DataArray(
                 data=eof,
                 dims=['lat', 'lon', 'mode'],
@@ -544,7 +543,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
-            modes = list(range(1, amp.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:amp.shape[-1]]
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['lat', 'lon', 'mode'],
@@ -593,7 +593,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, pha in phases.items():
-            modes = list(range(1, pha.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pha.shape[-1]]
             phases[key] = xr.DataArray(
                 data=pha,
                 dims=['lat', 'lon', 'mode'],
@@ -635,7 +636,8 @@ class xMCA(MCA):
         field_names = self._field_names
 
         for key, amp in amplitudes.items():
-            modes = list(range(1, amp.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:amp.shape[-1]]
             amplitudes[key] = xr.DataArray(
                 data=amp,
                 dims=['time', 'mode'],
@@ -676,7 +678,8 @@ class xMCA(MCA):
         coords      = self._field_coords
 
         for key, pha in phases.items():
-            modes = list(range(1, pha.shape[-1] + 1))
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))[:pha.shape[-1]]
             phases[key] = xr.DataArray(
                 data=pha,
                 dims=['time', 'mode'],
@@ -707,19 +710,42 @@ class xMCA(MCA):
 
         '''
 
-        fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift=phase_shift)
+        hom_pats, pvals = super().homogeneous_patterns(
+            n=n, phase_shift=phase_shift
+        )
 
         field_names = self._field_names
+        coords      = self._field_coords
         attrs = {k: str(v) for k, v in self._analysis.items()}
-        hom_patterns = {}
-        for key, field in fields.items():
-            hom_patterns[key] = calc_temporal_corr(fields[key], pcs[key].real)
-            name = ' '.join([field_names[key], 'homogeneous patterns'])
-            hom_patterns[key].name  = name
-            hom_patterns[key].attrs = attrs
 
-        return hom_patterns
+        for key in self._keys:
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))
+            modes = modes[:hom_pats[key].shape[-1]]
+
+            hom_pats[key] = xr.DataArray(
+                data=hom_pats[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'homogeneous patterns']),
+                attrs=attrs
+            )
+
+            pvals[key] = xr.DataArray(
+                data=pvals[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'pvalues homogeneous patterns']),
+                attrs=attrs
+            )
+
+        return hom_pats, pvals
 
     def heterogeneous_patterns(self, n=None, phase_shift=0):
         '''
@@ -740,28 +766,44 @@ class xMCA(MCA):
             Heterogeneous patterns associated to left and right input field.
 
         '''
-        fields  = self.fields()
-        pcs     = self.pcs(n, phase_shift=phase_shift)
+        het_pats, pvals = super().heterogeneous_patterns(
+            n=n, phase_shift=phase_shift
+        )
 
         field_names = self._field_names
+        coords      = self._field_coords
         attrs = {k: str(v) for k, v in self._analysis.items()}
-        het_patterns = {}
-        reverse = {'left' : 'right', 'right' : 'left'}
-        for key, field in fields.items():
-            try:
-                het_patterns[key] = calc_temporal_corr(
-                    fields[key], pcs[reverse[key]].real
-                )
-            except KeyError:
-                err = 'Key not found. Two fields needed for heterogenous maps.'
-                raise KeyError(err)
-            name = ' '.join([field_names[key], 'heterogenous patterns'])
-            het_patterns[key].name  = name
-            het_patterns[key].attrs = attrs
 
-        return het_patterns
+        for key in self._keys:
+            slice = self._get_slice(n)
+            modes = list(range(slice.start + 1, slice.stop + 1))
+            modes = modes[:het_pats[key].shape[-1]]
 
-    def reconstructed_fields(self, mode=slice(1, None)):
+            het_pats[key] = xr.DataArray(
+                data=het_pats[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'heterogeneous patterns']),
+                attrs=attrs
+            )
+
+            pvals[key] = xr.DataArray(
+                data=pvals[key],
+                dims=['lat', 'lon', 'mode'],
+                coords={
+                    'lon' : coords[key]['lon'],
+                    'lat' : coords[key]['lat'],
+                    'mode' : modes},
+                name=' '.join([field_names[key], 'pvalues heterogeneous patterns']),
+                attrs=attrs
+            )
+
+        return het_pats, pvals
+
+    def reconstructed_fields(self, mode=slice(1, None), original_scale=True):
         '''Reconstruct original input fields based on specified `mode`s.
 
         Parameters
@@ -777,49 +819,19 @@ class xMCA(MCA):
             Left and right reconstructed fields.
 
         '''
-
-        # TODO: move the computation to a private function;
-        # requires extra work: array has to deal with cool slice(n, m) feature
-        # which already exists for xarray
-        eofs    = self.eofs(scaling='None')
-        pcs     = self.pcs(scaling='eigen')
-        dof       = (self._n_observations['left'] - 1)
         coords  = self._field_coords
-        # TODO: remove this super ugly structure
-        n_vars = self._n_variables
-        no_nan_idx = self._no_nan_index
-        fshape = self._fields_spatial_shape
-        std     = self._field_stds
-        mean    = self._field_means
-        std_with_nan = {}
-        mean_with_nan = {}
-        for k in self._keys:
-            std_with_nan[k] = np.zeros(n_vars[k]) * np.nan
-            mean_with_nan[k] = np.zeros(n_vars[k]) * np.nan
-            std_with_nan[k][no_nan_idx[k]] = std[k]
-            mean_with_nan[k][no_nan_idx[k]] = mean[k]
-            std_with_nan[k] = std_with_nan[k].reshape(fshape[k])
-            mean_with_nan[k] = mean_with_nan[k].reshape(fshape[k])
+        dims  = self._field_dims
+        rec_fields = super().reconstructed_fields(
+            mode=mode, original_scale=original_scale
+        )
 
-        rec_fields = {}
         for key in self._keys:
-            eofs[key]   = eofs[key].sel(mode=mode)
-            pcs[key]    = pcs[key].sel(mode=mode)
-            rec_fields[key] = xr.dot(
-                pcs[key], eofs[key].conjugate(), dims=['mode']
+            rec_fields[key] = xr.DataArray(
+                rec_fields[key],
+                dims=dims[key],
+                coords=coords[key],
+                name='reconstructed_{:}_field'.format(key)
             )
-            rec_fields[key] *= np.sqrt(dof)
-            rec_fields[key] = rec_fields[key].real
-
-            if self._analysis['is_coslat_corrected']:
-                coslat = np.cos(np.deg2rad(coords[key]['lat']))
-                rec_fields[key] /= np.sqrt(coslat)
-
-            if self._analysis['is_normalized']:
-                rec_fields[key] *= std_with_nan[key]
-
-            # add mean fields
-            rec_fields[key]  += mean_with_nan[key]
 
         return rec_fields
 
@@ -1304,7 +1316,6 @@ class xMCA(MCA):
         if self._analysis['is_coslat_corrected']:
             self.apply_coslat()
 
-
     def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
 
@@ -1335,19 +1346,21 @@ class xMCA(MCA):
         '''
         uncertainties = super().rule_north(n=n)
         attrs = {k: str(v) for k, v in self._analysis.items()}
-
+        slice = self._get_slice(n)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(uncertainties)]
         uncertainties = xr.DataArray(
             uncertainties,
             dims=['mode'],
-            coords={'mode' : np.arange(1, uncertainties.shape[0] + 1)},
+            coords={'mode' : modes},
             attrs=attrs,
             name='singular values'
         )
         return uncertainties
 
     def bootstrapping(
-            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
-            block_size=1, replace=True, disable_progress=False):
+            self, n_runs, n_modes=20, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, strategy='standard',
+            disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1377,6 +1390,14 @@ class xMCA(MCA):
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        strategy : ['standard', 'iterative']
+            Whether to perform standard or iterative permutation. Standard
+            permutation typically is overly conservative since it estimates
+            the entire singular value spectrum at once. Iterative approach is
+            more realistic taking into account each singular value before
+            estimating the next one. The iterative approach usually takes much
+            more time. Consult Winkler et al. (2020) for more details on
+            the iterative approach.
         disable_progress : bool
             Whether to disable progress bar or not. By default False.
 
@@ -1391,20 +1412,28 @@ class xMCA(MCA):
         Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
         Chapman and Hall. 436 pp.
 
+        Winkler, A. M., Renaud, O., Smith, S. M. & Nichols, T. E. Permutation
+        inference for canonical correlation analysis. NeuroImage 220, 117065
+        (2020).
+
         '''
 
         surr_svals = super().bootstrapping(
             n_runs=n_runs, n_modes=n_modes, axis=0,
             on_left=on_left, on_right=on_right, block_size=block_size,
-            replace=replace, disable_progress=disable_progress
+            replace=replace, strategy=strategy,
+            disable_progress=disable_progress
         )
+
+        slice = self._get_slice(n_modes)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:len(surr_svals)]
 
         attrs = {k: str(v) for k, v in self._analysis.items()}
         surr_svals = xr.DataArray(
             surr_svals,
             dims=['mode', 'run'],
             coords={
-                'mode' : range(1, surr_svals.shape[0] + 1),
+                'mode' : modes,
                 'run' : range(1, surr_svals.shape[1] + 1)
             },
             name='singular values',
@@ -1442,17 +1471,19 @@ class xMCA(MCA):
         References
         ----------
         * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
-        principal components applied to a cyclone climatology. Mon. Weather
-        Rev. 110, 1–4.
+            principal components applied to a cyclone climatology. Mon. Weather
+            Rev. 110, 1–4.
 
         '''
         svals = super().rule_n(n_runs, n_modes)
 
+        slice = self._get_slice(n_modes)
+        modes = list(range(slice.start + 1, slice.stop + 1))[:svals.shape[0]]
         svals = xr.DataArray(
             svals,
             dims=['mode', 'run'],
             coords={
-                'mode' : np.arange(1, svals.shape[0] + 1),
+                'mode' : modes,
                 'run' : np.arange(1, n_runs + 1)
             },
             name='singular values'

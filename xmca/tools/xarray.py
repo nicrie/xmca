@@ -31,20 +31,6 @@ def is_DataArray(data):
         raise TypeError("Data format has to be xarray.DatArray.")
 
 
-def calc_temporal_corr(x, y):
-    is_DataArray(x)
-    is_DataArray(y)
-
-    x = x - x.mean('time')
-    y = y - y.mean('time')
-
-    xy = xr.dot(x * y, dims='time') / x.shape[0]
-    sigx = x.std('time')
-    sigy = y.std('time')
-    corr_coef = xy / sigx / sigy
-    return corr_coef
-
-
 def wrap_lon_to_180(da, lon='lon'):
     '''
     Wrap longitude coordinates of DatArray to -180..179

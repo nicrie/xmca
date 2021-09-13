@@ -5,6 +5,7 @@
 import warnings
 
 import numpy as np
+import scipy.stats
 
 
 # =============================================================================
@@ -70,6 +71,21 @@ def has_nan_time_steps(array):
     '''
 
     return (np.isnan(array).all(axis=tuple(range(1, array.ndim))).any())
+
+
+def pearsonr(x, y):
+    if x.shape[0] != y.shape[0]:
+        raise ValueError('Time dimensions are different.')
+    n = x.shape[0]
+
+    r = np.corrcoef(x, y, rowvar=False)
+    r = r[:x.shape[1], x.shape[1]:]
+
+    # get p-values
+    dist = scipy.stats.beta(n / 2 - 1, n / 2 - 1, loc=-1, scale=2)
+    p = 2 * dist.cdf(-abs(r))
+
+    return r, p
 
 
 def block_bootstrap(

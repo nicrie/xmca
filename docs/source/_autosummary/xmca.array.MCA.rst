@@ -23,12 +23,15 @@
       ~MCA.eofs
       ~MCA.explained_variance
       ~MCA.fields
+      ~MCA.heterogeneous_patterns
+      ~MCA.homogeneous_patterns
       ~MCA.load_analysis
       ~MCA.norm
       ~MCA.normalize
       ~MCA.pcs
       ~MCA.plot
       ~MCA.predict
+      ~MCA.reconstructed_fields
       ~MCA.rotate
       ~MCA.rotation_matrix
       ~MCA.rule_n

@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from xmca import __version__
 from xmca.tools.array import (get_nan_cols, has_nan_time_steps, remove_mean,
-                              remove_nan_cols, block_bootstrap)
+                              remove_nan_cols, pearsonr, block_bootstrap)
 from xmca.tools.rotation import promax
 from xmca.tools.text import boldify_str, secure_str, wrap_str
 
@@ -141,6 +141,36 @@ class MCA:
         }
 
         self._analysis['method']        = self._get_method_id()
+
+    def _get_slice(self, input):
+        ''' Create a appropriate slice object.
+
+        If input is an int, create slice(0, input). If input is a slice, create
+        slice(input.start - 1, input.stop, input.step).
+
+        '''
+
+        if np.issubdtype(type(input), np.integer) or input is None:
+            if input is None:
+                input = self._analysis['rank']
+            output = slice(0, input)
+        elif isinstance(input, slice):
+            try:
+                new_start = max(0, input.start - 1)
+            except TypeError:
+                new_start = 0
+            try:
+                new_stop = min(input.stop, self._analysis['rank'])
+            except TypeError:
+                new_stop = self._analysis['rank']
+            new_step = input.step
+            output = slice(new_start, new_stop, new_step)
+        else:
+            dtype = type(input)
+            msg = 'Invalid type {:}. Must be either int or slice.'.format(dtype)
+            raise ValueError(msg)
+
+        return output
 
     def set_field_names(self, left='left', right='right'):
         '''Set the name of the left and/or right field.
@@ -452,7 +482,7 @@ class MCA:
             Vts[k] = vt
         return Us, Ss, Vts
 
-    def _get_max_mode(self, n=None, rotated=False):
+    def _get_min_mode(self, n=None, rotated=False):
         n_modes = []
         n_modes.append(self._analysis['rank'])
 
@@ -463,6 +493,18 @@ class MCA:
             n_modes.append(self._analysis['n_rot'])
 
         return np.min(n_modes)
+
+    def _get_max_mode(self, n=None, rotated=False):
+        n_modes = []
+        n_modes.append(self._analysis['rank'])
+
+        if n is not None:
+            n_modes[0] = n
+
+        if rotated:
+            n_modes.append(self._analysis['n_rot'])
+
+        return np.max(n_modes)
 
     def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
@@ -561,8 +603,9 @@ class MCA:
         self._analysis['is_truncated_at'] = len(singular_values)
 
     def _get_svals(self, n=None):
+        modes = self._get_slice(n)
         try:
-            return self._singular_values[:n]
+            return self._singular_values[modes]
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular values. '
@@ -570,11 +613,18 @@ class MCA:
             )
 
     def _get_V(self, n=None, rotated=True):
-        all_modes = self._get_max_mode(rotated=rotated)
-        n = self._get_max_mode(n, rotated=rotated)
+        if rotated:
+            max_mode = self._analysis['n_rot']
+        else:
+            if isinstance(n, slice):
+                max_mode = n.stop
+            else:
+                max_mode = n
+
+        keep_modes = self._get_slice(n)
 
         try:
-            V = {k: v[:, :all_modes] for k, v in self._V.items()}
+            V = {k: v[:, :max_mode] for k, v in self._V.items()}
         except AttributeError:
             raise RuntimeError(
                 'Cannot retrieve singular vectors. '
@@ -583,37 +633,43 @@ class MCA:
 
         for k in self._keys:
             if rotated:
-                sqrt_svals = np.sqrt(self._get_svals(all_modes))
-                norm    = self._get_norm(all_modes, sorted=False)
+                sqrt_svals = np.sqrt(self._get_svals(max_mode))
+                norm    = self._get_norm(max_mode, sorted=False)
                 R       = self.rotation_matrix()
                 var_idx = self._var_idx
                 V[k] = V[k] * sqrt_svals @ R / norm[k]
                 # reorder according to variance
                 V[k] = V[k][:, var_idx]
 
-            V[k] = V[k][:, :n]
+            V[k] = V[k][:, keep_modes]
 
         return V
 
     def _get_U(self, n=None, rotated=True):
-        all_modes = self._get_max_mode(rotated=rotated)
-        n = self._get_max_mode(n, rotated=rotated)
+        if rotated:
+            max_mode = self._analysis['n_rot']
+        else:
+            if isinstance(n, slice):
+                max_mode = n.stop
+            else:
+                max_mode = n
+
+        keep_modes = self._get_slice(n)
 
         fields  = self._get_X()
-        V = self._get_V(all_modes, rotated=False)
-        sqrt_svals = np.sqrt(self._get_svals(all_modes))
+        V = self._get_V(max_mode, rotated=False)
+        sqrt_svals = np.sqrt(self._get_svals(max_mode))
         R       = self.rotation_matrix(inverse_transpose=True)
         var_idx = self._var_idx
-        dof = self._n_observations['left'] - 1
 
         U = {}
         for k in self._keys:
             U[k] = fields[k] @ V[k] / sqrt_svals
             if rotated:
-                U[k] = U[k] @ R  / np.sqrt(dof)
+                U[k] = U[k] @ R
                 # reorder according to variance
                 U[k] = U[k][:, var_idx]
-            U[k] = U[k][:, :n]
+            U[k] = U[k][:, keep_modes]
 
         return U
 
@@ -679,7 +735,7 @@ class MCA:
             # by eigenvalues
             elif scaling == 'eigen':
                 norm = self._get_norm(n, sorted=True)
-                U[k] *= norm[k]
+                U[k] *= (norm[k])
             # by maximum value
             elif scaling == 'max':
                 U[k] /= np.nanmax(abs(U[k].real), axis=0)
@@ -697,6 +753,7 @@ class MCA:
         return U
 
     def _get_norm(self, n=None, sorted=True):
+        modes = self._get_slice(n)
         try:
             norm = self._norm
         except AttributeError:
@@ -708,7 +765,7 @@ class MCA:
             idx = self._var_idx
             norm = {k: nrm[idx] for k, nrm in norm.items()}
 
-        norm = {k: nrm[:n] for k, nrm in norm.items()}
+        norm = {k: nrm[modes] for k, nrm in norm.items()}
 
         return norm
 
@@ -1128,6 +1185,117 @@ class MCA:
 
         return phases
 
+    def homogeneous_patterns(self, n=None, phase_shift=0):
+        pcs = self._get_pcs(n=n, phase_shift=phase_shift)
+        Xraw = self._get_X(real=True)
+
+        r = {}
+        p = {}
+        for key in self._keys:
+            r[key], p[key] = pearsonr(Xraw[key], pcs[key].real)
+
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
+
+        rvals = {}
+        pvals = {}
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = r[k].dtype
+            n_modes = r[k].shape[1]
+            rvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            rvals[k][no_nan_idx[k], :] = r[k]
+            # reshape eofs to have original input shape
+            rvals[k]   = rvals[k].reshape(field_shape[k] + (n_modes,))
+
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = p[k].dtype
+            n_modes = p[k].shape[1]
+            pvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            pvals[k][no_nan_idx[k], :] = p[k]
+            # reshape eofs to have original input shape
+            pvals[k]   = pvals[k].reshape(field_shape[k] + (n_modes,))
+
+        return rvals, pvals
+
+    def heterogeneous_patterns(self, n=None, phase_shift=0):
+        pcs = self._get_pcs(n=n, phase_shift=phase_shift)
+        Xraw = self._get_X(real=True)
+
+        r = {}
+        p = {}
+        reverse = dict(zip(self._keys, self._keys[::-1]))
+        for key in self._keys:
+            try:
+                r[key], p[key] = pearsonr(Xraw[key], pcs[reverse[key]].real)
+            except KeyError:
+                err = 'Key not found. Two fields needed for heterogenous maps.'
+                raise KeyError(err)
+
+        n_var       = self._n_variables
+        no_nan_idx  = self._no_nan_index
+        field_shape = self._fields_spatial_shape
+
+        rvals = {}
+        pvals = {}
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = r[k].dtype
+            n_modes = r[k].shape[1]
+            rvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            rvals[k][no_nan_idx[k], :] = r[k]
+            # reshape eofs to have original input shape
+            rvals[k]   = rvals[k].reshape(field_shape[k] + (n_modes,))
+
+        for k in self._keys:
+            # create data fields with original NaNs
+            dtype       = p[k].dtype
+            n_modes = p[k].shape[1]
+            pvals[k]   = np.zeros([n_var[k], n_modes], dtype=dtype) * np.nan
+            pvals[k][no_nan_idx[k], :] = p[k]
+            # reshape eofs to have original input shape
+            pvals[k]   = pvals[k].reshape(field_shape[k] + (n_modes,))
+
+        return rvals, pvals
+
+    def _reconstructed_X(self, mode=None, original_scale=True):
+        V = self._get_V(n=mode, rotated=True)
+        U = self._get_pcs(n=mode, scaling='eigen', rotated=True)
+
+        Xrec = {}
+        for loc in self._keys:
+            Xrec[loc] = U[loc] @ V[loc].conj().T
+            # ensure real part only for complex solution
+            Xrec[loc] = Xrec[loc].real
+
+        if original_scale:
+            Xrec = self._scale_X_inverse(Xrec)
+
+        return Xrec
+
+    def _reconstructed_fields(self, mode=None, original_scale=True):
+        Xrec = self._reconstructed_X(
+            mode=mode, original_scale=original_scale
+        )
+        # reshape to input dimensions
+        n_obs = self._n_observations['left']
+        n_vars = self._n_variables
+        spatial_shape = self._fields_spatial_shape
+        no_nan_idx = self._no_nan_index
+        for k in Xrec.keys():
+            rec_fields = np.zeros((n_obs, n_vars[k])) * np.nan
+            rec_fields[:, no_nan_idx[k]]  = Xrec[k]
+            Xrec[k] = rec_fields.reshape((-1,) + spatial_shape[k])
+
+        return Xrec
+
+    def reconstructed_fields(self, mode=None, original_scale=True):
+        return self._reconstructed_fields(
+            mode=mode, original_scale=original_scale
+        )
+
     def predict(
             self, left=None, right=None,
             n=None, scaling='None', phase_shift=0):
@@ -1163,8 +1331,6 @@ class MCA:
         data = [left, right]
         data_new = {k: d.copy() for k, d in zip(keys, data) if d is not None}
 
-        n_obs = self._n_observations['left']
-        dof = n_obs - 1
         shape = self._shape
         n_vars = self._n_variables
         no_nan_idx = self._no_nan_index
@@ -1225,7 +1391,7 @@ class MCA:
             #     x_new /= fields_std[k]
 
             pcs = x_new @ V[k][:, :n_rot] / sqrt_svals[:n_rot]
-            pcs = pcs @ R / np.sqrt(dof)
+            pcs = pcs @ R
             # reorder according to variance
             pcs = pcs[:, var_idx]
             # take first n PCs only
@@ -1571,13 +1737,16 @@ class MCA:
         References
         ----------
         * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
-        principal components applied to a cyclone climatology. Mon. Weather
-        Rev. 110, 1–4.
+            principal components applied to a cyclone climatology. Mon. Weather
+            Rev. 110, 1–4.
 
         '''
         m = self._n_observations
         n = self._n_variables
         complexify = self._analysis['is_complex']
+        rotated = self._analysis['is_rotated']
+        n_rot = self._analysis['n_rot']
+        power = self._analysis['power']
 
         svals = []
 
@@ -1587,13 +1756,16 @@ class MCA:
                 data[k] = np.random.standard_normal([m[k], n[k]])
             model = MCA(*list(data.values()))
             model.solve(complexify=complexify)
-            svals.append(model._get_svals())
+            if rotated:
+                model.rotate(n_rot, power)
+            svals.append(model._get_variance())
             del(model)
 
         svals = np.array(svals).T
-        ref = self._get_svals()
+        ref = self._get_variance()
         svals /= svals.sum(axis=0) / ref.sum()
-        return svals[:n_modes]
+        n_modes = self._get_slice(n_modes)
+        return svals[n_modes]
 
     def rule_north(self, n=None):
         '''Uncertainties of singular values based on North's *rule of thumb*.
@@ -1636,8 +1808,9 @@ class MCA:
         return err
 
     def bootstrapping(
-            self, n_runs, n_modes=None, axis=0, on_left=True, on_right=False,
-            block_size=1, replace=True, disable_progress=False):
+            self, n_runs, n_modes=20, axis=0, on_left=True, on_right=False,
+            block_size=1, replace=True, strategy='standard',
+            disable_progress=False):
         '''Perform Monte Carlo bootstrapping on model.
 
         Monte Carlo simulations allow to assess the signifcance of the
@@ -1667,6 +1840,14 @@ class MCA:
         replace : bool
             Whether to resample with (bootstrap) or without replacement
             (permutation). True by default (bootstrap).
+        strategy : ['standard', 'iterative']
+            Whether to perform standard or iterative permutation. Standard
+            permutation typically is overly conservative since it estimates
+            the entire singular value spectrum at once. Iterative approach is
+            more realistic taking into account each singular value before
+            estimating the next one. The iterative approach usually takes much
+            more time. Consult Winkler et al. (2020) for more details on
+            the iterative approach.
         disable_progress : bool
             Whether to disable progress bar or not. By default False.
 
@@ -1681,6 +1862,11 @@ class MCA:
         Efron, B., Tibshirani, R.J., 1993. An Introduction to the Bootstrap.
         Chapman and Hall. 436 pp.
 
+        Winkler, A. M., Renaud, O., Smith, S. M. & Nichols, T. E. Permutation
+        inference for canonical correlation analysis. NeuroImage 220, 117065
+        (2020).
+
+
         '''
         # get meta information from original analysis
         complexify = self._analysis['is_complex']
@@ -1690,55 +1876,74 @@ class MCA:
         n_rot = self._analysis['n_rot']
         power = self._analysis['power']
 
-        n_modes_max = self._get_max_mode(n_modes, rotated=True)
+        n_modes_max = self._get_min_mode(n_modes, rotated=True)
 
-        svals_surr = np.zeros([n_modes_max, n_runs])
-        for i in tqdm(range(n_runs), disable=disable_progress):
+        var_surr = np.zeros([n_modes_max, n_runs])
 
-            # get original data
-            X_surr = self._get_X(original_scale=False, real=True)
-
-            # resample data
-            if on_left and not on_right:
-                X_surr['left'] = block_bootstrap(
-                    X_surr['left'], axis=axis, block_size=block_size,
-                    replace=replace
-                )
-            elif on_right and not on_left:
-                try:
-                    X_surr['right'] = block_bootstrap(
-                        X_surr['right'], axis=axis, block_size=block_size,
+        # check each individual mode; for standard approach the singular value
+        # spectrum is estimated within one single iteration. For iterative
+        # approach, estimate first mode, then remove the mode from the data
+        # and rerun the analysis on the residual data for testing the second
+        # mode. Repeat this up to n_modes.
+        for mode in tqdm(range(n_modes), disable=disable_progress):
+            if strategy == 'standard':
+                # get original data
+                X_surr = self._get_X(original_scale=False, real=True)
+            elif strategy == 'iterative':
+                # get resuidual data by removing first modes
+                X_surr = self._get_X(original_scale=False, real=True)
+                X_rec = self._reconstructed_X(mode=mode, original_scale=False)
+                for k in X_surr.keys():
+                    X_surr[k] -= X_rec[k]
+            # perform n_runs on bootstrapped data
+            for run in tqdm(range(n_runs), disable=disable_progress, leave=True):
+                # resample data
+                if on_left and not on_right:
+                    X_surr['left'] = block_bootstrap(
+                        X_surr['left'], axis=axis, block_size=block_size,
                         replace=replace
                     )
-                except KeyError as err:
-                    msg = (
-                        'No bootstrapping possible. There is no right field. '
-                        'Set `on_right=False`.'
+                elif on_right and not on_left:
+                    try:
+                        X_surr['right'] = block_bootstrap(
+                            X_surr['right'], axis=axis, block_size=block_size,
+                            replace=replace
+                        )
+                    except KeyError as err:
+                        msg = (
+                            'No bootstrapping possible. There is no right field. '
+                            'Set `on_right=False`.'
+                        )
+                        raise ValueError(msg) from err
+                elif on_left and on_right:
+                    concat = np.concatenate(list(X_surr.values()), axis=1)
+                    concat = block_bootstrap(
+                        concat, axis=axis, block_size=block_size,
+                        replace=replace
                     )
-                    raise ValueError(msg) from err
-            elif on_left and on_right:
-                concat = np.concatenate(list(X_surr.values()), axis=1)
-                concat = block_bootstrap(
-                    concat, axis=axis, block_size=block_size,
-                    replace=replace
+                    X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
+                    X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
+                else:
+                    pass
+                    # msg = 'Either `on_left` or `on_right` needs to be True.'
+                    # raise ValueError(msg)
+
+                # perform analysis
+                model = MCA(*list(X_surr.values()))
+                model.solve(
+                    complexify=complexify, extend=extend, period=period
                 )
-                X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
-                X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
-            else:
-                msg = 'Either `on_left` or `on_right` needs to be True.'
-                raise ValueError(msg)
+                if is_rotated:
+                    model.rotate(n_rot, power)
 
-            # perform analysis
-            model = MCA(*list(X_surr.values()))
-            model.solve(
-                complexify=complexify, extend=extend, period=period
-            )
-            if is_rotated:
-                model.rotate(n_rot, power)
+                var = model._get_variance(n_modes_max - mode)
+                var_surr[mode:, run] = var
+                del(model)
 
-            svals_surr[:, i] = model._get_svals(n_modes_max)
-            del(model)
-        return svals_surr
+            if strategy == 'standard':
+                break
+
+        return var_surr
 
     def load_analysis(
             self, path,
