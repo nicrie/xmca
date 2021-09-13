@@ -1471,8 +1471,8 @@ class xMCA(MCA):
         References
         ----------
         * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
-        principal components applied to a cyclone climatology. Mon. Weather
-        Rev. 110, 1–4.
+            principal components applied to a cyclone climatology. Mon. Weather
+            Rev. 110, 1–4.
 
         '''
         svals = super().rule_n(n_runs, n_modes)

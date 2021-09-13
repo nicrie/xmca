@@ -1737,8 +1737,8 @@ class MCA:
         References
         ----------
         * Overland, J.E., Preisendorfer, R.W., 1982. A significance test for
-        principal components applied to a cyclone climatology. Mon. Weather
-        Rev. 110, 1–4.
+            principal components applied to a cyclone climatology. Mon. Weather
+            Rev. 110, 1–4.
 
         '''
         m = self._n_observations
