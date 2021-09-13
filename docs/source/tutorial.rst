@@ -114,6 +114,38 @@ Varimax-rotated MCA on the first 10 EOFs run:
     mca.rotate(n_rot=10, power=1)
 
 
+Now retrieving the rotated PCs/EOFs works the same as before for standard MCA.
+Note that the singular values are not affected by the rotation. If you want to
+obtain the (co-)variance associated to each mode, use the ``variance`` method,
+which is also used to determine the explained variance after rotation.
+
+
+.. code:: py
+
+    svals = mca.singular_values()  # same as before rotation
+    variance = mca.variance()  # different from singular values
+    rotated_expvar = mca.explained_variance()  # different after rotation
+
+    rotated_eofs  = mca.eofs()
+    rotated_pcs   = mca.pcs()
+
+If for some reason you want to obtain the unrotated PCs/EOFs after the model
+has been rotated, the ``rotated`` parameter comes in handy.
+
+
+.. code:: py
+
+    unrotated_eofs  = mca.eofs(rotated=False)
+    unrotated_pcs   = mca.pcs(rotated=False)
+
+
+.. note::
+    For standard MCA, the results of ``singular_values`` and ``variance`` are
+    identical. In fact, for standard MCA each singular value is indeed just the
+    covariance explained by the respective mode.
+
+
+
 Complex MCA
 ~~~~~~~~~~~
 Complex PCA/MCA [[#]_, [#]_] provides a means to investigate lagged
@@ -142,6 +174,7 @@ chosen a priori.
 As a result of complex MCA, the EOFs and PCs have a real and imaginary part.
 This allows to compute the spatial amplitude and phase function as well as
 the temporal amplitude and phase function:
+
 
 .. code:: py
 
@@ -216,6 +249,7 @@ Evaluation
 North's Rule of Thumb
 =====================
 We can obtain the error estimates of the singular values via ``rule_north``.
+
 .. code:: py
 
     svals_err_north = mca.rule_north().to_dataframe()

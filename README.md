@@ -13,7 +13,7 @@ The aim of this package is to provide a flexible tool for the climate science co
 *<sub>Mode 2 of complex rotated Maximum Covariance Analysis showing the shared dynamics of SST and continental precipitation associated to ENSO between 1980 and 2020.</sub>*
 
 
-## What is MCA?
+## :beginner: What is MCA?
 MCA maximises the temporal covariance between two different
 data fields and is closely related to Principal Component Analysis (**PCA**) / Empirical
 Orthogonal Function analysis (**EOF analysis**). While EOF analysis maximises the variance within a single data
@@ -22,12 +22,13 @@ fields. When the two input fields are the same, MCA reduces to standard EOF anal
 
 For the mathematical understanding please have a look at e.g. [Bretherton et al.][bretherton-paper] or the [lecture material][mca-material] written by C. Bretherton.
 
-## New in release 1.2.0
+## :star: New in release 1.4.0
 - much faster and more memory-efficient algorithm
 - added *Rule N* for significance testing of obtained singular values
+- added iterative permutation scheme for significance testing (Winkler et al. 2020)
 - period parameter of `solve` method provides more flexibility to exponential extension, making complex MCA more stable
 
-## Core Features
+## :pushpin: Core Features
 
 
 
@@ -37,16 +38,21 @@ For the mathematical understanding please have a look at e.g. [Bretherton et al.
 | MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|[:heavy_check_mark:][xmca]|[:heavy_check_mark:][xmca]|
 
 \* *click on check marks for reference* \
-\** *A paper featuring complex (rotated) MCA has been submitted and is currently under review. However, you can already check a pre-print on [arXiv][xmca].*
+\** *A paper featuring complex (rotated) MCA has been submitted and is currently under review. A pre-print is available on [arXiv][xmca].*
 
 
-## Installation
-Installation is simply done by:
+## :wrench: Installation
+Installation is simply done via
 
     pip install xmca
 
+If you have problems during the installation please consult the documentation or raise an issue here on Github.
 
-## Quickstart
+## :newspaper: Documentation
+A tutorial to get you started as well as the full API can be found in the [documentation](https://pyxmca.readthedocs.io/en/latest/index.html).
+
+
+## :zap: Quickstart
 
 Import the package
 
@@ -75,7 +81,7 @@ EOF analysis.
     pca = xMCA(west)                        # PCA of west coast
     pca.solve(complexify=False)            # True for complex PCA
 
-    eigenvalues = pca.singular_values()     # singular vales = eigenvalues for PCA
+    svals = pca.singular_values()     # singular vales = eigenvalues for PCA
     expvar      = pca.explained_variance()  # explained variance
     pcs         = pca.pcs()                 # Principal component scores (PCs)
     eofs        = pca.eofs()                # spatial patterns (EOFs)
@@ -188,16 +194,13 @@ You can save the plot to your local disk as a ``.png`` file via
 ```
 
 
-## Documentation
-Please have a look at the [documentation page](https://pyxmca.readthedocs.io/en/latest/index.html) for instructions on how to install and some examples to get started.
-
-## Please cite
+## :bookmark: Please cite
 I am just starting my career as a scientist. Feedback on my scientific work is therefore important to me in order to assess which of my work advances the scientific community. As such, if you use the package for your own research and find it helpful, I would appreciate feedback here on [Github](https://github.com/nicrie/xmca/issues/new), via [email](mailto:niclasrieger@gmail.com), or as a [citation](http://doi.org/10.5281/zenodo.4749830):
 
 Niclas Rieger, 2021: nicrie/xmca: version x.y.z. doi:[10.5281/zenodo.4749830](https://doi.org/10.5281/zenodo.4749830).
 
 
-## Credits
+## :muscle: Credits
 Kudos to the developers and contributors of the following Github projects which I initially used myself and used as an inspiration:
 
 * [ajdawson/eofs](https://github.com/ajdawson/eofs)
