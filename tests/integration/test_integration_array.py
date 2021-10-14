@@ -59,7 +59,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if flavour == 'cplx':
             cplx = True
-        if flavour == 'varmx':
+        elif flavour == 'varmx':
             n_rot = 10
         if analysis == 'uni':
             model = MCA(self.A)

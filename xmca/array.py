@@ -77,9 +77,8 @@ class MCA:
         if len(fields) > 2:
             raise ValueError("Too many fields. Pass 1 or 2 fields.")
 
-        if len(fields) == 2:
-            if fields[0].shape[0] != fields[1].shape[0]:
-                raise ValueError('''Time dimensions of given fields are different.
+        if len(fields) == 2 and fields[0].shape[0] != fields[1].shape[0]:
+            raise ValueError('''Time dimensions of given fields are different.
                 Time series should have same time lengths.''')
 
         if not all(isinstance(f, np.ndarray) for f in fields):
@@ -118,27 +117,24 @@ class MCA:
 
         # set meta information
         self._analysis = {
-            'version'               : __version__,
-            'is_bivariate'          : True if len(self._fields) > 1 else False,
-            # pre-processing
-            'is_normalized'         : False,
-            'is_coslat_corrected'   : False,
-            'method'                : 'pca',
-            # Complex solution
-            'is_complex'            : False,
-            'extend'                : False,
-            'theta_period'          : 365,
-            # Rotated solution
-            'is_rotated'            : False,
-            'n_rot'                : 0,
-            'power'                 : 0,
-            # Truncated solution
-            'is_truncated'          : False,
-            'is_truncated_at'       : 0,
-            'rank'                  : 0,
-            'total_covariance'      : 0.0,
-            'total_squared_covariance'      : 0.0
+            'version': __version__,
+            'is_bivariate': len(self._fields) > 1,
+            'is_normalized': False,
+            'is_coslat_corrected': False,
+            'method': 'pca',
+            'is_complex': False,
+            'extend': False,
+            'theta_period': 365,
+            'is_rotated': False,
+            'n_rot': 0,
+            'power': 0,
+            'is_truncated': False,
+            'is_truncated_at': 0,
+            'rank': 0,
+            'total_covariance': 0.0,
+            'total_squared_covariance': 0.0,
         }
+
 
         self._analysis['method']        = self._get_method_id()
 
@@ -221,11 +217,7 @@ class MCA:
 
     def _remove_nan_cols(
             self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        data_no_nan = {}
-        for k, field in data.items():
-            data_no_nan[k] = remove_nan_cols(field)
-
-        return data_no_nan
+        return {k: remove_nan_cols(field) for k, field in data.items()}
 
     def _reshape_to_2d(
             self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
@@ -240,10 +232,7 @@ class MCA:
         return data_2d
 
     def _get_method_id(self):
-        id = 'pca'
-        if self._analysis['is_bivariate']:
-            id = 'mca'
-        return id
+        return 'mca' if self._analysis['is_bivariate'] else 'pca'
 
     def _get_analysis_path(self, path=None):
         if path is None:
@@ -371,9 +360,7 @@ class MCA:
         model = ThetaModel(
             series, period=period, deseasonalize=True, use_test=False
         ).fit()
-        forecast = model.forecast(steps=steps, theta=20)
-
-        return forecast
+        return model.forecast(steps=steps, theta=20)
 
     def _get_reg_coefs(self, x, y):
         assert(x.shape[0] == y.shape[0])
@@ -483,9 +470,7 @@ class MCA:
         return Us, Ss, Vts
 
     def _get_min_mode(self, n=None, rotated=False):
-        n_modes = []
-        n_modes.append(self._analysis['rank'])
-
+        n_modes = [self._analysis['rank']]
         if n is not None:
             n_modes.append(n)
 
@@ -495,9 +480,7 @@ class MCA:
         return np.min(n_modes)
 
     def _get_max_mode(self, n=None, rotated=False):
-        n_modes = []
-        n_modes.append(self._analysis['rank'])
-
+        n_modes = [self._analysis['rank']]
         if n is not None:
             n_modes[0] = n
 
@@ -530,7 +513,7 @@ class MCA:
             steps for the exponential to decrease to 1/e. If no extension is
             selected, this parameter has no effect. Default is 1.
         '''
-        if any([np.isnan(field).all() for field in self._fields.values()]):
+        if any(np.isnan(field).all() for field in self._fields.values()):
             raise RuntimeError('''
             Fields are empty. Did you forget to load data?
             ''')
@@ -577,9 +560,7 @@ class MCA:
                 '''SVD failed. NaN entries may be the problem.'''
             )
 
-        V = {}
-        V['left'] = VLeft
-        V['right'] = VRight
+        V = {'left': VLeft, 'right': VRight}
         # singular vectors (EOFs) = V
         self._V = {key: mt[key].conj().T @ V[key] for key in self._keys}
 
@@ -616,11 +597,7 @@ class MCA:
         if rotated:
             max_mode = self._analysis['n_rot']
         else:
-            if isinstance(n, slice):
-                max_mode = n.stop
-            else:
-                max_mode = n
-
+            max_mode = n.stop if isinstance(n, slice) else n
         keep_modes = self._get_slice(n)
 
         try:
@@ -649,11 +626,7 @@ class MCA:
         if rotated:
             max_mode = self._analysis['n_rot']
         else:
-            if isinstance(n, slice):
-                max_mode = n.stop
-            else:
-                max_mode = n
-
+            max_mode = n.stop if isinstance(n, slice) else n
         keep_modes = self._get_slice(n)
 
         fields  = self._get_X()
@@ -771,12 +744,11 @@ class MCA:
 
     def _get_variance(self, n=None, sorted=True):
         norm = self._get_norm(n=n, sorted=sorted)
-        if self._analysis['is_bivariate']:
-            var = norm['left'] * norm['right']
-        else:
-            var = norm['left']**2
-
-        return var
+        return (
+            norm['left'] * norm['right']
+            if self._analysis['is_bivariate']
+            else norm['left'] ** 2
+        )
 
     def rotate(self, n_rot, power=1, tol=1e-8):
         '''Perform Promax rotation on the first `n` EOFs.
@@ -823,8 +795,7 @@ class MCA:
         L_rot, R, Phi = promax(L, power, maxIter=1000, tol=tol)
 
         # calculate variance/reconstruct rotated "singular_values"
-        norm    = {}
-        norm['left']    = np.linalg.norm(L_rot[:n_vars_left, :], axis=0)
+        norm = {'left': np.linalg.norm(L_rot[:n_vars_left, :], axis=0)}
         norm['right']   = np.linalg.norm(L_rot[n_vars_left:, :], axis=0)
         if not self._analysis['is_bivariate']:
             norm['right'] = norm['left']
@@ -980,8 +951,7 @@ class MCA:
 
         '''
         variance  = self._variance[self._var_idx][:n]
-        scf = variance**2 / self._analysis['total_squared_covariance'] * 100
-        return scf
+        return variance**2 / self._analysis['total_squared_covariance'] * 100
 
     def explained_variance(self, n=None):
         '''Return the CF of the first `n` modes.
@@ -1002,8 +972,7 @@ class MCA:
 
         '''
         variance  = self._get_variance(n=n, sorted=True)
-        exp_var = variance / self._analysis['total_covariance'] * 100
-        return exp_var
+        return variance / self._analysis['total_covariance'] * 100
 
     def pcs(self, n=None, scaling='None', phase_shift=0, rotated=True):
         '''Return the first `n` PCs.
@@ -1117,11 +1086,7 @@ class MCA:
         '''
         eofs = self.eofs(n, phase_shift=phase_shift, rotated=rotated)
 
-        phases = {}
-        for key, eof in eofs.items():
-            phases[key] = np.arctan2(eof.imag, eof.real).real
-
-        return phases
+        return {key: np.arctan2(eof.imag, eof.real).real for key, eof in eofs.items()}
 
     def temporal_amplitude(self, n=None, scaling='None', rotated=True):
         '''Return the temporal amplitude time series for the first `n` PCs.
@@ -1179,11 +1144,7 @@ class MCA:
         '''
         pcs = self.pcs(n, phase_shift=phase_shift, rotated=rotated)
 
-        phases = {}
-        for key, pc in pcs.items():
-            phases[key] = np.arctan2(pc.imag, pc.real).real
-
-        return phases
+        return {key: np.arctan2(pc.imag, pc.real).real for key, pc in pcs.items()}
 
     def homogeneous_patterns(self, n=None, phase_shift=0):
         pcs = self._get_pcs(n=n, phase_shift=phase_shift)
@@ -1590,11 +1551,7 @@ class MCA:
             Additional parameters provided to `matplotlib.pyplot.savefig`.
 
         '''
-        if path is None:
-            output = 'mode{:}.png'.format(mode)
-        else:
-            output = path
-
+        output = 'mode{:}.png'.format(mode) if path is None else path
         fig, axes = self.plot(mode=mode, **plot_kwargs)
         fig.subplots_adjust(left=0.06)
         plt.savefig(output, **save_kwargs)
@@ -1636,27 +1593,26 @@ class MCA:
 
         path_output = os.path.join(path, 'info.xmca')
 
-        file = open(path_output, 'w+')
-        file.write(wrap_str(file_header))
-        file.write('\n# To load this analysis use:')
-        file.write('\n# from xmca.xarray import xMCA')
-        file.write('\n# mca = xMCA()')
-        file.write('\n# mca.load_analysis(PATH_TO_THIS_FILE)')
-        file.write('\n')
-        file.write(sep_line)
-        file.write(sep_line)
-        file.write('\n{:<20} : {:<57}'.format('created', now))
-        file.write(sep_line)
-        for key, name in self._field_names.items():
-            file.write('\n{:<20} : {:<57}'.format(key, str(name)))
-        file.write(sep_line)
-        for key, info in self._analysis.items():
-            if key in [
-                    'is_bivariate', 'is_complex', 'is_rotated', 'is_truncated'
-            ]:
-                file.write(sep_line)
-            file.write('\n{:<20} : {:<57}'.format(key, str(info)))
-        file.close()
+        with open(path_output, 'w+') as file:
+            file.write(wrap_str(file_header))
+            file.write('\n# To load this analysis use:')
+            file.write('\n# from xmca.xarray import xMCA')
+            file.write('\n# mca = xMCA()')
+            file.write('\n# mca.load_analysis(PATH_TO_THIS_FILE)')
+            file.write('\n')
+            file.write(sep_line)
+            file.write(sep_line)
+            file.write('\n{:<20} : {:<57}'.format('created', now))
+            file.write(sep_line)
+            for key, name in self._field_names.items():
+                file.write('\n{:<20} : {:<57}'.format(key, str(name)))
+            file.write(sep_line)
+            for key, info in self._analysis.items():
+                if key in [
+                        'is_bivariate', 'is_complex', 'is_rotated', 'is_truncated'
+                ]:
+                    file.write(sep_line)
+                file.write('\n{:<20} : {:<57}'.format(key, str(info)))
 
     def _get_file_names(self, format):
 
@@ -1675,14 +1631,13 @@ class MCA:
         singular_values = 'singular_values'
         singular_values = '.'.join([singular_values, format])
 
-        file_names = {
+        return {
             'fields'    : fields,
             'eofs'      : eofs,
             'pcs'       : pcs,
             'singular'  : singular_values,
             'norm'      : norm
         }
-        return file_names
 
     def _save_data(self, data_array, path, *args, **kwargs):
         raise NotImplementedError('only works for `xarray`')
@@ -1692,26 +1647,24 @@ class MCA:
             key_type = type(self._analysis[key])
         except KeyError:
             raise KeyError("Key `{}` not found in info file.".format(key))
-        if key_type == bool:
-            self._analysis[key] = (value == 'True')
-        else:
-            self._analysis[key] = key_type(value)
+        self._analysis[key] = (
+            (value == 'True') if key_type == bool else key_type(value)
+        )
 
     def _set_info_from_file(self, path):
 
-        info_file = open(path, 'r')
-        lines = info_file.readlines()
-        for line in lines:
-            if (line[0] != '#'):
-                key = line.split(':')[0]
-                key = key.rstrip()
-                if key in ['left', 'right']:
-                    name = line.split(':')[1].strip()
-                    self._field_names[key] = name
-                if key in self._analysis.keys():
-                    value = line.split(':')[1].strip()
-                    self._set_analysis(key, value)
-        info_file.close()
+        with open(path, 'r') as info_file:
+            lines = info_file.readlines()
+            for line in lines:
+                if (line[0] != '#'):
+                    key = line.split(':')[0]
+                    key = key.rstrip()
+                    if key in ['left', 'right']:
+                        name = line.split(':')[1].strip()
+                        self._field_names[key] = name
+                    if key in self._analysis.keys():
+                        value = line.split(':')[1].strip()
+                        self._set_analysis(key, value)
 
     def rule_n(self, n_runs, n_modes=None):
         '''Apply *Rule N* by Overland and Preisendorfer, 1982.
@@ -1750,10 +1703,8 @@ class MCA:
 
         svals = []
 
-        for i in tqdm(range(n_runs)):
-            data = {}
-            for k in self._keys:
-                data[k] = np.random.standard_normal([m[k], n[k]])
+        for _ in tqdm(range(n_runs)):
+            data = {k: np.random.standard_normal([m[k], n[k]]) for k in self._keys}
             model = MCA(*list(data.values()))
             model.solve(complexify=complexify)
             if rotated:
@@ -1915,7 +1866,7 @@ class MCA:
                             'Set `on_right=False`.'
                         )
                         raise ValueError(msg) from err
-                elif on_left and on_right:
+                elif on_left:
                     concat = np.concatenate(list(X_surr.values()), axis=1)
                     concat = block_bootstrap(
                         concat, axis=axis, block_size=block_size,
@@ -1923,11 +1874,6 @@ class MCA:
                     )
                     X_surr['left'] = concat[:, :X_surr['left'].shape[1]]
                     X_surr['right'] = concat[:, X_surr['left'].shape[1]:]
-                else:
-                    pass
-                    # msg = 'Either `on_left` or `on_right` needs to be True.'
-                    # raise ValueError(msg)
-
                 # perform analysis
                 model = MCA(*list(X_surr.values()))
                 model.solve(
@@ -1967,11 +1913,7 @@ class MCA:
         '''
         self._set_info_from_file(path)
 
-        if self._analysis['is_bivariate']:
-            self._keys = ['left', 'right']
-        else:
-            self._keys = ['left']
-
+        self._keys = ['left', 'right'] if self._analysis['is_bivariate'] else ['left']
         self._set_field_meta(fields)
         fields = self._reshape_to_2d(fields)
         self._set_no_nan_idx(fields)

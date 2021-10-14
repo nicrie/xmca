@@ -49,7 +49,7 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
 
     # seek for rotation matrix based on varimax criteria
     converged = False
-    for i in range(maxIter):
+    for _ in range(maxIter):
         d_old = d
         basis = A @ R
 
