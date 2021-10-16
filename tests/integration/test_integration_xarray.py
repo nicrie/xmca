@@ -125,6 +125,26 @@ class TestIntegration(unittest.TestCase):
         assert_allclose(
             V2, eofs['right'], err_msg='eofs B do not match', **self.tols
         )
+
+        # test cpsñat weighting
+        if analysis == 'std':
+            model = xMCA(self.A, self.B)
+            model.normalize()
+            model.apply_coslat()
+            model.solve()
+            fields = model.fields()
+            model.save_analysis('tests/integration/temp/')
+
+            reload = xMCA()
+            reload.load_analysis('tests/integration/temp/info.xmca')
+            reload.apply_coslat()
+            fields_reloaded = reload.fields()
+            for f, r in zip(fields.values(), fields_reloaded.values()):
+                assert_allclose(
+                    f, r,
+                    err_msg='mismatch after coslat', **self.tols
+                )
+
         rmtree(join(getcwd(), 'tests/integration/temp/'))
 
     @parameterized.expand([
