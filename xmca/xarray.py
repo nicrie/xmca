@@ -177,11 +177,8 @@ class xMCA(MCA):
             epsilon = 1e-6
             weights[key] = np.sqrt(np.cos(np.deg2rad(coord['lat'])) + epsilon)
 
-        if (not self._analysis['is_coslat_corrected']):
-            self.apply_weights(**weights)
-            self._analysis['is_coslat_corrected'] = True
-        else:
-            print('Coslat correction already applied. Nothing was done.')
+        self.apply_weights(**weights)
+        self._analysis['is_coslat_corrected'] = True
 
     def solve(self, complexify=False, extend=False, period=1):
         '''Call the solver to perform EOF analysis/MCA.
