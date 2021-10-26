@@ -22,11 +22,14 @@ fields. When the two input fields are the same, MCA reduces to standard EOF anal
 
 For the mathematical understanding please have a look at e.g. [Bretherton et al.][bretherton-paper] or the [lecture material][mca-material] written by C. Bretherton.
 
-## :star: New in release 1.4.0
-- much faster and more memory-efficient algorithm
-- added *Rule N* for significance testing of obtained singular values
-- added iterative permutation scheme for significance testing (Winkler et al. 2020)
-- period parameter of `solve` method provides more flexibility to exponential extension, making complex MCA more stable
+## :star: New in release 1.4.x
+- Much faster and more memory-efficient algorithm
+- Significance testing of individual modes via
+  - *Rule N* ([Overland & Preisendorfer 1982][ruleN])
+  - Bootstrapping/permutation schemes + block-wise approach for autocorrelated data
+  - Iterative permutation ([Winkler et al. 2020][winkler])
+- Period parameter of `solve` method provides more flexibility to exponential extension, making complex MCA more stable
+- Fixed missing coslat weighting when saving a model ([Issue 25][issue25])
 
 ## :pushpin: Core Features
 
@@ -38,7 +41,7 @@ For the mathematical understanding please have a look at e.g. [Bretherton et al.
 | MCA          	|[:heavy_check_mark:][mca]|[:heavy_check_mark:][rotated-mca]|[:heavy_check_mark:][xmca]|[:heavy_check_mark:][xmca]|
 
 \* *click on check marks for reference* \
-\** *A paper featuring complex (rotated) MCA has been submitted and is currently under review. A pre-print is available on [arXiv][xmca].*
+\** *Complex rotated MCA is also available as a pre-print on [arXiv][arxiv].*
 
 
 ## :wrench: Installation
@@ -239,4 +242,12 @@ And of course credits to the developers of the extremely useful packages
 
 [theta]: https://linkinghub.elsevier.com/retrieve/pii/S0169207016300243
 
-[xmca]: https://arxiv.org/abs/2105.04618
+[xmca]: https://doi.org/10.1175/JCLI-D-21-0244.1
+
+[arxiv]: https://arxiv.org/abs/2105.04618
+
+[winkler]: https://www.sciencedirect.com/science/article/pii/S1053811920305516
+
+[issue25]: https://github.com/nicrie/xmca/issues/25
+
+[ruleN]: https://doi.org/10.1175/1520-0493(1982)110<0001:ASTFPC>2.0.CO;2
