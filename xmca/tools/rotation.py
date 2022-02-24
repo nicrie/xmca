@@ -64,9 +64,11 @@ def varimax(A, gamma=1, maxIter=1000, tol=1e-8):
             break
 
     if(not converged):
-        print('Error: Rotation process did not converge!')
-        A = np.empty(A.shape)
-        A[:] = np.nan
+        err_msg = (
+            'Rotation process did not converge. Try decreasing the tolerance. '
+            'Invalid NaN entries also might be a problem.'
+        )
+        raise RuntimeError(err_msg)
 
     # de-normalize using broadcasting
     A = h[:,np.newaxis] * A
