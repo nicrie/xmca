@@ -1481,7 +1481,7 @@ class xMCA(MCA):
             dims=['mode', 'run'],
             coords={
                 'mode' : modes,
-                'run' : np.arange(1, n_runs + 1)
+                'run' : np.arange(1, svals.shape[1] + 1)
             },
             name='singular values'
         )

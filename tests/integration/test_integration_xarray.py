@@ -567,7 +567,7 @@ class TestIntegration(unittest.TestCase):
 
         model.solve(complexify=cplx)
         if flavour == 'varmx':
-            model.rotate(n_rot)
+            model.rotate(n_rot, tol=1e-5)
 
         model.rule_north(3)
         model.rule_n(3)

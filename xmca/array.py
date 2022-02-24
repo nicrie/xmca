@@ -1757,7 +1757,10 @@ class MCA:
             model = MCA(*list(data.values()))
             model.solve(complexify=complexify)
             if rotated:
-                model.rotate(n_rot, power)
+                try:
+                    model.rotate(n_rot, power)
+                except RuntimeError:
+                    continue
             svals.append(model._get_variance())
             del(model)
 
@@ -1934,7 +1937,10 @@ class MCA:
                     complexify=complexify, extend=extend, period=period
                 )
                 if is_rotated:
-                    model.rotate(n_rot, power)
+                    try:
+                        model.rotate(n_rot, power)
+                    except RuntimeError:
+                        continue
 
                 var = model._get_variance(n_modes_max - mode)
                 var_surr[mode:, run] = var
