@@ -244,7 +244,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if analysis == 'cplx':
             cplx = True
-        if analysis == 'varmx':
+        elif analysis == 'varmx':
             n_rot = 10
         model = xMCA(self.A, self.B)
         model.solve(complexify=cplx)
@@ -267,7 +267,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if analysis == 'cplx':
             cplx = True
-        if analysis == 'varmx':
+        elif analysis == 'varmx':
             n_rot = 10
         model = xMCA(self.A, self.B)
         model.solve(complexify=cplx)
@@ -292,7 +292,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if analysis == 'cplx':
             cplx = True
-        if analysis == 'varmx':
+        elif analysis == 'varmx':
             n_rot = 10
         model = xMCA(self.A, self.B)
         model.solve(complexify=cplx)
@@ -315,7 +315,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if analysis == 'cplx':
             cplx = True
-        if analysis == 'varmx':
+        elif analysis == 'varmx':
             n_rot = 10
         model = xMCA(self.A, self.B)
         result1 = model.fields(original_scale=True)
@@ -353,7 +353,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if flavour == 'cplx':
             cplx = True
-        if flavour == 'varmx':
+        elif flavour == 'varmx':
             n_rot = 10
         if analysis == 'uni':
             model = xMCA(self.A)
@@ -485,7 +485,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if flavour == 'cplx':
             cplx = True
-        if flavour == 'varmx':
+        elif flavour == 'varmx':
             n_rot = 10
         if analysis == 'uni':
             model = xMCA(self.A)
@@ -503,9 +503,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_apply_weights(self):
         model = xMCA(self.A, self.B)
-        weights = {}
-        weights['left'] = self.A.coords['lat']
-        weights['right'] = self.B.coords['lat']
+        weights = {'left': self.A.coords['lat'], 'right': self.B.coords['lat']}
         model.apply_weights(**weights)
 
     def test_complex_solver(self):
@@ -558,7 +556,7 @@ class TestIntegration(unittest.TestCase):
         n_rot = 0
         if flavour == 'cplx':
             cplx = True
-        if flavour == 'varmx':
+        elif flavour == 'varmx':
             n_rot = 10
         if analysis == 'uni':
             model = xMCA(self.A)

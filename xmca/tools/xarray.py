@@ -25,9 +25,7 @@ def is_DataArray(data):
         Input data is of type `DataArray`.
 
     '''
-    if(isinstance(data, xr.DataArray)):
-        pass
-    else:
+    if not (isinstance(data, xr.DataArray)):
         raise TypeError("Data format has to be xarray.DatArray.")
 
 

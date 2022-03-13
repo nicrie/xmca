@@ -37,9 +37,7 @@ def get_nan_cols(arr: np.ndarray) -> np.ndarray:
         Index of columns with NaN entries from original data
 
     '''
-    nan_index = np.isnan(arr).any(axis=0)
-
-    return nan_index
+    return np.isnan(arr).any(axis=0)
 
 
 def remove_nan_cols(arr: np.ndarray) -> np.ndarray:
@@ -57,9 +55,7 @@ def remove_nan_cols(arr: np.ndarray) -> np.ndarray:
 
     '''
     idx = get_nan_cols(arr)
-    new_arr  = arr[:, ~idx]
-
-    return new_arr
+    return arr[:, ~idx]
 
 
 def has_nan_time_steps(array):

@@ -170,12 +170,13 @@ class xMCA(MCA):
         '''
 
         coords  = self._field_coords
-        weights = {}
-        for key, coord in coords.items():
-            # add small epsilon to assure correct handling of boundaries
-            # e.g. 90.00001 degrees results in a negative value for sqrt
-            epsilon = 1e-6
-            weights[key] = np.sqrt(np.cos(np.deg2rad(coord['lat'])) + epsilon)
+        # add small epsilon to assure correct handling of boundaries
+        # e.g. 90.00001 degrees results in a negative value for sqrt
+        epsilon = 1e-6
+        weights = {
+            key: np.sqrt(np.cos(np.deg2rad(coord['lat'])) + epsilon)
+            for key, coord in coords.items()
+        }
 
         self.apply_weights(**weights)
         self._analysis['is_coslat_corrected'] = True
@@ -964,9 +965,8 @@ class xMCA(MCA):
             map_projs[k1] = {}
             for k2 in data.keys():
                 map_projs[k1][k2] = None
-                if k1 in ['eof', 'phase']:
-                    if k2 in ['left', 'right']:
-                        map_projs[k1][k2] = projection.get(k2, None)
+                if k1 in ['eof', 'phase'] and k2 in ['left', 'right']:
+                    map_projs[k1][k2] = projection.get(k2, None)
 
         # create figure and axes
         fig = plt.figure(figsize=figsize, dpi=150)
