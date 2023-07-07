@@ -1,3 +1,6 @@
+# Warning: This package is no longer actively maintained. Please use [xeofs](https://github.com/nicrie/xeofs) instead.
+
+
 # xMCA | Maximum Covariance Analysis in Python
 
 [![version](https://img.shields.io/pypi/v/xmca?color=f2cc8f&label=PyPI)](https://pypi.org/project/xmca/)
